@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.xius.TariffBuilder.exception.TariffInsertException;
+
 import jakarta.transaction.Transactional;
 
 @Service
@@ -68,6 +70,7 @@ public class ServiceplanZone {
             Integer newRatCount = countZone("CS_RAT_ZONE_GROUPS", newZoneId);
 
             if (newRatCount == 0) {
+                try {
                 jdbcTemplate.update(
                         """
                         insert into CS_RAT_ZONE_GROUPS
@@ -91,6 +94,9 @@ public class ServiceplanZone {
                         suffix,
                         oldZoneId
                 );
+                } catch (Exception ex) {
+                    throw new TariffInsertException("cloneZoneGroup", "CS_RAT_ZONE_GROUPS", ex);
+                }
 
                 logger.info("CS_RAT_ZONE_GROUPS cloned oldZoneId={} newZoneId={}", oldZoneId, newZoneId);
             } else {
@@ -108,6 +114,7 @@ public class ServiceplanZone {
             Integer newDreCount = countZone("CS_DRE_RATING_GROUP_DETAILS", newZoneId);
 
             if (newDreCount == 0) {
+                try {
                 jdbcTemplate.update(
                         """
                         insert into CS_DRE_RATING_GROUP_DETAILS
@@ -137,6 +144,9 @@ public class ServiceplanZone {
                         suffix,
                         oldZoneId
                 );
+                } catch (Exception ex) {
+                    throw new TariffInsertException("cloneRatingGroupDetails", "CS_DRE_RATING_GROUP_DETAILS", ex);
+                }
 
                 logger.info("CS_DRE_RATING_GROUP_DETAILS cloned oldZoneId={} newZoneId={}", oldZoneId, newZoneId);
             } else {
@@ -241,6 +251,7 @@ public class ServiceplanZone {
                 Long.class
         );
 
+        try {
         jdbcTemplate.update(
                 """
                 insert into RAT_MT_CALENDAR
@@ -280,6 +291,9 @@ public class ServiceplanZone {
                 networkId,
                 oldCalendarId
         );
+        } catch (Exception ex) {
+            throw new TariffInsertException("cloneCalendar", "RAT_MT_CALENDAR", ex);
+        }
 
         calendarCache.put(oldCalendarId, newCalendarId);
 

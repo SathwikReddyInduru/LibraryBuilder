@@ -1,13 +1,69 @@
 [ {
+  "name" : "Untitled Draft",
+  "pkgType" : "PREPAID",
+  "pkgSubType" : "NORMAL",
+  "savedOn" : "15 Jun 2026",
+  "savedTime" : "09:39",
+  "username" : "USER1",
+  "selectedSvcs_s2" : "[\"DATA\"]",
+  "selectedSvcs_s3" : "[\"DATA\"]",
+  "selectedSvcs_s4" : null,
+  "state" : {
+    "s2" : [ {
+      "id" : "2475",
+      "name" : "MI MUNDO L_D_T_345",
+      "networkId" : "16"
+    } ],
+    "s3" : [ ],
+    "s4" : [ ],
+    "price" : "",
+    "publicityCode" : "",
+    "endDate" : "",
+    "isCorporate" : false
+  }
+}, {
+  "name" : "T_679_CL2",
+  "pkgType" : "PREPAID",
+  "pkgSubType" : "NORMAL",
+  "savedOn" : "09 Jun 2026",
+  "savedTime" : "16:27",
+  "username" : "USER1",
+  "selectedSvcs_s2" : "[\"VOICE\"]",
+  "selectedSvcs_s3" : "[\"VOICE\"]",
+  "selectedSvcs_s4" : "[]",
+  "state" : {
+    "s2" : [ {
+      "id" : 2466,
+      "name" : "MI MUNDO L V4_T_679_CL2"
+    } ],
+    "s3" : [ {
+      "id" : 2467,
+      "name" : "xius_atp_T_679_CL2",
+      "chargeId" : "T_679_CL2_PR1",
+      "validity" : "O",
+      "rentalPeriod" : 87,
+      "midnightExpiry" : "No",
+      "renewal" : "No",
+      "rental" : 0,
+      "maxCount" : 0,
+      "freeCycles" : "0"
+    } ],
+    "s4" : [ ],
+    "price" : "689.0",
+    "publicityCode" : "P_679_CL2",
+    "endDate" : "2026-08-13",
+    "isCorporate" : false
+  }
+}, {
   "name" : "test_09",
   "pkgType" : "POSTPAID",
   "pkgSubType" : "NORMAL",
   "savedOn" : "09 Jun 2026",
-  "savedTime" : "11:27",
+  "savedTime" : "15:59",
   "username" : "USER1",
   "selectedSvcs_s2" : "[\"VOICE\"]",
   "selectedSvcs_s3" : "[\"VOICE\"]",
-  "selectedSvcs_s4" : "[\"VOICE\"]",
+  "selectedSvcs_s4" : "[]",
   "state" : {
     "s2" : [ {
       "id" : 1743,
@@ -23,31 +79,9 @@
       "rental" : 0,
       "maxCount" : 0,
       "freeCycles" : "0",
-      "priority" : "0"
-    }, {
-      "id" : "1744",
-      "name" : "MI MUNDO S_VO",
-      "validity" : "M",
-      "rentalPeriod" : "",
-      "renewal" : "No",
-      "midnightExpiry" : "No",
-      "rental" : "",
-      "maxCount" : "",
-      "freeCycles" : "0",
-      "priority" : "0"
+      "priority" : 0
     } ],
-    "s4" : [ {
-      "id" : "2173",
-      "name" : "MI MUNDO M_VO_TP_939",
-      "validity" : "M",
-      "rentalPeriod" : "",
-      "renewal" : "No",
-      "midnightExpiry" : "No",
-      "rental" : "",
-      "maxCount" : "",
-      "freeCycles" : "0",
-      "priority" : "0"
-    } ],
+    "s4" : [ ],
     "price" : "299",
     "publicityCode" : "p_09",
     "endDate" : "2026-06-30",

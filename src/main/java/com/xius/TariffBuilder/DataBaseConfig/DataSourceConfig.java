@@ -18,41 +18,24 @@ public class DataSourceConfig {
  
     // ORACLE
     @Primary
-    @Bean(name="oracleDataSource")
-    @ConfigurationProperties(prefix="spring.datasource")
-    public DataSource oracleDataSource(){
- 
-        return DataSourceBuilder.create().build();
-    }
- 
-    @Primary
-    @Bean(name="oracleJdbcTemplate")
-    public JdbcTemplate oracleJdbcTemplate(
-            @Qualifier("oracleDataSource") DataSource ds){
- 
-        return new JdbcTemplate(ds);
-    }
-
-    @Primary
-    @Bean(name="transactionManager")
-    public PlatformTransactionManager transactionManager(
-            @Qualifier("oracleDataSource") DataSource ds) {
-        return new DataSourceTransactionManager(ds);
-    }
- 
- 
-    // POSTGRES (LOGIN)
-    @Bean(name="pgDataSource")
-    @ConfigurationProperties(prefix="postgredb.datasource")
-    public DataSource pgDataSource(){
- 
-        return DataSourceBuilder.create().build();
-    }
- 
-    @Bean(name="pgJdbcTemplate")
-    public JdbcTemplate pgJdbcTemplate(
-            @Qualifier("pgDataSource") DataSource ds){
- 
-        return new JdbcTemplate(ds);
-    }
+@Bean(name="oracleDataSource")
+@ConfigurationProperties(prefix="login.datasource")
+public DataSource oracleDataSource() {
+    return DataSourceBuilder.create().build();
 }
+ 
+@Primary
+@Bean(name="oracleJdbcTemplate")
+public JdbcTemplate oracleJdbcTemplate(
+        @Qualifier("oracleDataSource") DataSource ds) {
+    return new JdbcTemplate(ds);
+}
+ 
+@Primary
+@Bean(name="transactionManager")
+public PlatformTransactionManager transactionManager(
+        @Qualifier("oracleDataSource") DataSource ds) {
+    return new DataSourceTransactionManager(ds);
+}
+}
+ 

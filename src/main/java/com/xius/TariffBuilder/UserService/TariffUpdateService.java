@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -184,7 +185,10 @@ public class TariffUpdateService {
 						  AND a.SERVICE_PACKAGE_ID = ?
 						""", String.class, networkId, servicePackageId);
 
-				tpServices.stream().filter(ALLOWED_SERVICES::contains).forEach(selectedSvcs_s2::add);
+				tpServices.stream()
+						.filter(Objects::nonNull)
+						.filter(ALLOWED_SERVICES::contains)
+						.forEach(selectedSvcs_s2::add);
 
 			} else if ("DATP".equalsIgnoreCase(planType)) {
 

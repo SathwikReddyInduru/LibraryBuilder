@@ -766,7 +766,7 @@ async function saveConfiguration() {
         packageType: sessionStorage.getItem("pkgType"),
 
         tariffPackCategory: sessionStorage.getItem("pkgSubType") ||
-            "NORMAL",
+            "GENERAL",
 
         tariffPackageDesc: configName,
 
@@ -929,7 +929,7 @@ function viewTree() {
     const state = getState();
     const name = document.getElementById('configName').value || 'Unnamed Package';
     const type = sessionStorage.getItem('pkgType') || '';
-    const sub = sessionStorage.getItem('pkgSubType') || 'NORMAL';
+    const sub = sessionStorage.getItem('pkgSubType') || 'GENERAL';
 
     document.getElementById('treeName').textContent = name;
     document.getElementById('treeMeta').textContent = `${type ? type + ' | ' : ''}${sub} | ${state.isCorporate ? 'Corporate' : 'Retail'}`;
@@ -1049,7 +1049,7 @@ function loadHierarchy(tpName) {
 			    </span>
 			    <span class="meta-pill">
 			        <span class="pill-label">Category</span>
-			        <span class="pill-value">${data.tariffPackCategory || 'Normal'}</span>
+			        <span class="pill-value">${data.tariffPackCategory || 'General'}</span>
 			    </span>
 			    <span class="meta-pill">
 			        <span class="pill-label">Segment</span>
@@ -1145,9 +1145,13 @@ function approvePackage(tpName, btn) {
 
             console.log("APPROVED", data);
 
-            alert(tpName + ' approved, ' + "Tariff Package Created with ID : "
-                + data.tariffPackageId);
+            if (data.status === 'error') {
+                const detail = data.failedTable ? '\nFailed at: ' + data.failedStep + ' -> ' + data.failedTable : '';
+                alert(' Approve failed:\n' + (data.message || 'Unknown error') + detail);
+                return;
+            }
 
+            alert(tpName + ' approved. Tariff Package Created with ID: ' + data.tariffPackageId);
             window.location.href = '/builder/admin';
 
         })
@@ -1155,7 +1159,7 @@ function approvePackage(tpName, btn) {
 
             console.error(err);
 
-            alert("Error approving tariff");
+            alert(' Error approving tariff package.');
         });
 }
 
@@ -1681,7 +1685,7 @@ async function loadApprovedPackage(index) {
         sessionStorage.setItem('state', JSON.stringify(state));
         sessionStorage.setItem('configName', data.tpName || d.tariffPackageDesc || plan.tariffPackageDesc);
         sessionStorage.setItem('pkgType', d.packageType || '');
-        sessionStorage.setItem('pkgSubType', d.tariffPackCategory || 'NORMAL');
+        sessionStorage.setItem('pkgSubType', d.tariffPackCategory || 'GENERAL');
         sessionStorage.setItem('selectedSvcs_s2', svcsToJson(d.selectedSvcs_s2));
         sessionStorage.setItem('selectedSvcs_s3', svcsToJson(d.selectedSvcs_s3));
         sessionStorage.setItem('selectedSvcs_s4', svcsToJson(d.selectedSvcs_s4));
@@ -2737,8 +2741,15 @@ async function _cloneTreeAction(action) {
 
             const result = await res.json();
 
-            if (!res.ok || result.error) {
-                alert(result.error || 'Clone failed. Please try again.');
+            if (!res.ok || result.status === 'error') {
+                const reason = result.message || result.error || 'Clone failed. Please try again.';
+                const detail = result.failedTable ? '\nFailed at: ' + result.failedStep + ' -> ' + result.failedTable : '';
+                alert(' Clone failed:\n' + reason + detail);
+                return;
+            }
+
+            if (!result.clonedTpName) {
+                alert(' Clone failed: server did not return a cloned plan name.');
                 return;
             }
 
@@ -2807,7 +2818,7 @@ async function _cloneTreeAction(action) {
         sessionStorage.setItem('state', JSON.stringify(state));
         sessionStorage.setItem('configName', payload.tpName || d.tariffPackageDesc || '');
         sessionStorage.setItem('pkgType', d.packageType || '');
-        sessionStorage.setItem('pkgSubType', d.tariffPackCategory || 'NORMAL');
+        sessionStorage.setItem('pkgSubType', d.tariffPackCategory || 'GENERAL');
         sessionStorage.setItem('selectedSvcs_s2', svcsToJson(d.selectedSvcs_s2));
         sessionStorage.setItem('selectedSvcs_s3', svcsToJson(d.selectedSvcs_s3));
         sessionStorage.setItem('selectedSvcs_s4', svcsToJson(d.selectedSvcs_s4));
