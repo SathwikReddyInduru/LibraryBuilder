@@ -137,3 +137,65 @@ function selectSubType(subType) {
 
     document.getElementById('card-' + subType).classList.add('selected');
 }
+
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    if (NETWORK_ID) {
+        loadPeriodicCharges(NETWORK_ID);
+    } else {
+        console.error("NETWORK_ID not available");
+    }
+
+});
+
+function selectPeriodicCharge(chargeId) {
+
+    if (!chargeId) {
+        sessionStorage.removeItem("periodicCharge");
+        return;
+    }
+
+    sessionStorage.setItem("periodicChargeID", chargeId);
+
+    console.log("Selected Periodic Charge:", chargeId);
+}
+
+async function loadPeriodicCharges(networkId) {
+    try {
+        const response = await fetch(`/periodic_charges/${networkId}`);
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch periodic charges");
+        }
+
+        const charges = await response.json();
+
+        const dropdown = document.getElementById("periodicCharge");
+
+        dropdown.innerHTML =
+            '<option value="">Select Periodic Charge...</option>';
+
+        charges.forEach(charge => {
+            const option = document.createElement("option");
+
+            option.value = charge.CHARGE_ID;
+
+            option.textContent =
+                `${charge.CHARGE_DESC} (${charge.RENTAL_FEE})`;
+
+            dropdown.appendChild(option);
+        });
+
+        // Restore previously selected value
+        const savedCharge =
+            sessionStorage.getItem("periodicChargeID");
+
+        if (savedCharge) {
+            dropdown.value = savedCharge;
+        }
+
+    } catch (error) {
+        console.error("Error loading periodic charges:", error);
+    }
+}

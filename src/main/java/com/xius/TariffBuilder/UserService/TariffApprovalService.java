@@ -104,20 +104,11 @@ public class TariffApprovalService {
 		} catch (TariffInsertException tie) {
 			transactionManager.rollback(status);
 			logger.error("TariffInsertException during approve tpName={}", tpName, tie);
-			Map<String, Object> err = new LinkedHashMap<>();
-			err.put("status", "error");
-			err.put("message", "Error inserting into " + tie.getFailedTable() + " at " + tie.getStep() + ": "
-					+ (tie.getCause() != null ? tie.getCause().getMessage() : tie.getMessage()));
-			err.put("failedStep", tie.getStep());
-			err.put("failedTable", tie.getFailedTable());
-			return err;
+			throw tie; // Let GlobalExceptionHandler handle the response
 		} catch (Exception ex) {
 			transactionManager.rollback(status);
 			logger.error("Approve failed tpName={}", tpName, ex);
-			Map<String, Object> err = new HashMap<>();
-			err.put("status", "error");
-			err.put("message", ex.getMessage() != null ? ex.getMessage() : "Unexpected error during approve");
-			return err;
+			throw new RuntimeException(ex); // Let GlobalExceptionHandler handle the response
 		}
 	}
 
@@ -153,50 +144,55 @@ public class TariffApprovalService {
 		String clonedPublicityId = null;
 
 		try {
-		if ("modify".equals(cloneMode) && requestBody.containsKey("overrideTpName")
-				&& requestBody.containsKey("overridePublicityId")) {
-			String overrideTpName = requestBody.get("overrideTpName").toString();
-			String overridePublicityId = requestBody.get("overridePublicityId").toString();
-			boolean nameUnchanged = overrideTpName.equals(originalTpName);
-			if (nameUnchanged) {
+			if ("modify".equals(cloneMode) && requestBody.containsKey("overrideTpName")
+					&& requestBody.containsKey("overridePublicityId")) {
+				String overrideTpName = requestBody.get("overrideTpName").toString();
+				String overridePublicityId = requestBody.get("overridePublicityId").toString();
+				boolean nameUnchanged = overrideTpName.equals(originalTpName);
+				if (nameUnchanged) {
+					String rootTpName = stripCloneSuffix(originalTpName);
+					int cloneNumber = resolveNextCloneNumber(rootTpName, networkId);
+					String cloneSuffix = "_CL" + cloneNumber;
+					clonedTpName = rootTpName + cloneSuffix;
+					clonedPublicityId = stripCloneSuffix(overridePublicityId) + cloneSuffix;
+					logger.info(
+							"Clone modify mode (name unchanged): rootTpName={} cloneSuffix={} clonedTpName={} clonedPublicityId={}",
+							rootTpName, cloneSuffix, clonedTpName, clonedPublicityId);
+				} else {
+					// B1 — user typed a new name: use it as-is
+					clonedTpName = overrideTpName;
+					clonedPublicityId = overridePublicityId;
+					logger.info("Clone modify mode (name changed): clonedTpName={} clonedPublicityId={}",
+							clonedTpName, clonedPublicityId);
+				}
+			} else {
 				String rootTpName = stripCloneSuffix(originalTpName);
 				int cloneNumber = resolveNextCloneNumber(rootTpName, networkId);
 				String cloneSuffix = "_CL" + cloneNumber;
 				clonedTpName = rootTpName + cloneSuffix;
-				clonedPublicityId = stripCloneSuffix(overridePublicityId) + cloneSuffix;
-				logger.info("Clone modify mode (name unchanged): rootTpName={} cloneSuffix={} clonedTpName={} clonedPublicityId={}",
-						rootTpName, cloneSuffix, clonedTpName, clonedPublicityId);
-			} else {
-				// B1 — user typed a new name: use it as-is
-				clonedTpName = overrideTpName;
-				clonedPublicityId = overridePublicityId;
-				logger.info("Clone modify mode (name changed): clonedTpName={} clonedPublicityId={}",
-						clonedTpName, clonedPublicityId);
+				String originalPublicityId = originalData.get("publicityId").toString();
+				clonedPublicityId = stripCloneSuffix(originalPublicityId) + cloneSuffix;
+				logger.info(
+						"Clone direct mode: originalTpName={} rootTpName={} cloneSuffix={} clonedTpName={} clonedPublicityId={}",
+						originalTpName, rootTpName, cloneSuffix, clonedTpName, clonedPublicityId);
 			}
-		} else {
-			String rootTpName = stripCloneSuffix(originalTpName);
-			int cloneNumber = resolveNextCloneNumber(rootTpName, networkId);
-			String cloneSuffix = "_CL" + cloneNumber;
-			clonedTpName = rootTpName + cloneSuffix;
-			String originalPublicityId = originalData.get("publicityId").toString();
-			clonedPublicityId = stripCloneSuffix(originalPublicityId) + cloneSuffix;
-			logger.info(
-					"Clone direct mode: originalTpName={} rootTpName={} cloneSuffix={} clonedTpName={} clonedPublicityId={}",
-					originalTpName, rootTpName, cloneSuffix, clonedTpName, clonedPublicityId);
-		}
 
 		} catch (Exception ex) {
-			logger.error("Clone name resolution failed originalTpName={} error={}", originalTpName, ex.getMessage(), ex);
+			logger.error("Clone name resolution failed originalTpName={} error={}", originalTpName, ex.getMessage(),
+					ex);
 			Map<String, Object> err = new LinkedHashMap<>();
 			err.put("status", "error");
-			err.put("message", "Clone name resolution failed: " + (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
+			err.put("message", "Clone name resolution failed: "
+					+ (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
 			return err;
 		}
 
-		// Guard: if name resolution produced null (should not happen after above), return error
+		// Guard: if name resolution produced null (should not happen after above),
+		// return error
 		if (clonedTpName == null) {
 			logger.error("clonedTpName is null after name resolution — originalTpName={}", originalTpName);
-			return Map.of("status", "error", "message", "Clone failed: could not resolve a valid clone name for " + originalTpName);
+			return Map.of("status", "error", "message",
+					"Clone failed: could not resolve a valid clone name for " + originalTpName);
 		}
 
 		// Deep-copy and mutate the data map
@@ -238,7 +234,6 @@ public class TariffApprovalService {
 		}
 	}
 
-	// VALIDATE endpoint logic (CHANGE 6)
 	public Map<String, Object> validateClone(Long networkId, String tpName, String publicityId) {
 		Map<String, Object> response = new LinkedHashMap<>();
 		if (saveConfigDao.checkTariffExists(networkId, tpName)) {
@@ -258,15 +253,16 @@ public class TariffApprovalService {
 
 	// EXTRACT CLONE LABEL
 	private String extractCloneLabel(String tpName) {
-		if (tpName == null) return tpName;
-		java.util.regex.Matcher m =
-				java.util.regex.Pattern.compile("_(CL\\d+)$").matcher(tpName);
+		if (tpName == null)
+			return tpName;
+		java.util.regex.Matcher m = java.util.regex.Pattern.compile("_(CL\\d+)$").matcher(tpName);
 		return m.find() ? m.group(1) : tpName;
 	}
 
-	// STRIP CLONE SUFFIX  (remove trailing _CL<number>, _TP<number>, or _ATP<number>)
+	// STRIP CLONE SUFFIX (remove trailing _CL<number>, _TP<number>, or _ATP<number>)
 	private String stripCloneSuffix(String name) {
-		if (name == null) return null;
+		if (name == null)
+			return null;
 		return name.replaceAll("_(CL|TP|ATP)\\d+$", "");
 	}
 
@@ -315,13 +311,14 @@ public class TariffApprovalService {
 
 		int max = 0;
 		for (String desc : existing) {
-			java.util.regex.Matcher m =
-					java.util.regex.Pattern.compile("_TP(\\d+)$").matcher(desc);
+			java.util.regex.Matcher m = java.util.regex.Pattern.compile("_TP(\\d+)$").matcher(desc);
 			if (m.find()) {
 				try {
 					int n = Integer.parseInt(m.group(1));
-					if (n > max) max = n;
-				} catch (NumberFormatException ignored) {}
+					if (n > max)
+						max = n;
+				} catch (NumberFormatException ignored) {
+				}
 			}
 		}
 		logger.info("resolveNextTpSuffixNumber existingMax={} nextNumber={}", max, max + 1);
@@ -332,6 +329,9 @@ public class TariffApprovalService {
 	// RESOLVE NEXT ATP SUFFIX NUMBER (for DATP / AATP packages)
 	// Uses a single global interval across ATP records (add_pack_yn='Y').
 	// Scans all SERVICE_PACKAGE_DESC ending with _ATP<n> and returns max+1.
+	// This is called ONCE per executeTariffCreation call to get the starting
+	// number; each individual ATP then increments the local counter so that
+	// every ATP in the same TP gets its own unique suffix (ATP5, ATP6, ATP7 …).
 	// =====================================================
 	private int resolveNextAtpSuffixNumber() {
 		List<String> existing = jdbcTemplate.queryForList("""
@@ -343,13 +343,14 @@ public class TariffApprovalService {
 
 		int max = 0;
 		for (String desc : existing) {
-			java.util.regex.Matcher m =
-					java.util.regex.Pattern.compile("_ATP(\\d+)$").matcher(desc);
+			java.util.regex.Matcher m = java.util.regex.Pattern.compile("_ATP(\\d+)$").matcher(desc);
 			if (m.find()) {
 				try {
 					int n = Integer.parseInt(m.group(1));
-					if (n > max) max = n;
-				} catch (NumberFormatException ignored) {}
+					if (n > max)
+						max = n;
+				} catch (NumberFormatException ignored) {
+				}
 			}
 		}
 		logger.info("resolveNextAtpSuffixNumber existingMax={} nextNumber={}", max, max + 1);
@@ -392,15 +393,19 @@ public class TariffApprovalService {
 		// Resets per tariff creation call.
 		AtomicInteger prCounter = new AtomicInteger(0);
 
-		// tpSuffix: suffix appended to SERVICE_PACKAGE_DESC / SERVICE_PLAN_DESC for step-2 service packages.
-		// Uses a global incrementing interval -> TP1, TP2, TP3 ...
-		// atpSuffix: suffix appended to DATP / AATP service package names.
-		// Uses a separate global incrementing interval -> ATP1, ATP2, ATP3 ...
+		// tpSuffix: suffix appended to SERVICE_PACKAGE_DESC / SERVICE_PLAN_DESC for
+		// base service packages. Uses a global incrementing interval -> TP1, TP2, TP3 ...
 		int tpSuffixNumber = resolveNextTpSuffixNumber();
 		String tpSuffix = "TP" + tpSuffixNumber;
-		int atpSuffixNumber = resolveNextAtpSuffixNumber();
-		String atpSuffix = "ATP" + atpSuffixNumber;
-		logger.info("executeTariffCreation tpName={} tpSuffix={} atpSuffix={}", tpName, tpSuffix, atpSuffix);
+
+		// atpSuffixCounter: starting number for per-ATP suffix generation.
+		// Each ATP in this TP gets its own unique suffix -> ATP5, ATP6, ATP7 ...
+		// The counter is incremented inside the loop (STEP 5) so all DATPs and AATPs
+		// within a single tariff creation share one monotonically increasing sequence.
+		int atpSuffixCounter = resolveNextAtpSuffixNumber();
+
+		logger.info("executeTariffCreation tpName={} tpSuffix={} atpSuffixStartingAt=ATP{}",
+				tpName, tpSuffix, atpSuffixCounter);
 
 		try {
 			// ── STEP 1 ──────────────────────────────────────────────────────
@@ -439,10 +444,14 @@ public class TariffApprovalService {
 			}
 
 			// ── STEP 3 ──────────────────────────────────────────────────────
+			// Zone cloning uses tpSuffix for the plan zone.
+			// For the bucket zone, we use the first ATP's suffix (atpSuffixCounter as-is),
+			// since all ATPs share a single newBucketZoneId for this TP.
 			Long newPlanZoneId;
 			Long newBucketZoneId;
 
 			if (hasAnyAtps) {
+				String firstAtpSuffix = "ATP" + atpSuffixCounter;
 				if (oldPlanZoneId != null && oldPlanZoneId.equals(oldBucketZoneId)) {
 					Long newZoneId = servicePlanZone.generateNewZoneId();
 					newPlanZoneId = newZoneId;
@@ -452,7 +461,7 @@ public class TariffApprovalService {
 					newPlanZoneId = servicePlanZone.generateNewZoneId();
 					servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, tpSuffix);
 					newBucketZoneId = servicePlanZone.generateNewZoneId();
-					servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, atpSuffix);
+					servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, firstAtpSuffix);
 				}
 			} else {
 				newPlanZoneId = servicePlanZone.generateNewZoneId();
@@ -462,8 +471,8 @@ public class TariffApprovalService {
 			}
 
 			// ── STEP 4 ──────────────────────────────────────────────────────
-			CloneServiceResult serviceResult = serviceCloneService.cloneService(networkId, oldServicePackageId, tpSuffix,
-					newPlanZoneId);
+			CloneServiceResult serviceResult = serviceCloneService.cloneService(networkId, oldServicePackageId,
+					tpSuffix, newPlanZoneId);
 
 			Long newServicePackageId = serviceResult.getNewPackageId();
 			Long newServicePlanId = serviceResult.getNewPlanId();
@@ -472,46 +481,62 @@ public class TariffApprovalService {
 					newServicePlanId);
 
 			// ── STEP 5 ──────────────────────────────────────────────────────
+			// Each ATP gets its own unique suffix (ATP5, ATP6, ATP7 ...) by incrementing
+			// atpSuffixCounter inside the loop. DATPs are processed first, then AATPs,
+			// so the sequence is continuous across both lists.
 			List<Long> defaultAtpIds = new ArrayList<>();
 			List<Long> allowedAtpIds = new ArrayList<>();
 			List<Long> newAtpIds = new ArrayList<>();
 
-			// Generate chargeIds for each ATP and attach to the ATP map
 			if (hasAnyAtps) {
+
 				if (hasDefaultAtps) {
 					for (Map<String, Object> atp : defaultAtps) {
-						String chargeId = tpName + "_PR" + prCounter.incrementAndGet();
+						// ── Unique suffix for this specific ATP ──────────────
+						String atpSuffix = "ATP" + atpSuffixCounter++;
+
+						String chargeId = tpName + "_"+ atpSuffix;
 						atp.put("chargeId", chargeId);
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
-						CloneAtpResult atpResult = bundleService.cloneAtpData(oldAtpId, networkId, atpSuffix,
-								newBucketZoneId);
+
+						CloneAtpResult atpResult = bundleService.cloneAtpData(
+								oldAtpId, networkId, atpSuffix, newBucketZoneId);
+
 						defaultAtpIds.add(atpResult.getNewAtpId());
 						newAtpIds.add(atpResult.getNewAtpId());
-						logger.info("Default ATP cloned oldAtpId={} newAtpId={} chargeId={}", oldAtpId,
-								atpResult.getNewAtpId(), chargeId);
+
+						logger.info("Default ATP cloned oldAtpId={} newAtpId={} atpSuffix={} chargeId={}",
+								oldAtpId, atpResult.getNewAtpId(), atpSuffix, chargeId);
 					}
 				}
 
 				if (hasAllowedAtps) {
 					for (Map<String, Object> atp : addAtps) {
-						String chargeId = tpName + "_PR" + prCounter.incrementAndGet();
+						// ── Unique suffix for this specific ATP ──────────────
+						String atpSuffix = "ATP" + atpSuffixCounter++;
+
+						String chargeId = tpName + "_"+ atpSuffix;
 						atp.put("chargeId", chargeId);
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
-						CloneAtpResult atpResult = bundleService.cloneAtpData(oldAtpId, networkId, atpSuffix,
-								newBucketZoneId);
+
+						CloneAtpResult atpResult = bundleService.cloneAtpData(
+								oldAtpId, networkId, atpSuffix, newBucketZoneId);
+
 						allowedAtpIds.add(atpResult.getNewAtpId());
 						newAtpIds.add(atpResult.getNewAtpId());
-						logger.info("Allowed ATP cloned oldAtpId={} newAtpId={} chargeId={}", oldAtpId,
-								atpResult.getNewAtpId(), chargeId);
+
+						logger.info("Allowed ATP cloned oldAtpId={} newAtpId={} atpSuffix={} chargeId={}",
+								oldAtpId, atpResult.getNewAtpId(), atpSuffix, chargeId);
 					}
 				}
+
 			} else {
 				logger.info("No ATPs present. Skipping bundle and bucket clone.");
 			}
 
 			logger.info("Final defaultAtpIds={} allowedAtpIds={}", defaultAtpIds, allowedAtpIds);
 
-			// ── STEP 6: Periodic charge — one insert per ATP (CHANGE 8) ─────
+			// ── STEP 6: Periodic charge — one insert per ATP ─────────────────
 			if (hasDefaultAtps) {
 				for (Map<String, Object> atp : defaultAtps) {
 					insertPeriodicChargeForAtp(atp, data, networkId, username);
@@ -522,11 +547,25 @@ public class TariffApprovalService {
 					insertPeriodicChargeForAtp(atp, data, networkId, username);
 				}
 			}
+
 			if (!hasAnyAtps) {
 				logger.info("No ATPs. Skipping periodic charge insert.");
 			}
+            
+           String oldChargeId = data.get("periodicChargeID").toString();
 
-			// ── STEP 7: Create tariff package (no CHARGE_ID column) ─────────
+String newChargeId = clonePeriodicCharge(
+        oldChargeId,
+        networkId,
+        tpSuffix,
+        username);
+
+logger.info("TP Periodic Charge cloned oldChargeId={} newChargeId={}",
+        oldChargeId,
+        newChargeId); 
+
+		
+			// ── STEP 7: Create tariff package ─────────
 			Long tariffId;
 			try {
 				tariffId = jdbcTemplate.queryForObject("select SEQ_TARIFF_PACK_ID.nextval from dual", Long.class);
@@ -541,13 +580,14 @@ public class TariffApprovalService {
 						    PUBLICITY_ID,
 						    PACKAGE_TYPE,
 						    IS_CORPORATE_YN,
-						    TARIFF_PACK_CATEGORY
+						    TARIFF_PACK_CATEGORY,
+							CHARGE_ID
 						)
-						values (?,?,?,?,?,?,?,?)
+						values (?,?,?,?,?,?,?,?,?)
 						""", tariffId, data.get("tariffPackageDesc"), networkId,
 						Date.valueOf(LocalDate.parse(data.get("endDate").toString(), formatter)),
 						data.get("publicityId"), data.get("packageType"), convertYN(data.get("isCorporateYn")),
-						data.get("tariffPackCategory"));
+						data.get("tariffPackCategory"), newChargeId);
 			} catch (Exception ex) {
 				throw new TariffInsertException("STEP 7", "CS_RAT_TARIFF_PACKAGE", ex);
 			}
@@ -578,10 +618,10 @@ public class TariffApprovalService {
 						    TARIFF_PACKAGE_ID,
 						    SERVICE_PACKAGE_ID,
 						    NETWORK_ID,
-						    TARIFF_PLAN_TYPE
+						    TARIFF_PLAN_TYPE,CHARGE_ID
 						)
-						values (?,?,?,?)
-						""", tariffId, newServicePackageId, networkId, "TP");
+						values (?,?,?,?,?)
+						""", tariffId, newServicePackageId, networkId, "TP", newChargeId);
 			} catch (Exception ex) {
 				throw new TariffInsertException("STEP 9", "CS_RAT_TARIFF_SERVICE_PACK_MAP", ex);
 			}
@@ -590,8 +630,8 @@ public class TariffApprovalService {
 			int datpIdx = 0;
 			for (Long atpId : defaultAtpIds) {
 				Object priorityObj = defaultAtps.get(defaultAtpIds.indexOf(atpId)).get("priority");
-String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
-Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
+				String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
+				Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
 				String atpChargeId = defaultAtps.get(datpIdx).get("chargeId").toString();
 				try {
 					jdbcTemplate.update("""
@@ -616,8 +656,8 @@ Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr)
 			int aatpIdx = 0;
 			for (Long atpId : allowedAtpIds) {
 				Object priorityObj = addAtps.get(allowedAtpIds.indexOf(atpId)).get("priority");
-String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
-Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
+				String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
+				Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
 				String atpChargeId = addAtps.get(aatpIdx).get("chargeId").toString();
 				try {
 					jdbcTemplate.update("""
@@ -656,7 +696,7 @@ Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr)
 		}
 	}
 
-	// ── CHANGE 8: insert one row per ATP ─────────────────────────────────────
+	// ── Insert one periodic charge row per ATP ────────────────────────────────
 	private void insertPeriodicChargeForAtp(Map<String, Object> atp, Map<String, Object> data, Long networkId,
 			String username) {
 
@@ -730,4 +770,93 @@ Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr)
 		logger.info("TP removed from json storage tpName={}", tpName);
 	}
 
+
+	private String clonePeriodicCharge(String oldChargeId,
+                                   Long networkId,
+                                   String tpSuffix,
+                                   String username) {
+
+    String newChargeId = oldChargeId + "_" + tpSuffix;
+
+    Integer count = jdbcTemplate.queryForObject("""
+            select count(*)
+            from CS_RAT_PERIODIC_CHARGE_INFO
+            where CHARGE_ID = ?
+              and NETWORK_ID = ?
+            """,
+            Integer.class,
+            newChargeId,
+            networkId);
+
+    if (count != null && count > 0) {
+        return newChargeId;
+    }
+
+    jdbcTemplate.update("""
+            insert into CS_RAT_PERIODIC_CHARGE_INFO
+            (
+                CHARGE_ID,
+                CHARGE_DESC,
+                NETWORK_ID,
+                SERVICE_TYPE,
+                RENTAL_TYPE,
+                RENTAL_PERIOD,
+                ALCS_ID,
+                ACTIVATION_FEE,
+                RENTAL_FEE,
+                RENTAL_FREE_CYCLES,
+                PRO_RAT_YN,
+                ADV_YN,
+                TAX1,
+                TAX2,
+                TAX3,
+                ADD_PACK_CHARGE_YN,
+                RENTAL_DEDUCTION_IN_GRACE,
+                DEACTIVATION_FEE,
+                AUTO_RENEWAL,
+                CREATED_BY,
+                CREATED_DATE,
+                PLAN_EXP_MIDNIGHT_YN,
+                RESERVED_AMOUNT,
+                MAX_RENEWAL_COUNT,
+                SALES_FEE
+            )
+            select
+                ?,                                
+                CHARGE_DESC || '_' || ?,        
+                NETWORK_ID,
+                SERVICE_TYPE,
+                RENTAL_TYPE,
+                RENTAL_PERIOD,
+                ALCS_ID,
+                ACTIVATION_FEE,
+                RENTAL_FEE,
+                RENTAL_FREE_CYCLES,
+                PRO_RAT_YN,
+                ADV_YN,
+                TAX1,
+                TAX2,
+                TAX3,
+                ADD_PACK_CHARGE_YN,
+                RENTAL_DEDUCTION_IN_GRACE,
+                DEACTIVATION_FEE,
+                AUTO_RENEWAL,
+                ?,
+                SYSDATE,
+                PLAN_EXP_MIDNIGHT_YN,
+                RESERVED_AMOUNT,
+                MAX_RENEWAL_COUNT,
+                SALES_FEE
+            from CS_RAT_PERIODIC_CHARGE_INFO
+            where CHARGE_ID = ?
+              and NETWORK_ID = ?
+            """,
+            newChargeId,
+            tpSuffix,
+            username,
+            oldChargeId,
+            networkId);
+
+    return newChargeId;
+}
 }

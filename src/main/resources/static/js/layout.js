@@ -672,9 +672,16 @@ function checkStepAccess(targetStep) {
     const pkgType = sessionStorage.getItem('pkgType');
     const state = JSON.parse(sessionStorage.getItem('state') || '{}');
 
+    // const periodicCharge = document.getElementById("periodicCharge").value;
+    const periodicCharge = sessionStorage.getItem("periodicChargeID");
+
     if (!pkgType) {
         alert("Please select PREPAID or POSTPAID in Step 1");
         return false;
+    }
+    if (!periodicCharge) {
+        alert("Please select a Periodic Charge");
+        return;
     }
 
     const hasStep2Data = state.s2 && Array.isArray(state.s2) && state.s2.length > 0;
@@ -769,6 +776,7 @@ async function saveConfiguration() {
             "GENERAL",
 
         tariffPackageDesc: configName,
+        periodicChargeID: sessionStorage.getItem("periodicChargeID") || "",
 
         charge: state.price,
 
