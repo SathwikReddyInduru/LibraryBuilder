@@ -49,122 +49,6 @@ function onCorporateChange(checked) {
     saveState(state);
 }
 
-// ── Save Configuration (standard flow) ──────────────────────────
-async function saveConfiguration() {
-    const state = getState();
-
-    if (!state?.s2?.length) {
-        alert('Service Plan selection in Step 2 is required');
-        return;
-    }
-    if (!state.price) {
-        alert('Enter charge amount');
-        return;
-    }
-    if (!state.endDate) {
-        alert('Select end date');
-        return;
-    }
-    if (!state.publicityCode) {
-        alert('Enter publicity code');
-        return;
-    }
-
-    function formatDateToMMDDYYYY(dateStr) {
-        if (!dateStr) return '12/31/2030';
-        const [year, month, day] = dateStr.split('-');
-        return `${month}/${day}/${year}`;
-    }
-
-    const username = USERNAME;
-    const networkId = sessionStorage.getItem('networkId');
-    const isRejectedResubmit = !!sessionStorage.getItem('rejectedTpName');
-
-    // CHANGE 7: no chargeId in ATP objects
-    const payload = {
-        username: username,
-        isUpdate: isRejectedResubmit,   // skip duplicate JSON check when re-submitting a rejected TP
-        submittedOn: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        packageType: sessionStorage.getItem('pkgType') || '',
-        tariffPackCategory: sessionStorage.getItem('pkgSubType') || 'NORMAL',
-        tariffPackageDesc: sessionStorage.getItem('configName') || sessionStorage.getItem('tpName') || '',
-        charge: state.price,
-        endDate: formatDateToMMDDYYYY(state.endDate),
-        publicityId: state.publicityCode,
-        isCorporateYn: state.isCorporate || false,
-        tariffPlanId: Number(state.s2[0].id),
-        tariffPlanName: state.s2[0].name,
-        selectedSvcs_s2: sessionStorage.getItem('selectedSvcs_s2') || '[]',
-        selectedSvcs_s3: sessionStorage.getItem('selectedSvcs_s3') || '[]',
-        selectedSvcs_s4: sessionStorage.getItem('selectedSvcs_s4') || '[]',
-        defaultAtps: (state.s3 || []).map(item => ({
-            servicePackageId: Number(item.id),
-            packageName:      item.name,
-            validity:         item.validity,
-            rentalPeriod:     item.validity === 'O' ? (item.rentalPeriod || 1) : "",
-            midnightExpiry:   item.midnightExpiry,
-            renewal:          item.renewal,
-            rental:           item.rental    || 0,
-            maxCount:         item.maxCount  || 0,
-            freeCycles:       item.freeCycles || 0
-        })),
-        allowedAtps: (state.s4 || []).map(item => ({
-            servicePackageId: Number(item.id),
-            packageName:      item.name,
-            validity:         item.validity,
-            rentalPeriod:     item.validity === 'O' ? (item.rentalPeriod || 1) : "",
-            midnightExpiry:   item.midnightExpiry,
-            renewal:          item.renewal,
-            rental:           item.rental    || 0,
-            maxCount:         item.maxCount  || 0,
-            freeCycles:       item.freeCycles || 0
-        }))
-    };
-
-    const saveBtn = document.getElementById('saveConfigBtn');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
-
-    try {
-        const res = await fetch('/save-config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const result = await res.json();
-
-        if (result.error) {
-            alert(result.error);
-            return;
-        }
-
-        // If this was loaded from a rejected TP, remove it from rejected list
-        const rejectedTpName = sessionStorage.getItem('rejectedTpName');
-        const wasRejected = !!rejectedTpName;
-        if (rejectedTpName) {
-            await fetch('/rejected/delete/' + encodeURIComponent(rejectedTpName), { method: 'POST' })
-                .catch(err => console.warn('Could not remove from rejected list:', err));
-            sessionStorage.removeItem('rejectedTpName');
-        }
-
-        alert('✅ Configuration saved successfully!\nPlan: ' + (result.tpName || ''));
-        clearBuilderSession();
-        closeCloneTree();
-        if (wasRejected) {
-            window.isInternalNavigation = true;
-            window.location.href = '/builder/step1?openSaved=1';
-        } else {
-            openClone();
-        }
-
-    } catch (err) {
-        console.error('Save config error:', err);
-        alert('Server error during save. Please try again.');
-    } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'SAVE CONFIG'; }
-    }
-}
-
 // ── Clone Package — CHANGE 3: direct vs modify modes ─────────────
 async function clonePackageFromBuilder() {
     const state = getState();
@@ -227,6 +111,7 @@ async function clonePackageFromBuilder() {
         isCorporateYn:      state.isCorporate || false,
         tariffPlanId:       Number(state.s2[0].id),
         tariffPlanName:     state.s2[0].name,
+        periodicChargeID:   sessionStorage.getItem('periodicChargeID') || '',
         selectedSvcs_s2:    sessionStorage.getItem('selectedSvcs_s2') || '[]',
         selectedSvcs_s3:    sessionStorage.getItem('selectedSvcs_s3') || '[]',
         selectedSvcs_s4:    sessionStorage.getItem('selectedSvcs_s4') || '[]',
@@ -374,6 +259,7 @@ async function updatePackage() {
             packageType:       sessionStorage.getItem('pkgType') || '',
             tariffPackCategory: sessionStorage.getItem('pkgSubType') || 'NORMAL',
             tariffPackageDesc: sessionStorage.getItem('configName') || '',
+            periodicChargeID:  sessionStorage.getItem('periodicChargeID') || '',
             charge:            state.price,
             endDate:           formatDateToMMDDYYYY(state.endDate),
             publicityId:       state.publicityCode,

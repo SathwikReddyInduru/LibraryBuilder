@@ -142,7 +142,8 @@ function selectSubType(subType) {
 document.addEventListener('DOMContentLoaded', function () {
 
     if (NETWORK_ID) {
-        loadPeriodicCharges(NETWORK_ID);
+        const currentChargeId = sessionStorage.getItem("periodicChargeID");
+        loadPeriodicCharges(NETWORK_ID, currentChargeId);
     } else {
         console.error("NETWORK_ID not available");
     }
@@ -161,9 +162,13 @@ function selectPeriodicCharge(chargeId) {
     console.log("Selected Periodic Charge:", chargeId);
 }
 
-async function loadPeriodicCharges(networkId) {
+async function loadPeriodicCharges(networkId, currentChargeId) {
     try {
-        const response = await fetch(`/periodic_charges/${networkId}`);
+        const url = currentChargeId
+            ? `/periodic_charges/${networkId}?currentChargeId=${encodeURIComponent(currentChargeId)}`
+            : `/periodic_charges/${networkId}`;
+
+        const response = await fetch(url);
 
         if (!response.ok) {
             throw new Error("Failed to fetch periodic charges");
@@ -174,15 +179,14 @@ async function loadPeriodicCharges(networkId) {
         const dropdown = document.getElementById("periodicCharge");
 
         dropdown.innerHTML =
-            '<option value="">Select Periodic Charge...</option>';
+            '<option value="">────── Select ──────</option>';
 
         charges.forEach(charge => {
             const option = document.createElement("option");
 
             option.value = charge.CHARGE_ID;
 
-            option.textContent =
-                `${charge.CHARGE_DESC} (${charge.RENTAL_FEE})`;
+            option.textContent = charge.CHARGE_DESC || charge.CHARGE_ID;
 
             dropdown.appendChild(option);
         });

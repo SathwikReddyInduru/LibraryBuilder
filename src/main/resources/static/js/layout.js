@@ -39,6 +39,7 @@ function saveDraftOnExit() {
         name: configName || 'Untitled Draft',
         pkgType,
         pkgSubType: sessionStorage.getItem('pkgSubType'),
+        periodicChargeID: sessionStorage.getItem('periodicChargeID') || '',
         savedOn,
         savedTime,
         username,
@@ -138,6 +139,7 @@ function loadDraft(index) {
     sessionStorage.setItem('configName', draft.name || '');
     sessionStorage.setItem('pkgType', draft.pkgType || '');
     sessionStorage.setItem('pkgSubType', draft.pkgSubType || '');
+    sessionStorage.setItem('periodicChargeID', draft.periodicChargeID || '');
 
     sessionStorage.setItem('selectedSvcs_s2', draft.selectedSvcs_s2 || '[]');
     sessionStorage.setItem('selectedSvcs_s3', draft.selectedSvcs_s3 || '[]');
@@ -228,6 +230,8 @@ function manualSaveDraft() {
         pkgType,
 
         pkgSubType: sessionStorage.getItem('pkgSubType'),
+
+        periodicChargeID: sessionStorage.getItem('periodicChargeID') || '',
 
         savedOn,
 
@@ -919,6 +923,7 @@ function clearBuilderSession() {
     sessionStorage.removeItem('configName');
     sessionStorage.removeItem('pkgType');
     sessionStorage.removeItem('pkgSubType');
+    sessionStorage.removeItem('periodicChargeID');
     sessionStorage.removeItem("isUpdate");
     sessionStorage.removeItem('loadedFromDraft');
     sessionStorage.removeItem('cloneMode');
@@ -1139,6 +1144,12 @@ function approvePackage(tpName, btn) {
     if (!confirm("Approve " + tpName + " ?"))
         return;
 
+    const originalHTML = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-spinner"></span>Approving…';
+    }
+
     fetch("/approve/" + tpName, {
         method: "POST"
     })
@@ -1154,6 +1165,7 @@ function approvePackage(tpName, btn) {
             console.log("APPROVED", data);
 
             if (data.status === 'error') {
+                if (btn) { btn.disabled = false; btn.innerHTML = originalHTML; }
                 const detail = data.failedTable ? '\nFailed at: ' + data.failedStep + ' -> ' + data.failedTable : '';
                 alert(' Approve failed:\n' + (data.message || 'Unknown error') + detail);
                 return;
@@ -1165,6 +1177,7 @@ function approvePackage(tpName, btn) {
         })
         .catch(err => {
 
+            if (btn) { btn.disabled = false; btn.innerHTML = originalHTML; }
             console.error(err);
 
             alert(' Error approving tariff package.');
@@ -1354,11 +1367,9 @@ function loadSaved() {
 
 function loadSavedPackage(index) {
 
-    const config =
-        window.ALL_SAVED[index];
+    const config = window.ALL_SAVED[index];
 
-    const d =
-        config.data;
+    const d = config.data;
 
     /*
        convert saved format → builder state
@@ -1442,6 +1453,11 @@ function loadSavedPackage(index) {
     sessionStorage.setItem(
         "pkgSubType",
         d.tariffPackCategory
+    );
+
+    sessionStorage.setItem(
+        "periodicChargeID",
+        d.periodicChargeID || ""
     );
 
     /*
@@ -1694,6 +1710,7 @@ async function loadApprovedPackage(index) {
         sessionStorage.setItem('configName', data.tpName || d.tariffPackageDesc || plan.tariffPackageDesc);
         sessionStorage.setItem('pkgType', d.packageType || '');
         sessionStorage.setItem('pkgSubType', d.tariffPackCategory || 'GENERAL');
+        sessionStorage.setItem('periodicChargeID', d.periodicChargeID || '');
         sessionStorage.setItem('selectedSvcs_s2', svcsToJson(d.selectedSvcs_s2));
         sessionStorage.setItem('selectedSvcs_s3', svcsToJson(d.selectedSvcs_s3));
         sessionStorage.setItem('selectedSvcs_s4', svcsToJson(d.selectedSvcs_s4));
@@ -1834,6 +1851,7 @@ function loadRejectedPackage(index) {
     sessionStorage.setItem("configName", config.tpName);
     sessionStorage.setItem("pkgType", d.packageType || "");
     sessionStorage.setItem("pkgSubType", d.tariffPackCategory || "");
+    sessionStorage.setItem("periodicChargeID", d.periodicChargeID || "");
 
     sessionStorage.setItem("selectedSvcs_s2", d.selectedSvcs_s2 || '[]');
     sessionStorage.setItem("selectedSvcs_s3", d.selectedSvcs_s3 || '[]');
@@ -2106,6 +2124,12 @@ function openClone() {
     _tpfClearAll();   // reset filters on every open
     page.style.display = 'flex';
 
+    // Hide bottom rail nodes — clone page has no context for them
+    ['mn-approved', 'mn-rejected', 'mn-saved', 'mn-drafts'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
     // Clear search input
     const si = document.getElementById('cloneSearchInput');
     if (si) si.value = '';
@@ -2143,6 +2167,12 @@ function closeClonePage() {
         // Restore workspace body + header
         if (workBody) workBody.style.display = '';
         if (headerPill) headerPill.style.display = '';
+
+        // Restore bottom rail nodes — only show ones not hidden by Thymeleaf (activeStep)
+        ['mn-approved', 'mn-rejected', 'mn-saved', 'mn-drafts'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && !el.classList.contains('hidden')) el.style.display = '';
+        });
 
         // Restore rails + active nav node based on current module/step
         const step = getActiveStep();
@@ -2827,6 +2857,7 @@ async function _cloneTreeAction(action) {
         sessionStorage.setItem('configName', payload.tpName || d.tariffPackageDesc || '');
         sessionStorage.setItem('pkgType', d.packageType || '');
         sessionStorage.setItem('pkgSubType', d.tariffPackCategory || 'GENERAL');
+        sessionStorage.setItem('periodicChargeID', d.periodicChargeID || '');
         sessionStorage.setItem('selectedSvcs_s2', svcsToJson(d.selectedSvcs_s2));
         sessionStorage.setItem('selectedSvcs_s3', svcsToJson(d.selectedSvcs_s3));
         sessionStorage.setItem('selectedSvcs_s4', svcsToJson(d.selectedSvcs_s4));

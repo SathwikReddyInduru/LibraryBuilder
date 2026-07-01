@@ -130,6 +130,7 @@ public class TariffUpdateService {
 		data.put("packageType", first.getPackageType());
 		data.put("tariffPackCategory", first.getTariffPackCategory());
 		data.put("tariffPackageDesc", first.getTariffPackageDesc());
+		data.put("periodicChargeID", first.getChargeId() != null ? first.getChargeId() : "");
 
 		Double minAtpCharge = list.stream()
 				.filter(r -> r.getTariffPlanType() != null
@@ -289,7 +290,8 @@ public class TariffUpdateService {
 					    PACKAGE_TYPE         = ?,
 					    IS_CORPORATE_YN      = ?,
 					    TARIFF_PACK_CATEGORY = ?,
-					    END_DATE             = ?
+					    END_DATE             = ?,
+						CHARGE_ID = ?
 					WHERE TARIFF_PACKAGE_ID = ?
 					  AND NETWORK_ID = ?
 					""",
@@ -299,6 +301,7 @@ public class TariffUpdateService {
 					convertYN(data.get("isCorporateYn")),
 					data.get("tariffPackCategory"),
 					Date.valueOf(LocalDate.parse(data.get("endDate").toString(), formatter)),
+					data.get("periodicChargeID"),
 					tariffPackageId,
 					networkId);
 

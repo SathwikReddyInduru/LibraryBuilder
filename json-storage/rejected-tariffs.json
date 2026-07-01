@@ -1,1 +1,42 @@
-{ }
+{
+  "saifghfg" : {
+    "tpName" : "saifghfg",
+    "username" : "USER1",
+    "networkId" : 16,
+    "data" : {
+      "username" : "USER1",
+      "isUpdate" : false,
+      "submittedOn" : "30 Jun 2026",
+      "packageType" : "POSTPAID",
+      "tariffPackCategory" : "GENERAL",
+      "tariffPackageDesc" : "saifghfg",
+      "periodicChargeID" : "MI MUNDO L_S",
+      "charge" : "123",
+      "endDate" : "06/20/2026",
+      "publicityId" : "liokik",
+      "chargeId" : "saifghfg_PR",
+      "isCorporateYn" : false,
+      "tariffPlanId" : 1743,
+      "tariffPlanName" : "MI MUNDO S_V",
+      "selectedSvcs_s2" : "[\"VOICE\"]",
+      "selectedSvcs_s3" : "[\"VOICE\"]",
+      "selectedSvcs_s4" : "[]",
+      "defaultAtps" : [ {
+        "servicePackageId" : 1763,
+        "chargeId" : "saifghfg_PR",
+        "packageName" : "POSTPAID_SMS",
+        "validity" : "M",
+        "rentalPeriod" : "",
+        "midnightExpiry" : "No",
+        "renewal" : "No",
+        "rental" : 0,
+        "maxCount" : 0,
+        "freeCycles" : "0",
+        "priority" : 0
+      } ],
+      "allowedAtps" : [ ]
+    },
+    "rejectedOn" : "2026-06-30T17:23:11.954069800",
+    "remarks" : "test"
+  }
+}

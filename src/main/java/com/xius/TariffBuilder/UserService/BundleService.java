@@ -199,6 +199,8 @@ public class BundleService {
 
 			Long newBundleId = cloneBundle(oldBundleId, networkId, tpName);
 
+			cloneImsiRanges(oldBundleId, newBundleId, networkId);
+
 			List<String> bucketIds = jdbcTemplate.queryForList("""
 					select BUCKET_ID
 					from CS_BNDL_MT_BNDL_BUCKET_MAP
@@ -299,6 +301,48 @@ public class BundleService {
 		return newBundleId;
 	}
 
+	/*
+     * Clone all SIM/IMSI range rows for a bundle, assigning them to the new bundle id.
+     */
+    private void cloneImsiRanges(Long oldBundleId, Long newBundleId, Long networkId) {
+ 
+        List<Map<String, Object>> ranges = jdbcTemplate.queryForList("""
+                select RANGE_FROM, RANGE_TO, SIM_OR_IMSI_FLAG, INCLUDE_EXCLUDE_FLAG
+                from BNDL_MT_SIM_IMSI_RANGES
+                where BUNDLE_ID = ?
+                and NETWORK_ID = ?
+                """, oldBundleId, networkId);
+ 
+        for (Map<String, Object> row : ranges) {
+ 
+            try {
+                jdbcTemplate.update("""
+                        insert into BNDL_MT_SIM_IMSI_RANGES
+                        (
+                            BUNDLE_ID,
+                            RANGE_FROM,
+                            RANGE_TO,
+                            SIM_OR_IMSI_FLAG,
+                            INCLUDE_EXCLUDE_FLAG,
+                            NETWORK_ID
+                        )
+                        values (?,?,?,?,?,?)
+                        """,
+                        newBundleId,
+                        row.get("RANGE_FROM"),
+                        row.get("RANGE_TO"),
+                        row.get("SIM_OR_IMSI_FLAG"),
+                        row.get("INCLUDE_EXCLUDE_FLAG"),
+                        networkId);
+            } catch (Exception ex) {
+                throw new TariffInsertException("cloneImsiRanges", "BNDL_MT_SIM_IMSI_RANGES", ex);
+            }
+        }
+ 
+        logger.info("IMSI ranges cloned oldBundleId={} newBundleId={} count={}", oldBundleId, newBundleId,
+                ranges.size());
+    }
+
 	private String generateNewBucketId() {
 
 		return jdbcTemplate.queryForObject("""
@@ -307,7 +351,6 @@ public class BundleService {
 				where regexp_like(substr(BUCKET_ID,2),'^\\d+$')
 				""", String.class);
 	}
-
 
 	private void cloneBucket(String oldBucketId, String newBucketId, String tpName, Long networkId,
 			Long newBucketZoneId) {

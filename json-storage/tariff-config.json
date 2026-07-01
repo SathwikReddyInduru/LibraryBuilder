@@ -1,4 +1,42 @@
 {
+  "testing" : {
+    "tpName" : "testing",
+    "username" : "FTLU",
+    "networkId" : 1,
+    "data" : {
+      "username" : "FTLU",
+      "isUpdate" : false,
+      "submittedOn" : "30 Jun 2026",
+      "packageType" : "POSTPAID",
+      "tariffPackCategory" : "GENERAL",
+      "tariffPackageDesc" : "testing",
+      "periodicChargeID" : "F1MOBILE_S_PC_UL",
+      "charge" : "555",
+      "endDate" : "07/01/2026",
+      "publicityId" : "p_092026",
+      "chargeId" : "testing_PR",
+      "isCorporateYn" : false,
+      "tariffPlanId" : 1,
+      "tariffPlanName" : "FT_TRAIFF_PLAN",
+      "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
+      "selectedSvcs_s3" : "[\"VOICE\"]",
+      "selectedSvcs_s4" : "[]",
+      "defaultAtps" : [ {
+        "servicePackageId" : 2,
+        "chargeId" : "testing_PR",
+        "packageName" : "VC DAILY 10M",
+        "validity" : "M",
+        "rentalPeriod" : "",
+        "midnightExpiry" : "No",
+        "renewal" : "No",
+        "rental" : 0,
+        "maxCount" : 0,
+        "freeCycles" : "0",
+        "priority" : 0
+      } ],
+      "allowedAtps" : [ ]
+    }
+  },
   "test_1" : {
     "tpName" : "test_1",
     "username" : "FTLU",

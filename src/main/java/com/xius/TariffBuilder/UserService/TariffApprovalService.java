@@ -552,18 +552,20 @@ public class TariffApprovalService {
 				logger.info("No ATPs. Skipping periodic charge insert.");
 			}
             
-           String oldChargeId = data.get("periodicChargeID").toString();
+			String oldChargeId = data.get("periodicChargeID") != null ? data.get("periodicChargeID").toString() : "";
 
-String newChargeId = clonePeriodicCharge(
-        oldChargeId,
-        networkId,
-        tpSuffix,
-        username);
-
-logger.info("TP Periodic Charge cloned oldChargeId={} newChargeId={}",
-        oldChargeId,
-        newChargeId); 
-
+		    String newChargeId = "";
+			if (!oldChargeId.isBlank()) {
+				newChargeId = clonePeriodicCharge(
+						oldChargeId,
+						networkId,
+						tpSuffix,
+						username);
+				logger.info("TP Periodic Charge cloned oldChargeId={} newChargeId={}",
+						oldChargeId, newChargeId);
+			} else {
+				logger.warn("periodicChargeID is empty — skipping charge clone for tpSuffix={}", tpSuffix);
+			}
 		
 			// ── STEP 7: Create tariff package ─────────
 			Long tariffId;
