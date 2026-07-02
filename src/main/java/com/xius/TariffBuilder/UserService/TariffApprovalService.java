@@ -128,7 +128,7 @@ public class TariffApprovalService {
 		logger.info("Clone request received originalTpName={} networkId={} username={} cloneMode={}", originalTpName,
 				networkId, username, cloneMode);
 
-		// Validate required fields up-front — gives clear error instead of NPE/undefined
+		// Validate required fields up-front — gives clear error instead of
 		if (requestBody.get("tpName") == null) {
 			return Map.of("status", "error", "message", "Missing required field: tpName");
 		}
@@ -259,7 +259,8 @@ public class TariffApprovalService {
 		return m.find() ? m.group(1) : tpName;
 	}
 
-	// STRIP CLONE SUFFIX (remove trailing _CL<number>, _TP<number>, or _ATP<number>)
+	// STRIP CLONE SUFFIX (remove trailing _CL<number>, _TP<number>, or
+	// _ATP<number>)
 	private String stripCloneSuffix(String name) {
 		if (name == null)
 			return null;
@@ -394,7 +395,8 @@ public class TariffApprovalService {
 		AtomicInteger prCounter = new AtomicInteger(0);
 
 		// tpSuffix: suffix appended to SERVICE_PACKAGE_DESC / SERVICE_PLAN_DESC for
-		// base service packages. Uses a global incrementing interval -> TP1, TP2, TP3 ...
+		// base service packages. Uses a global incrementing interval -> TP1, TP2, TP3
+		// ...
 		int tpSuffixNumber = resolveNextTpSuffixNumber();
 		String tpSuffix = "TP" + tpSuffixNumber;
 
@@ -495,7 +497,7 @@ public class TariffApprovalService {
 						// ── Unique suffix for this specific ATP ──────────────
 						String atpSuffix = "ATP" + atpSuffixCounter++;
 
-						String chargeId = tpName + "_"+ atpSuffix;
+						String chargeId = tpName + "_" + atpSuffix;
 						atp.put("chargeId", chargeId);
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
@@ -515,7 +517,7 @@ public class TariffApprovalService {
 						// ── Unique suffix for this specific ATP ──────────────
 						String atpSuffix = "ATP" + atpSuffixCounter++;
 
-						String chargeId = tpName + "_"+ atpSuffix;
+						String chargeId = tpName + "_" + atpSuffix;
 						atp.put("chargeId", chargeId);
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
@@ -551,22 +553,11 @@ public class TariffApprovalService {
 			if (!hasAnyAtps) {
 				logger.info("No ATPs. Skipping periodic charge insert.");
 			}
-            
-			String oldChargeId = data.get("periodicChargeID") != null ? data.get("periodicChargeID").toString() : "";
 
-		    String newChargeId = "";
-			if (!oldChargeId.isBlank()) {
-				newChargeId = clonePeriodicCharge(
-						oldChargeId,
-						networkId,
-						tpSuffix,
-						username);
-				logger.info("TP Periodic Charge cloned oldChargeId={} newChargeId={}",
-						oldChargeId, newChargeId);
-			} else {
-				logger.warn("periodicChargeID is empty — skipping charge clone for tpSuffix={}", tpSuffix);
-			}
-		
+			String newChargeId = createTpPeriodicCharge(
+					networkId,
+					username, data);
+
 			// ── STEP 7: Create tariff package ─────────
 			Long tariffId;
 			try {
@@ -772,93 +763,76 @@ public class TariffApprovalService {
 		logger.info("TP removed from json storage tpName={}", tpName);
 	}
 
+	private String createTpPeriodicCharge(Long networkId, String username, Map<String, Object> data) {
 
-	private String clonePeriodicCharge(String oldChargeId,
-                                   Long networkId,
-                                   String tpSuffix,
-                                   String username) {
+		try {
 
-    String newChargeId = oldChargeId + "_" + tpSuffix;
+			// Generate next TP charge id
+			Integer nextNumber = jdbcTemplate.queryForObject("""
+					SELECT NVL(
+					       MAX(
+					           TO_NUMBER(
+					               REGEXP_SUBSTR(CHARGE_ID,'[0-9]+$')
+					           )
+					       ),0
+					) + 1
+					FROM CS_RAT_PERIODIC_CHARGE_INFO
+					WHERE CHARGE_ID LIKE 'TP_CHARGE_%'
+					""",
+					Integer.class);
 
-    Integer count = jdbcTemplate.queryForObject("""
-            select count(*)
-            from CS_RAT_PERIODIC_CHARGE_INFO
-            where CHARGE_ID = ?
-              and NETWORK_ID = ?
-            """,
-            Integer.class,
-            newChargeId,
-            networkId);
+			String chargeId = "TP_CHARGE_" + nextNumber;
 
-    if (count != null && count > 0) {
-        return newChargeId;
-    }
+			logger.info("Creating TP periodic charge chargeId={}", chargeId);
 
-    jdbcTemplate.update("""
-            insert into CS_RAT_PERIODIC_CHARGE_INFO
-            (
-                CHARGE_ID,
-                CHARGE_DESC,
-                NETWORK_ID,
-                SERVICE_TYPE,
-                RENTAL_TYPE,
-                RENTAL_PERIOD,
-                ALCS_ID,
-                ACTIVATION_FEE,
-                RENTAL_FEE,
-                RENTAL_FREE_CYCLES,
-                PRO_RAT_YN,
-                ADV_YN,
-                TAX1,
-                TAX2,
-                TAX3,
-                ADD_PACK_CHARGE_YN,
-                RENTAL_DEDUCTION_IN_GRACE,
-                DEACTIVATION_FEE,
-                AUTO_RENEWAL,
-                CREATED_BY,
-                CREATED_DATE,
-                PLAN_EXP_MIDNIGHT_YN,
-                RESERVED_AMOUNT,
-                MAX_RENEWAL_COUNT,
-                SALES_FEE
-            )
-            select
-                ?,                                
-                CHARGE_DESC || '_' || ?,        
-                NETWORK_ID,
-                SERVICE_TYPE,
-                RENTAL_TYPE,
-                RENTAL_PERIOD,
-                ALCS_ID,
-                ACTIVATION_FEE,
-                RENTAL_FEE,
-                RENTAL_FREE_CYCLES,
-                PRO_RAT_YN,
-                ADV_YN,
-                TAX1,
-                TAX2,
-                TAX3,
-                ADD_PACK_CHARGE_YN,
-                RENTAL_DEDUCTION_IN_GRACE,
-                DEACTIVATION_FEE,
-                AUTO_RENEWAL,
-                ?,
-                SYSDATE,
-                PLAN_EXP_MIDNIGHT_YN,
-                RESERVED_AMOUNT,
-                MAX_RENEWAL_COUNT,
-                SALES_FEE
-            from CS_RAT_PERIODIC_CHARGE_INFO
-            where CHARGE_ID = ?
-              and NETWORK_ID = ?
-            """,
-            newChargeId,
-            tpSuffix,
-            username,
-            oldChargeId,
-            networkId);
+			jdbcTemplate.update("""
+					INSERT INTO CS_RAT_PERIODIC_CHARGE_INFO
+					(
+					    CHARGE_ID,
+					    CHARGE_DESC,
+					    NETWORK_ID,
+					    RENTAL_TYPE,
+					    RENTAL_PERIOD,
+					    ACTIVATION_FEE,
+					    RENTAL_FEE,
+					    RENTAL_FREE_CYCLES,
+					    AUTO_RENEWAL,
+					    PLAN_EXP_MIDNIGHT_YN,
+					    MAX_RENEWAL_COUNT,
+					    CREATED_BY,
+					    CREATED_DATE
+					)
+					VALUES
+					(
+					    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSDATE
+					)
+					""",
+					chargeId, // CHARGE_ID
+					chargeId, // CHARGE_DESC
+					networkId, // NETWORK_ID
+					"M",
+					1,
+					data.get("charge"),
+					0,
+					0,
+					"N",
+					"N",
+					0,
+					username);
 
-    return newChargeId;
-}
+			logger.info("TP periodic charge created successfully chargeId={}", chargeId);
+
+			return chargeId;
+
+		} catch (Exception ex) {
+
+			logger.error("Failed to create TP periodic charge", ex);
+
+			throw new TariffInsertException(
+					"STEP 6",
+					"CS_RAT_PERIODIC_CHARGE_INFO",
+					ex);
+		}
+	}
+
 }

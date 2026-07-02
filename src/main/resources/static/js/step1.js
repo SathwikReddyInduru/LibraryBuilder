@@ -139,67 +139,67 @@ function selectSubType(subType) {
 }
 
 
-document.addEventListener('DOMContentLoaded', function () {
+// document.addEventListener('DOMContentLoaded', function () {
 
-    if (NETWORK_ID) {
-        const currentChargeId = sessionStorage.getItem("periodicChargeID");
-        loadPeriodicCharges(NETWORK_ID, currentChargeId);
-    } else {
-        console.error("NETWORK_ID not available");
-    }
+//     if (NETWORK_ID) {
+//         const currentChargeId = sessionStorage.getItem("periodicChargeID");
+//         loadPeriodicCharges(NETWORK_ID, currentChargeId);
+//     } else {
+//         console.error("NETWORK_ID not available");
+//     }
 
-});
+// });
 
-function selectPeriodicCharge(chargeId) {
+// function selectPeriodicCharge(chargeId) {
 
-    if (!chargeId) {
-        sessionStorage.removeItem("periodicCharge");
-        return;
-    }
+//     if (!chargeId) {
+//         sessionStorage.removeItem("periodicCharge");
+//         return;
+//     }
 
-    sessionStorage.setItem("periodicChargeID", chargeId);
+//     sessionStorage.setItem("periodicChargeID", chargeId);
 
-    console.log("Selected Periodic Charge:", chargeId);
-}
+//     console.log("Selected Periodic Charge:", chargeId);
+// }
 
-async function loadPeriodicCharges(networkId, currentChargeId) {
-    try {
-        const url = currentChargeId
-            ? `/periodic_charges/${networkId}?currentChargeId=${encodeURIComponent(currentChargeId)}`
-            : `/periodic_charges/${networkId}`;
+// async function loadPeriodicCharges(networkId, currentChargeId) {
+//     try {
+//         const url = currentChargeId
+//             ? `/periodic_charges/${networkId}?currentChargeId=${encodeURIComponent(currentChargeId)}`
+//             : `/periodic_charges/${networkId}`;
 
-        const response = await fetch(url);
+//         const response = await fetch(url);
 
-        if (!response.ok) {
-            throw new Error("Failed to fetch periodic charges");
-        }
+//         if (!response.ok) {
+//             throw new Error("Failed to fetch periodic charges");
+//         }
 
-        const charges = await response.json();
+//         const charges = await response.json();
 
-        const dropdown = document.getElementById("periodicCharge");
+//         const dropdown = document.getElementById("periodicCharge");
 
-        dropdown.innerHTML =
-            '<option value="">────── Select ──────</option>';
+//         dropdown.innerHTML =
+//             '<option value="">────── Select ──────</option>';
 
-        charges.forEach(charge => {
-            const option = document.createElement("option");
+//         charges.forEach(charge => {
+//             const option = document.createElement("option");
 
-            option.value = charge.CHARGE_ID;
+//             option.value = charge.CHARGE_ID;
 
-            option.textContent = charge.CHARGE_DESC || charge.CHARGE_ID;
+//             option.textContent = charge.CHARGE_DESC || charge.CHARGE_ID;
 
-            dropdown.appendChild(option);
-        });
+//             dropdown.appendChild(option);
+//         });
 
-        // Restore previously selected value
-        const savedCharge =
-            sessionStorage.getItem("periodicChargeID");
+//         // Restore previously selected value
+//         const savedCharge =
+//             sessionStorage.getItem("periodicChargeID");
 
-        if (savedCharge) {
-            dropdown.value = savedCharge;
-        }
+//         if (savedCharge) {
+//             dropdown.value = savedCharge;
+//         }
 
-    } catch (error) {
-        console.error("Error loading periodic charges:", error);
-    }
-}
+//     } catch (error) {
+//         console.error("Error loading periodic charges:", error);
+//     }
+// }
