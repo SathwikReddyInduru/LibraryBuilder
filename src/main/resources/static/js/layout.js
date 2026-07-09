@@ -2190,11 +2190,16 @@ function closeClonePage() {
 // ── OTT name → asset lookup ──
 // srcs[] = multiple icons for combo bundles (e.g. Netflix Prime shows both icons).
 // Combo entries MUST come before their component keywords so exact match wins.
+// NOTE: only entries with `allowed: true` are ever matched/rendered. This keeps
+// the rendered icon set in lock-step with the _OTT_SERVICES master list below —
+// anything not defined there (Facebook, Instagram, Google, etc.) is looked up
+// here for reference only and will never produce an icon or a fallback badge.
 const _OTT_META = [
     // ── Combo bundles (before individual keywords) ──────────────────────────
     {
         keywords: ['netflix prime'],
         title: 'Netflix + Prime',
+        allowed: true,
         srcs: [
             { src: '/images/ott/Netflix.avif', title: 'Netflix' },
             { src: '/images/ott/Prime.svg', title: 'Prime Video' }
@@ -2202,16 +2207,16 @@ const _OTT_META = [
         src: '/images/ott/Netflix.avif',
         desc: 'Netflix + Prime Video bundle'
     },
-    // ── Individual OTT platforms ─────────────────────────────────────────────
-    { keywords: ['netflix'], title: 'Netflix', src: '/images/ott/Netflix.avif', desc: 'Award-winning series | Movies | Documentaries' },
-    { keywords: ['prime', 'amazon'], title: 'Prime Video', src: '/images/ott/Prime.svg', desc: 'Amazon Originals | Movies | Live Sports' },
-    { keywords: ['hotstar', 'jiohotstar', 'disney'], title: 'JioHotstar', src: '/images/ott/Jiohotstar.svg', desc: 'TV Shows | Movies | Originals | Live Sports' },
-    { keywords: ['zee5', 'zee'], title: 'ZEE5', src: '/images/ott/Zee5.svg', desc: 'Web Series | Movies | Originals in 18 languages' },
-    { keywords: ['sony', 'sonyliv'], title: 'SonyLIV', src: '/images/ott/SonyLiv.svg', desc: 'Popular TV Shows | New Series | Movies' },
-    { keywords: ['mxplayer', 'mx player', 'mx'], title: 'MX Player', src: '/images/ott/MX_Player.webp', desc: 'Free Movies | Web Series | Music Videos' },
-    { keywords: ['saavn', 'jiosaavn', 'jio saavn'], title: 'JioSaavn', src: '/images/ott/jiosaavn.png', desc: 'Music | Podcasts | Radio | 80M+ Songs' },
-    { keywords: ['fancode', 'fan code'], title: 'FanCode', src: '/images/ott/FanCode.svg', desc: 'Live Cricket | Football | Sports Streaming' },
-    // ── Social / Internet services ───────────────────────────────────────────
+    // ── Individual OTT platforms (must match _OTT_SERVICES below) ───────────
+    { keywords: ['netflix'], title: 'Netflix', allowed: true, src: '/images/ott/Netflix.avif', desc: 'Award-winning series | Movies | Documentaries' },
+    { keywords: ['prime', 'amazon'], title: 'Prime Video', allowed: true, src: '/images/ott/Prime.svg', desc: 'Amazon Originals | Movies | Live Sports' },
+    { keywords: ['hotstar', 'jiohotstar', 'disney'], title: 'JioHotstar', allowed: true, src: '/images/ott/Jiohotstar.svg', desc: 'TV Shows | Movies | Originals | Live Sports' },
+    { keywords: ['zee5', 'zee'], title: 'ZEE5', allowed: true, src: '/images/ott/Zee5.svg', desc: 'Web Series | Movies | Originals in 18 languages' },
+    { keywords: ['sony', 'sonyliv'], title: 'SonyLIV', allowed: true, src: '/images/ott/SonyLiv.svg', desc: 'Popular TV Shows | New Series | Movies' },
+    { keywords: ['mxplayer', 'mx player', 'mx'], title: 'MX Player', allowed: true, src: '/images/ott/MX_Player.webp', desc: 'Free Movies | Web Series | Music Videos' },
+    { keywords: ['saavn', 'jiosaavn', 'jio saavn'], title: 'JioSaavn', allowed: true, src: '/images/ott/jiosaavn.png', desc: 'Music | Podcasts | Radio | 80M+ Songs' },
+    { keywords: ['fancode', 'fan code'], title: 'FanCode', allowed: true, src: '/images/ott/FanCode.svg', desc: 'Live Cricket | Football | Sports Streaming' },
+    // ── NOT part of _OTT_SERVICES — kept for reference only, never rendered ──
     {
         keywords: ['facebook'],
         title: 'Facebook',
@@ -2257,52 +2262,52 @@ const _OTT_META = [
 ];
 _OTT_META.forEach(m => { if (!m.initial) m.initial = m.title.charAt(0); });
 
+// Resolves a raw rate-group name to a known OTT entry, or null if it isn't
+// one of the explicitly allowed services. Returning null (instead of a
+// generic fallback badge) is what keeps unknown/undefined services from
+// being rendered at all — no icon, no letter badge, nothing.
 function _ottLookup(name) {
     const lower = (name || '').toLowerCase().trim();
-    // 1. Exact keyword match (e.g. "netflix prime" matches the combo entry exactly)
-    const exact = _OTT_META.find(m => m.keywords.some(k => k === lower));
+    // 1. Exact keyword match among allowed entries only
+    const exact = _OTT_META.find(m => m.allowed && m.keywords.some(k => k === lower));
     if (exact) return exact;
-    // 2. Longest keyword substring match so specific beats general
+    // 2. Longest keyword substring match among allowed entries so specific beats general
     const found = _OTT_META
-        .filter(m => m.keywords.some(k => lower.includes(k)))
+        .filter(m => m.allowed && m.keywords.some(k => lower.includes(k)))
         .sort((a, b) => Math.max(...b.keywords.map(k => k.length)) - Math.max(...a.keywords.map(k => k.length)))[0];
     if (found) return found;
-    return { title: name, src: null, srcs: null, desc: name, initial: name.charAt(0).toUpperCase() };
+    // Not a recognized/allowed OTT service — render nothing for it.
+    return null;
 }
 
-// Build OTT icon strip: show `max` icons then '...'
-// For combo entries (srcs[]), each sub-icon counts as one slot.
+// Build OTT icon strip: show `max` icons then '...'. Unknown/undefined
+// services (anything _ottLookup can't resolve) are silently dropped —
+// they don't get an icon, a fallback letter badge, or count toward the
+// visible slots / "+N more" total.
 function _buildOttStripHtml(rateGroupNames, max) {
     if (!rateGroupNames || !rateGroupNames.length) return '';
-    let html = '';
-    let shown = 0;
+
+    // Resolve every name to its known icon(s); drop anything unresolved.
+    const resolved = [];
     for (const name of rateGroupNames) {
-        if (shown >= max) break;
         const svc = _ottLookup(name);
-        // Combo: render each sub-icon individually
+        if (!svc) continue; // not one of our defined OTT services — skip entirely
         if (svc.srcs && svc.srcs.length) {
-            for (const sub of svc.srcs) {
-                if (shown >= max) break;
-                html += `<img class="tp-ott-icon-img" src="${sub.src}" alt="${sub.title}" title="${sub.title}"
-                         onerror="this.onerror=null;this.style.display='none';">`;
-                shown++;
-            }
+            svc.srcs.forEach(sub => resolved.push(sub));
         } else if (svc.src) {
-            html += `<img class="tp-ott-icon-img" src="${svc.src}" alt="${svc.title}" title="${svc.title}"
-                     onerror="this.onerror=null;this.style.display='none';">`;
-            shown++;
-        } else {
-            html += `<span class="tp-ott-fallback-badge" title="${svc.title}">${svc.initial}</span>`;
-            shown++;
+            resolved.push(svc);
         }
     }
-    const remaining = rateGroupNames.length - rateGroupNames.slice(0, rateGroupNames.findIndex((_, i) => i >= rateGroupNames.length)).length;
-    // Count total logical slots used vs total
-    const totalSlots = rateGroupNames.reduce((acc, n) => {
-        const s = _ottLookup(n);
-        return acc + (s.srcs ? s.srcs.length : 1);
-    }, 0);
-    if (totalSlots > max) html += `<span class="tp-ott-more">+${totalSlots - max}</span>`;
+
+    if (!resolved.length) return '';
+
+    let html = resolved.slice(0, max).map(item =>
+        `<img class="tp-ott-icon-img" src="${item.src}" alt="${item.title}" title="${item.title}"
+             onerror="this.onerror=null;this.style.display='none';">`
+    ).join('');
+
+    if (resolved.length > max) html += `<span class="tp-ott-more">+${resolved.length - max}</span>`;
+
     return html;
 }
 
@@ -2920,24 +2925,26 @@ function openTpDetails(groupData) {
         ? (group.rentalPeriod != null ? group.rentalPeriod + ' Day' + (group.rentalPeriod !== 1 ? 's' : '') + ' Plan' : 'Others')
         : (group.rentalType || 'Individual plan');
 
-    // ── OTT strip (small icons beside notes) ──────────────
+    // ── Resolve rate-group names to KNOWN OTT services only ──
+    // Anything not defined in _OTT_META (allowed:true) is dropped here —
+    // no icon strip entry, no list entry, no fallback badge.
     const rateNames = group.rateGroupNames || [];
+    const resolvedOtts = rateNames.map(name => _ottLookup(name)).filter(Boolean);
+
+    // ── OTT strip (small icons beside notes) — only recognized services ──
     const ottStripHtml = _buildOttStripHtml(rateNames, 4);
 
-    // ── Full OTT benefit list ──────────────────────────────
-    const ottListHtml = rateNames.length
-        ? rateNames.map(name => {
-            const svc = _ottLookup(name);
-            // Combo entry: show stacked icons side by side
+    // ── Full OTT benefit list — only recognized services ────
+    const ottListHtml = resolvedOtts.length
+        ? resolvedOtts.map(svc => {
             const imgHtml = svc.srcs && svc.srcs.length
                 ? svc.srcs.map(sub =>
                     `<img class="tp-modal-ott-item-img" src="${sub.src}" alt="${sub.title}"
                           style="margin-right:4px"
                           onerror="this.onerror=null;this.style.display='none';">`
                 ).join('')
-                : svc.src
-                    ? `<img class="tp-modal-ott-item-img" src="${svc.src}" alt="${svc.title}" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="tp-modal-ott-fallback-badge" style="display:none">${svc.initial}</span>`
-                    : `<span class="tp-modal-ott-fallback-badge">${svc.initial}</span>`;
+                : `<img class="tp-modal-ott-item-img" src="${svc.src}" alt="${svc.title}"
+                        onerror="this.onerror=null;this.style.display='none';">`;
             return `
             <div class="tp-modal-ott-item">
                 <div style="display:flex;align-items:center;gap:2px">${imgHtml}</div>
@@ -2968,7 +2975,7 @@ function openTpDetails(groupData) {
             </div>
         </div>
 
-        ${rateNames.length ? `<div class="tp-modal-ott-row">
+        ${resolvedOtts.length ? `<div class="tp-modal-ott-row">
             <div class="tp-modal-ott-icons">${ottStripHtml}</div>
             <ul class="tp-modal-ott-notes">${notesHtml}</ul>
         </div>` : `<ul class="tp-modal-ott-notes" style="margin:12px 0 4px 0">${notesHtml}</ul>`}
@@ -2982,8 +2989,8 @@ function openTpDetails(groupData) {
             <div class="tp-modal-your-benefits">
                 <div class="tp-modal-your-benefits-title">your benefits</div>
                 <p class="tp-modal-your-benefits-text">
-                    ${rateNames.length > 0
-            ? 'Includes ' + rateNames.slice(0, 3).join(', ') + (rateNames.length > 3 ? ' &amp; ' + (rateNames.length - 3) + ' more OTT' + (rateNames.length - 3 > 1 ? 's' : '') + '.' : '.')
+                    ${resolvedOtts.length > 0
+            ? 'Includes ' + resolvedOtts.slice(0, 3).map(s => s.title).join(', ') + (resolvedOtts.length > 3 ? ' &amp; ' + (resolvedOtts.length - 3) + ' more OTT' + (resolvedOtts.length - 3 > 1 ? 's' : '') + '.' : '.')
             : 'No OTT benefits included.'}
                     ${hasData ? buckets.find(b => b.balanceCategory === 'DATA').bucketUnitValue + ' Data.' : 'No Data included.'}
                     ${!hasVoice ? 'No Voice calls.' : ''}

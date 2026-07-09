@@ -390,20 +390,13 @@ public class TariffApprovalService {
 	private Map<String, Object> executeTariffCreation(Map<String, Object> data, String tpName, Long networkId,
 			String username) {
 
-		// Shared counter for chargeId generation: tpName_PR1, tpName_PR2, ...
-		// Resets per tariff creation call.
 		AtomicInteger prCounter = new AtomicInteger(0);
 
-		// tpSuffix: suffix appended to SERVICE_PACKAGE_DESC / SERVICE_PLAN_DESC for
-		// base service packages. Uses a global incrementing interval -> TP1, TP2, TP3
-		// ...
+		
 		int tpSuffixNumber = resolveNextTpSuffixNumber();
 		String tpSuffix = "TP" + tpSuffixNumber;
 
-		// atpSuffixCounter: starting number for per-ATP suffix generation.
-		// Each ATP in this TP gets its own unique suffix -> ATP5, ATP6, ATP7 ...
-		// The counter is incremented inside the loop (STEP 5) so all DATPs and AATPs
-		// within a single tariff creation share one monotonically increasing sequence.
+	
 		int atpSuffixCounter = resolveNextAtpSuffixNumber();
 
 		logger.info("executeTariffCreation tpName={} tpSuffix={} atpSuffixStartingAt=ATP{}",
@@ -665,9 +658,9 @@ public class TariffApprovalService {
 							    SERVICE_DURATION
 							)
 							values (?,?,?,?,?,?,?)
-							""", tariffId, atpId, networkId, "AATP", atpChargeId, priorityValue, 30);
+							""", tariffId, atpId, networkId, "RCATP", atpChargeId, priorityValue, 30);
 				} catch (Exception ex) {
-					throw new TariffInsertException("STEP 10", "CS_RAT_TARIFF_SERVICE_PACK_MAP(AATP)", ex);
+					throw new TariffInsertException("STEP 10", "CS_RAT_TARIFF_SERVICE_PACK_MAP(RCATP)", ex);
 				}
 				aatpIdx++;
 			}
@@ -807,9 +800,9 @@ public class TariffApprovalService {
 					    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSDATE
 					)
 					""",
-					chargeId, // CHARGE_ID
-					chargeId, // CHARGE_DESC
-					networkId, // NETWORK_ID
+					chargeId, 
+					chargeId, 
+					networkId, 
 					"M",
 					1,
 					data.get("charge"),
