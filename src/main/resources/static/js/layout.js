@@ -2449,6 +2449,9 @@ function _groupPlansByDesc(plans) {
                 rentalPeriod: p.rentalPeriod,
                 buckets,
                 rateGroupNames: Array.isArray(p.rateGroupNames) ? [...p.rateGroupNames] : [],
+                // Per-DATP benefit breakdown (voice/sms/data attached to individual DATPs),
+                // shown separately in the details modal underneath the main benefits.
+                datpBenefits: Array.isArray(p.datpBenefits) ? [...p.datpBenefits] : [],
                 _raw: [p],
             });
         } else {
@@ -2460,6 +2463,11 @@ function _groupPlansByDesc(plans) {
             if (Array.isArray(p.rateGroupNames)) {
                 p.rateGroupNames.forEach(function (name) {
                     if (name && !group.rateGroupNames.includes(name)) group.rateGroupNames.push(name);
+                });
+            }
+            if (Array.isArray(p.datpBenefits)) {
+                p.datpBenefits.forEach(function (datp) {
+                    if (datp && !group.datpBenefits.some(d => d.datpId === datp.datpId)) group.datpBenefits.push(datp);
                 });
             }
             group._raw.push(p);
@@ -2920,6 +2928,37 @@ function openTpDetails(groupData) {
             <span class="tp-modal-bucket-key">${b.balanceCategory.toLowerCase()}</span>
         </div>`).join('');
 
+    // ── DATP benefits: same visual style as the main buckets above,
+    //    but no price is shown, and each DATP gets its own stacked row.
+    //    The list container has a fixed max-height with scroll once it
+    //    grows beyond a few rows (see .tp-modal-datp-list in builder.css).
+    const datpBenefits = (group.datpBenefits || []).filter(d => d && (d.voiceBenefit || d.smsBenefit || d.dataBenefit));
+
+    const datpSectionHtml = datpBenefits.length ? `
+        <div class="tp-modal-datp-section">
+            <div class="tp-modal-datp-title">Benefits</div>
+            <div class="tp-modal-datp-list">
+                ${datpBenefits.map(d => {
+        const dRowBuckets = [];
+        if (d.voiceBenefit) dRowBuckets.push({ balanceCategory: 'VOICE', bucketUnitValue: d.voiceBenefit });
+        if (d.smsBenefit) dRowBuckets.push({ balanceCategory: 'SMS', bucketUnitValue: d.smsBenefit });
+        if (d.dataBenefit) dRowBuckets.push({ balanceCategory: 'DATA', bucketUnitValue: d.dataBenefit });
+
+        const dBucketsHtml = dRowBuckets.map(b => `
+                        <div class="tp-modal-bucket">
+                            <span class="tp-modal-bucket-val">${b.bucketUnitValue || '-'}</span>
+                            <span class="tp-modal-bucket-key">${b.balanceCategory.toLowerCase()}</span>
+                        </div>`).join('');
+
+        return `
+                    <div class="tp-modal-datp-row">
+                        <span class="tp-modal-datp-name">${d.datpName || 'DATP'}</span>
+                        <div class="tp-modal-buckets">${dBucketsHtml}</div>
+                    </div>`;
+    }).join('')}
+            </div>
+        </div>` : '';
+
     // ── Modal badge label ──────────────────────────────────
     const badgeLabel = (group.rentalType || '').toLowerCase() === 'others'
         ? (group.rentalPeriod != null ? group.rentalPeriod + ' Day' + (group.rentalPeriod !== 1 ? 's' : '') + ' Plan' : 'Others')
@@ -2975,6 +3014,8 @@ function openTpDetails(groupData) {
             </div>
         </div>
 
+        ${datpSectionHtml}
+
         ${resolvedOtts.length ? `<div class="tp-modal-ott-row">
             <div class="tp-modal-ott-icons">${ottStripHtml}</div>
             <ul class="tp-modal-ott-notes">${notesHtml}</ul>
@@ -3001,6 +3042,32 @@ function openTpDetails(groupData) {
     `;
 
     modal.classList.add('active');
+
+    // Shrink benefit values just enough to fit on one line (no wrap, no scroll)
+    requestAnimationFrame(() => _autofitBenefitRows(content));
+}
+
+// ── Shrinks .tp-modal-buckets rows that overflow their container ──
+// Tries progressively smaller font-size/gap steps until the row's
+// content fits within its own width, then stops. Never wraps or scrolls.
+function _autofitBenefitRows(scope) {
+    const rows = scope.querySelectorAll('.tp-modal-buckets');
+    const STEPS = [
+        { val: 16, key: 11, gap: 14 },
+        { val: 15, key: 10.5, gap: 12 },
+        { val: 14, key: 10, gap: 10 },
+        { val: 13, key: 9.5, gap: 8 },
+        { val: 12, key: 9, gap: 6 }
+    ];
+
+    rows.forEach(row => {
+        for (const step of STEPS) {
+            row.style.setProperty('--bucket-val-size', step.val + 'px');
+            row.style.setProperty('--bucket-key-size', step.key + 'px');
+            row.style.columnGap = step.gap + 'px';
+            if (row.scrollWidth <= row.clientWidth) break;
+        }
+    });
 }
 
 function closeTpDetails() {

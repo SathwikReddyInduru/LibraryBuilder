@@ -3144,12 +3144,16 @@ button:disabled {
 .tp-modal-hero {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
     margin-bottom: 18px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     background: #f8fafc;
     border-radius: 0 16px 16px 16px;
     padding: 16px 20px;
+}
+
+.tp-modal-price-block {
+    flex-shrink: 0;
 }
 
 .tp-modal-price {
@@ -3186,8 +3190,12 @@ button:disabled {
 .tp-modal-buckets {
     display: flex;
     align-items: flex-start;
-    gap: 20px;
-    flex-wrap: wrap;
+    gap: 14px;
+    flex-wrap: nowrap;
+    justify-content: space-around;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .tp-modal-bucket {
@@ -3195,21 +3203,85 @@ button:disabled {
     flex-direction: column;
     align-items: flex-start;
     gap: 1px;
+    flex-shrink: 0;
     /* no border, no divider */
 }
 
 .tp-modal-bucket-val {
-    font-size: 20px;
-    font-weight: 800;
+    font-size: var(--bucket-val-size, 16px);
+    font-weight: 700;
     color: #0f172a;
     line-height: 1.15;
+    white-space: nowrap;
 }
 
 .tp-modal-bucket-key {
-    font-size: 11px;
+    font-size: var(--bucket-key-size, 11px);
     color: #94a3b8;
     font-weight: 500;
     text-transform: lowercase;
+    white-space: nowrap;
+}
+
+/* ── DATP benefits: same look as the main buckets, no price, stacked rows ── */
+.tp-modal-datp-section {
+    margin-bottom: 18px;
+}
+
+.tp-modal-datp-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 10px;
+}
+
+/* Fixed height — scrolls once more than ~3 rows are present */
+.tp-modal-datp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 190px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.tp-modal-datp-list::-webkit-scrollbar {
+    width: 5px;
+}
+
+.tp-modal-datp-list::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 4px;
+}
+
+.tp-modal-datp-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 10px 14px;
+    flex-shrink: 0;
+}
+
+.tp-modal-datp-name {
+    font-size: 10px;
+    font-weight: 700;
+    color: #475569;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* DATP benefit values sit on a single line beneath the name */
+.tp-modal-datp-row .tp-modal-buckets {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: auto;
+    width: 100%;
 }
 
 /* ── OTT icons + bullet notes row ── */
