@@ -26,6 +26,7 @@ public class TariffPackageService {
 										SELECT a.tariff_package_id,
 				       a.tariff_package_desc,
 				       a.package_type,
+					   a.is_corporate_yn,
 
 				       MIN(c.charge_id) AS charge_id,
 
@@ -168,7 +169,8 @@ public class TariffPackageService {
 
 				GROUP BY a.tariff_package_id,
 				         a.tariff_package_desc,
-				         a.package_type
+				         a.package_type,
+						 a.is_corporate_yn
 
 				ORDER BY a.tariff_package_id
 
@@ -357,6 +359,7 @@ public class TariffPackageService {
 							rs.getString("voice_benefit"));
 
 					dto.setPackageType(rs.getString("package_type"));
+					dto.setIsCorporateYn(rs.getString("is_corporate_yn"));
 
 					dto.setRateGroupNames(
 							new ArrayList<>());

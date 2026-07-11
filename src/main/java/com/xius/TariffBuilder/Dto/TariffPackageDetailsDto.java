@@ -26,4 +26,5 @@ public class TariffPackageDetailsDto {
 
 	private List<String> rateGroupNames;
 	private List<DatpBenefitDto> datpBenefits;
+	private String isCorporateYn;
 }
