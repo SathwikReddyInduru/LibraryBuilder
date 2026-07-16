@@ -245,7 +245,11 @@ async function updatePackage() {
         renewal:          item.renewal,
         rental:           item.rental    || 0,
         maxCount:         item.maxCount  || 0,
-        freeCycles:       item.freeCycles || 0
+        freeCycles:       item.freeCycles || 0,
+        priority:         (item.priority !== '' && item.priority !== null && item.priority !== undefined && Number(item.priority) > 0)
+                              ? Number(item.priority)
+                              : 0,
+ 
     });
 
     const payload = {
@@ -296,8 +300,8 @@ async function updatePackage() {
 
         alert('✅ Package updated successfully!\nPlan: ' + (sessionStorage.getItem('configName') || ''));
         clearBuilderSession();
-        window.isInternalNavigation = true;
-        window.location.href = '/builder/step1';
+        // window.isInternalNavigation = true;
+        // window.location.href = '/builder/step1';
 
     } catch (err) {
         console.error('Update package error:', err);

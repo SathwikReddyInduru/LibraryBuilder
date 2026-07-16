@@ -10,7 +10,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -22,11 +21,14 @@ import com.xius.TariffBuilder.util.JsonStorage;
 public class SaveConfigService {
 
 	private static final Logger logger = LoggerFactory.getLogger(SaveConfigService.class);
-	@Autowired
-	private SaveConfigDao dao;
+	private final SaveConfigDao dao;
 
-	@Autowired
-	private JsonStorage jsonStorage;
+	private final JsonStorage jsonStorage;
+
+	SaveConfigService(SaveConfigDao dao, JsonStorage jsonStorage) {
+		this.dao = dao;
+		this.jsonStorage = jsonStorage;
+	}
 
 	public Map<String, Object> prepareConfig(
 

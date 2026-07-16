@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xius.TariffBuilder.util.JsonStorage;
@@ -15,8 +14,11 @@ public class TariffService {
 
 	private static final Logger logger = LoggerFactory.getLogger(TariffService.class);
 
-	@Autowired
-	private JsonStorage jsonStorage;
+	private final JsonStorage jsonStorage;
+
+	TariffService(JsonStorage jsonStorage) {
+		this.jsonStorage = jsonStorage;
+	}
 
 	public List<String> getTariffPackages() {
 

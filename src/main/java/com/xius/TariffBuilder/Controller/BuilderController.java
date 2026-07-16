@@ -10,7 +10,6 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -30,13 +29,12 @@ import com.xius.TariffBuilder.Dto.LoginRequestDto;
 import com.xius.TariffBuilder.Dto.TariffPackageDetailsDto;
 import com.xius.TariffBuilder.Dto.UsrPrivilegeDTO;
 import com.xius.TariffBuilder.Entity.ServicePlanPackMap;
-import com.xius.TariffBuilder.UserService.BundleService;
 import com.xius.TariffBuilder.UserService.SaveConfigService;
-import com.xius.TariffBuilder.UserService.ServiceCloneService;
 import com.xius.TariffBuilder.UserService.ServicePackageService;
 import com.xius.TariffBuilder.UserService.ServicePlanService;
 import com.xius.TariffBuilder.UserService.TariffApprovalService;
 import com.xius.TariffBuilder.UserService.TariffPackageService;
+import com.xius.TariffBuilder.UserService.TariffPackageSyncService;
 import com.xius.TariffBuilder.UserService.TariffService;
 import com.xius.TariffBuilder.UserService.UserLoginService;
 import com.xius.TariffBuilder.util.JsonStorage;
@@ -50,38 +48,40 @@ public class BuilderController {
 
     private static final Logger logger = LoggerFactory.getLogger(BuilderController.class);
 
-    @Autowired
-    private ServicePlanService service;
+    private final ServicePlanService service;
 
-    @Autowired
-    private TariffService tariffService;
+    private final TariffService tariffService;
 
-    @Autowired
-    private SaveConfigService saveConfigService;
+    private final SaveConfigService saveConfigService;
 
-    @Autowired
-    private UserLoginService userLoginService;
+    private final UserLoginService userLoginService;
 
-    @Autowired
-    private ServiceCloneService serviceCloneService;
 
-    @Autowired
-    private ServicePackageService servicePackageService;
+    private final ServicePackageService servicePackageService;
 
-    @Autowired
-    private BundleService bundleService;
 
-    @Autowired
-    private TariffApprovalService tariffApprovalService;
+    private final TariffApprovalService tariffApprovalService;
 
-    @Autowired
-    private JsonStorage jsonStorage;
+    private final JsonStorage jsonStorage;
 
-    @Autowired
-    private TariffPackageService tariffPackageService;
+    private final TariffPackageService tariffPackageService;
 
-    @Autowired
-    private TariffUpdateService tariffUpdateService;
+    private final TariffUpdateService tariffUpdateService;
+    private final TariffPackageSyncService tariffPackageSyncService;
+    
+
+    BuilderController(ServicePlanService service, TariffService tariffService, SaveConfigService saveConfigService, UserLoginService userLoginService, ServicePackageService servicePackageService, TariffApprovalService tariffApprovalService, JsonStorage jsonStorage, TariffPackageService tariffPackageService, TariffUpdateService tariffUpdateService,TariffPackageSyncService tariffPackageSyncService) {
+        this.service = service;
+        this.tariffService = tariffService;
+        this.saveConfigService = saveConfigService;
+        this.userLoginService = userLoginService;
+        this.servicePackageService = servicePackageService;
+        this.tariffApprovalService = tariffApprovalService;
+        this.jsonStorage = jsonStorage;
+        this.tariffPackageService = tariffPackageService;
+        this.tariffUpdateService = tariffUpdateService;
+        this.tariffPackageSyncService = tariffPackageSyncService;
+    }
 
     // ================= LOGIN =================
 
@@ -613,15 +613,17 @@ public class BuilderController {
         return ResponseEntity.ok(tariffUpdateService.getTariffPackageDetails(tariffPackageId, networkId));
     }
 
-    @ResponseBody
-@PutMapping("/update/{tariffPackageId}")
-public ResponseEntity<Map<String, Object>> updateTariffPackage(
-        @PathVariable Long tariffPackageId,
-        @RequestParam Long networkId,
-        @RequestBody Map<String, Object> requestBody) {
+ @ResponseBody
+   @PutMapping("/update/{tariffPackageId}")
+   public ResponseEntity<Map<String, Object>> updateTariffPackage(
+           @PathVariable Long tariffPackageId,
+           @RequestParam Long networkId,
+           @RequestBody Map<String, Object> requestBody,
+           HttpSession session) {
  
-    Map<String, Object> result = tariffUpdateService.updateTariffPackage(
-            tariffPackageId, networkId, requestBody);
-    return ResponseEntity.ok(result);
-}
+       String username = (String) session.getAttribute("username");
+       Map<String, Object> result = tariffPackageSyncService.syncTariffPackage(
+               tariffPackageId, networkId, requestBody, username != null ? username : "system");
+       return ResponseEntity.ok(result);
+   }
 }

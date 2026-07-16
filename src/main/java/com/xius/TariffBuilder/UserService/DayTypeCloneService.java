@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -17,9 +16,13 @@ public class DayTypeCloneService {
 
     private static final Logger logger = LoggerFactory.getLogger(DayTypeCloneService.class);
 
-    @Autowired
     @Qualifier("oracleJdbcTemplate")
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
+
+
+    DayTypeCloneService(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
    
     public Long cloneDayType(Long oldDayTypeId,
@@ -66,14 +69,11 @@ public class DayTypeCloneService {
             Long oldSlotId = ((Number) tzRow.get("RATESLOT_ID")).longValue();
             logger.info("Processing TimeZone row with RATESLOT_ID={} for oldDayTypeId={}", oldSlotId, oldDayTypeId);
 
-            // Clone RAT_MT_RATESLOTS + RAT_AT_SLOTRATE; returns the new RATESLOT_ID
             Long newSlotId = cloneSlotRate(oldSlotId, networkId);
 
-            // Clone the RAT_TIMEZONE row using the new DAYTYPE_ID and new RATESLOT_ID
             cloneTimezoneRow(newDayTypeId, newSlotId, networkId);
         }
 
-        // ── Cache and return ─────────────────────────────────────────────────
         dayTypeCache.put(oldDayTypeId, newDayTypeId);
         logger.info("Cached DayType mapping {} -> {}", oldDayTypeId, newDayTypeId);
         logger.info("DayType clone completed for oldDayTypeId={}. Returning DAYTYPE_ID={}",

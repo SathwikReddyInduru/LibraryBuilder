@@ -4,28 +4,20 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
-import com.xius.TariffBuilder.Dto.TariffPackageDetails;
 import com.xius.TariffBuilder.Entity.SaveConfigDao;
 import com.xius.TariffBuilder.UserService.BundleService.CloneAtpResult;
 import com.xius.TariffBuilder.UserService.ServiceCloneService.CloneServiceResult;
@@ -38,26 +30,35 @@ public class TariffApprovalService {
 	private static final Logger logger = LoggerFactory.getLogger(TariffApprovalService.class);
 	private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
-	@Autowired
-	private JdbcTemplate jdbcTemplate;
+	private final JdbcTemplate jdbcTemplate;
 
-	@Autowired
-	private JsonStorage jsonStorage;
+	private final JsonStorage jsonStorage;
 
-	@Autowired
-	private ServiceCloneService serviceCloneService;
+	private final ServiceCloneService serviceCloneService;
 
-	@Autowired
-	private BundleService bundleService;
+	private final BundleService bundleService;
 
-	@Autowired
-	private ServiceplanZone servicePlanZone;
+	private final ServiceplanZone servicePlanZone;
 
-	@Autowired
-	private SaveConfigDao saveConfigDao;
+	private final SaveConfigDao saveConfigDao;
 
-	@Autowired
-	private PlatformTransactionManager transactionManager;
+	private final PlatformTransactionManager transactionManager;
+
+	private final RcAtpRechargeService rcAtpRechargeService;
+
+	private final SeriesGeneratorService seriesGeneratorService;	
+
+	TariffApprovalService(JdbcTemplate jdbcTemplate, JsonStorage jsonStorage, ServiceCloneService serviceCloneService, BundleService bundleService, SaveConfigDao saveConfigDao, ServiceplanZone servicePlanZone, PlatformTransactionManager transactionManager, RcAtpRechargeService rcAtpRechargeService, SeriesGeneratorService seriesGeneratorService) {
+		this.jdbcTemplate = jdbcTemplate;
+		this.jsonStorage = jsonStorage;
+		this.serviceCloneService = serviceCloneService;
+		this.bundleService = bundleService;
+		this.saveConfigDao = saveConfigDao;
+		this.servicePlanZone = servicePlanZone;
+		this.transactionManager = transactionManager;
+		this.rcAtpRechargeService = rcAtpRechargeService;
+		this.seriesGeneratorService = seriesGeneratorService;
+	}
 
 	// =====================================================
 	// APPROVE TARIFF
@@ -187,19 +188,11 @@ public class TariffApprovalService {
 			return err;
 		}
 
-		// Guard: if name resolution produced null (should not happen after above),
-		// return error
-		if (clonedTpName == null) {
-			logger.error("clonedTpName is null after name resolution — originalTpName={}", originalTpName);
-			return Map.of("status", "error", "message",
-					"Clone failed: could not resolve a valid clone name for " + originalTpName);
-		}
-
 		// Deep-copy and mutate the data map
 		Map<String, Object> clonedData = new HashMap<>(originalData);
 		clonedData.put("publicityId", clonedPublicityId);
 		clonedData.put("tariffPackageDesc", clonedTpName);
-		// chargeIds for ATPs will be regenerated server-side (no top-level chargeId)
+
 
 		DefaultTransactionDefinition def = new DefaultTransactionDefinition();
 		def.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
@@ -251,16 +244,6 @@ public class TariffApprovalService {
 		return response;
 	}
 
-	// EXTRACT CLONE LABEL
-	private String extractCloneLabel(String tpName) {
-		if (tpName == null)
-			return tpName;
-		java.util.regex.Matcher m = java.util.regex.Pattern.compile("_(CL\\d+)$").matcher(tpName);
-		return m.find() ? m.group(1) : tpName;
-	}
-
-	// STRIP CLONE SUFFIX (remove trailing _CL<number>, _TP<number>, or
-	// _ATP<number>)
 	private String stripCloneSuffix(String name) {
 		if (name == null)
 			return null;
@@ -298,65 +281,7 @@ public class TariffApprovalService {
 		return max + 1;
 	}
 
-	// =====================================================
-	// RESOLVE NEXT TP SUFFIX NUMBER (for service package / service plan)
-	// Uses a single global interval across the CS_RAT_SERVICE_PACKAGE table.
-	// Scans all SERVICE_PACKAGE_DESC ending with _TP<n> and returns max+1.
-	// =====================================================
-	private int resolveNextTpSuffixNumber() {
-		List<String> existing = jdbcTemplate.queryForList("""
-				select SERVICE_PACKAGE_DESC
-				from CS_RAT_SERVICE_PACKAGE
-				where REGEXP_LIKE(SERVICE_PACKAGE_DESC, '_TP[0-9]+$')
-				""", String.class);
-
-		int max = 0;
-		for (String desc : existing) {
-			java.util.regex.Matcher m = java.util.regex.Pattern.compile("_TP(\\d+)$").matcher(desc);
-			if (m.find()) {
-				try {
-					int n = Integer.parseInt(m.group(1));
-					if (n > max)
-						max = n;
-				} catch (NumberFormatException ignored) {
-				}
-			}
-		}
-		logger.info("resolveNextTpSuffixNumber existingMax={} nextNumber={}", max, max + 1);
-		return max + 1;
-	}
-
-	// =====================================================
-	// RESOLVE NEXT ATP SUFFIX NUMBER (for DATP / AATP packages)
-	// Uses a single global interval across ATP records (add_pack_yn='Y').
-	// Scans all SERVICE_PACKAGE_DESC ending with _ATP<n> and returns max+1.
-	// This is called ONCE per executeTariffCreation call to get the starting
-	// number; each individual ATP then increments the local counter so that
-	// every ATP in the same TP gets its own unique suffix (ATP5, ATP6, ATP7 …).
-	// =====================================================
-	private int resolveNextAtpSuffixNumber() {
-		List<String> existing = jdbcTemplate.queryForList("""
-				select SERVICE_PACKAGE_DESC
-				from CS_RAT_SERVICE_PACKAGE
-				where ADD_PACK_YN = 'Y'
-				  and REGEXP_LIKE(SERVICE_PACKAGE_DESC, '_ATP[0-9]+$')
-				""", String.class);
-
-		int max = 0;
-		for (String desc : existing) {
-			java.util.regex.Matcher m = java.util.regex.Pattern.compile("_ATP(\\d+)$").matcher(desc);
-			if (m.find()) {
-				try {
-					int n = Integer.parseInt(m.group(1));
-					if (n > max)
-						max = n;
-				} catch (NumberFormatException ignored) {
-				}
-			}
-		}
-		logger.info("resolveNextAtpSuffixNumber existingMax={} nextNumber={}", max, max + 1);
-		return max + 1;
-	}
+	
 
 	// =====================================================
 	// REJECT TARIFF
@@ -370,7 +295,6 @@ public class TariffApprovalService {
 			return err;
 		}
 
-		// Save to rejected-tariffs.json before removing from pending
 		Map<String, Object> rejectedEntry = new LinkedHashMap<>(json);
 		rejectedEntry.put("rejectedOn", java.time.LocalDateTime.now().toString());
 		rejectedEntry.put("remarks", remarks != null ? remarks : "");
@@ -385,19 +309,18 @@ public class TariffApprovalService {
 	}
 
 	// =====================================================
-	// SHARED CORE: executeTariffCreation
+	// executeTariffCreation
 	// =====================================================
 	private Map<String, Object> executeTariffCreation(Map<String, Object> data, String tpName, Long networkId,
 			String username) {
 
-		AtomicInteger prCounter = new AtomicInteger(0);
 
-		
-		int tpSuffixNumber = resolveNextTpSuffixNumber();
+
+		int tpSuffixNumber = seriesGeneratorService.resolveNextTpSuffixNumber();
 		String tpSuffix = "TP" + tpSuffixNumber;
 
-	
-		int atpSuffixCounter = resolveNextAtpSuffixNumber();
+
+		int atpSuffixCounter = seriesGeneratorService.resolveNextAtpSuffixNumber();
 
 		logger.info("executeTariffCreation tpName={} tpSuffix={} atpSuffixStartingAt=ATP{}",
 				tpName, tpSuffix, atpSuffixCounter);
@@ -439,9 +362,6 @@ public class TariffApprovalService {
 			}
 
 			// ── STEP 3 ──────────────────────────────────────────────────────
-			// Zone cloning uses tpSuffix for the plan zone.
-			// For the bucket zone, we use the first ATP's suffix (atpSuffixCounter as-is),
-			// since all ATPs share a single newBucketZoneId for this TP.
 			Long newPlanZoneId;
 			Long newBucketZoneId;
 
@@ -476,9 +396,6 @@ public class TariffApprovalService {
 					newServicePlanId);
 
 			// ── STEP 5 ──────────────────────────────────────────────────────
-			// Each ATP gets its own unique suffix (ATP5, ATP6, ATP7 ...) by incrementing
-			// atpSuffixCounter inside the loop. DATPs are processed first, then AATPs,
-			// so the sequence is continuous across both lists.
 			List<Long> defaultAtpIds = new ArrayList<>();
 			List<Long> allowedAtpIds = new ArrayList<>();
 			List<Long> newAtpIds = new ArrayList<>();
@@ -507,7 +424,6 @@ public class TariffApprovalService {
 
 				if (hasAllowedAtps) {
 					for (Map<String, Object> atp : addAtps) {
-						// ── Unique suffix for this specific ATP ──────────────
 						String atpSuffix = "ATP" + atpSuffixCounter++;
 
 						String chargeId = tpName + "_" + atpSuffix;
@@ -629,10 +545,11 @@ public class TariffApprovalService {
 							    TARIFF_PLAN_TYPE,
 							    CHARGE_ID,
 							    PRIORITY,
-							    SERVICE_DURATION
+							    SERVICE_DURATION,
+								EFFECTIVE_START_OFFSET
 							)
-							values (?,?,?,?,?,?,?)
-							""", tariffId, atpId, networkId, "DATP", atpChargeId, priorityValue, 30);
+							values (?,?,?,?,?,?,?,?)
+							""", tariffId, atpId, networkId, "DATP", atpChargeId, priorityValue, 30,0);
 				} catch (Exception ex) {
 					throw new TariffInsertException("STEP 10", "CS_RAT_TARIFF_SERVICE_PACK_MAP(DATP)", ex);
 				}
@@ -655,14 +572,28 @@ public class TariffApprovalService {
 							    TARIFF_PLAN_TYPE,
 							    CHARGE_ID,
 							    PRIORITY,
-							    SERVICE_DURATION
+							    SERVICE_DURATION,
+								EFFECTIVE_START_OFFSET
 							)
-							values (?,?,?,?,?,?,?)
-							""", tariffId, atpId, networkId, "RCATP", atpChargeId, priorityValue, 30);
+							values (?,?,?,?,?,?,?,?)
+							""", tariffId, atpId, networkId, "RCATP", atpChargeId, priorityValue, 30,0);
 				} catch (Exception ex) {
 					throw new TariffInsertException("STEP 10", "CS_RAT_TARIFF_SERVICE_PACK_MAP(RCATP)", ex);
 				}
 				aatpIdx++;
+			}
+
+			if (!allowedAtpIds.isEmpty()) {
+
+				logger.info(
+						"Creating Recharge Product for RCATPs. tariffId={}, rcAtpCount={}",
+						tariffId,
+						allowedAtpIds.size());
+				rcAtpRechargeService.createRcForRcAtps(
+						tariffId,
+						tpName,
+						networkId,
+						allowedAtpIds);
 			}
 
 			Map<String, Object> response = new HashMap<>();
@@ -800,9 +731,9 @@ public class TariffApprovalService {
 					    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSDATE
 					)
 					""",
-					chargeId, 
-					chargeId, 
-					networkId, 
+					chargeId,
+					chargeId,
+					networkId,
 					"M",
 					1,
 					data.get("charge"),

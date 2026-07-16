@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -19,9 +18,12 @@ public class BundleService {
 
 	private static final Logger logger = LoggerFactory.getLogger(BundleService.class);
 
-	@Autowired
 	@Qualifier("oracleJdbcTemplate")
-	private JdbcTemplate jdbcTemplate;
+	private final JdbcTemplate jdbcTemplate;
+
+	BundleService(JdbcTemplate jdbcTemplate) {
+		this.jdbcTemplate = jdbcTemplate;
+	}
 
 	public static class CloneAtpResult {
 
@@ -54,9 +56,11 @@ public class BundleService {
 		}
 	}
 
-	/*
-	 * Get first old bucket id from ATP.
-	 */
+
+
+	
+	 // Get first old bucket id from ATP.
+	 
 	public String getOldBucketId(Long atpId, Long networkId) {
 
 		return jdbcTemplate.query("""
@@ -70,9 +74,9 @@ public class BundleService {
 				""", rs -> rs.next() ? rs.getString("BUCKET_ID") : null, atpId, networkId);
 	}
 
-	/*
-	 * Get zone id from old bucket.
-	 */
+	
+	 //Get zone id from old bucket.
+	 
 	public Long getBucketZoneId(String bucketId) {
 
 		if (bucketId == null) {
@@ -86,9 +90,7 @@ public class BundleService {
 				""", rs -> rs.next() ? rs.getObject("ZONE_GROUP_ID", Long.class) : null, bucketId);
 	}
 
-	/*
-	 * Generate new bucket zone id based on bucket table.
-	 */
+	 // Generate new bucket zone id based on bucket table.
 	public Long generateNewBucketZoneId() {
 
 		return jdbcTemplate.queryForObject("""
@@ -97,9 +99,9 @@ public class BundleService {
 				""", Long.class);
 	}
 
-	/*
-	 * Clone ATP, bundle, and bucket. Bucket will use newBucketZoneId.
-	 */
+	
+	 //Clone ATP, bundle, and bucket. Bucket will use newBucketZoneId.
+
 	@Transactional
 	public CloneAtpResult cloneAtpData(Long atpId, Long networkId, String tpName, Long newBucketZoneId) {
 
@@ -345,10 +347,9 @@ public class BundleService {
 		return newBundleId;
 	}
 
-	/*
-	 * Clone all SIM/IMSI range rows for a bundle, assigning them to the new bundle
-	 * id.
-	 */
+	
+	 //Clone all SIM/IMSI range rows for a bundle, assigning them to the new bundle
+	
 	private void cloneImsiRanges(Long oldBundleId, Long newBundleId, Long networkId) {
 
 		List<Map<String, Object>> ranges = jdbcTemplate.queryForList("""

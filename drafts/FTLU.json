@@ -1,0 +1,47 @@
+[ {
+  "name" : "Untitled Draft",
+  "pkgType" : "PREPAID",
+  "pkgSubType" : "GENERAL",
+  "periodicChargeID" : "",
+  "savedOn" : "15 Jul 2026",
+  "savedTime" : "11:49",
+  "username" : "FTLU",
+  "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
+  "selectedSvcs_s3" : "[\"SMS\"]",
+  "selectedSvcs_s4" : "[\"SMS\"]",
+  "state" : {
+    "s2" : [ {
+      "id" : "1",
+      "name" : "FT_TRAIFF_PLAN",
+      "networkId" : "1"
+    } ],
+    "s3" : [ {
+      "id" : "9",
+      "name" : "F1_SMS_100",
+      "validity" : "M",
+      "rentalPeriod" : "",
+      "renewal" : "No",
+      "midnightExpiry" : "No",
+      "rental" : "",
+      "maxCount" : "",
+      "freeCycles" : "0",
+      "priority" : ""
+    } ],
+    "s4" : [ {
+      "id" : "7",
+      "name" : "F1 SMS 50",
+      "validity" : "M",
+      "rentalPeriod" : "",
+      "renewal" : "No",
+      "midnightExpiry" : "No",
+      "rental" : "",
+      "maxCount" : "",
+      "freeCycles" : "0",
+      "priority" : ""
+    } ],
+    "price" : "876",
+    "publicityCode" : "",
+    "endDate" : "",
+    "isCorporate" : false
+  }
+} ]

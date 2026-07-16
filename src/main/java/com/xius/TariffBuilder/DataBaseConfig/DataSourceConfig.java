@@ -38,4 +38,3 @@ public PlatformTransactionManager transactionManager(
     return new DataSourceTransactionManager(ds);
 }
 }
- 

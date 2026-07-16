@@ -6,7 +6,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xius.TariffBuilder.Dto.LoginRequestDto;
@@ -17,8 +16,11 @@ public class UserLoginService {
 
 	private static final Logger logger = LoggerFactory.getLogger(UserLoginService.class);
 
-	@Autowired
-	private UserAuthRepository repository;
+	private final UserAuthRepository repository;
+
+	UserLoginService(UserAuthRepository repository) {
+		this.repository = repository;
+	}
 
 	public Map<String, Object> authenticate(LoginRequestDto request) {
 

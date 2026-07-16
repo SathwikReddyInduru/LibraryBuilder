@@ -11,13 +11,14 @@ public class TariffInsertException extends RuntimeException {
         this.failedTable = failedTable;
     }
 
-    public String getStep()        { return step; }
-    public String getFailedTable() { return failedTable; }
+    public String getStep() {
+        return step;
+    }
 
-    /**
-     * Walks the cause chain and returns the first java.sql.SQLException found,
-     * which carries the Oracle error code (getErrorCode()) and ORA- message.
-     */
+    public String getFailedTable() {
+        return failedTable;
+    }
+
     public java.sql.SQLException getSqlCause() {
         Throwable t = getCause();
         while (t != null) {

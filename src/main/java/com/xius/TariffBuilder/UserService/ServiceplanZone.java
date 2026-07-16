@@ -6,7 +6,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -20,13 +19,15 @@ public class ServiceplanZone {
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceplanZone.class);
 
-    @Autowired
     @Qualifier("oracleJdbcTemplate")
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
 
-    // ── NEW: delegate DayType / TimeZone / SlotRate cloning ──────────────────
-    @Autowired
-    private DayTypeCloneService dayTypeCloneService;
+    private final DayTypeCloneService dayTypeCloneService;
+
+    ServiceplanZone(JdbcTemplate jdbcTemplate, DayTypeCloneService dayTypeCloneService) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.dayTypeCloneService = dayTypeCloneService;
+    }
 
     public Long generateNewZoneId() {
         return jdbcTemplate.queryForObject(

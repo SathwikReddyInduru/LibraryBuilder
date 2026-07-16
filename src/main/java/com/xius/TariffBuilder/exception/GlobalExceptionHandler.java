@@ -18,9 +18,8 @@ public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    // -------------------------------------------------------------------------
     // TariffInsertException — DB failure during clone / approve
-    // -------------------------------------------------------------------------
+
     @ExceptionHandler(TariffInsertException.class)
     public ResponseEntity<Map<String, Object>> handleTariffInsert(TariffInsertException ex) {
 
@@ -36,9 +35,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.ok(body);
     }
 
-    // -------------------------------------------------------------------------
     // Request / parameter errors
-    // -------------------------------------------------------------------------
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<Map<String, Object>> handleMissingParam(MissingServletRequestParameterException ex) {
         return error("Missing required parameter.",
@@ -57,9 +54,7 @@ public class GlobalExceptionHandler {
                      "The request body is missing or not valid JSON.");
     }
 
-    // -------------------------------------------------------------------------
     // Null / generic runtime errors
-    // -------------------------------------------------------------------------
     @ExceptionHandler(NullPointerException.class)
     public ResponseEntity<Map<String, Object>> handleNpe(NullPointerException ex) {
         logger.error("NullPointerException", ex);
@@ -73,7 +68,7 @@ public class GlobalExceptionHandler {
 
         // Never forward raw exception messages to the UI — they can contain SQL text.
         if (isSqlRelated(ex)) {
-            return error("Tariff package creation failed.",
+            return error("Tariff package update failed.",
                          "A database error occurred. Check server logs for details.");
         }
 
@@ -97,11 +92,8 @@ public class GlobalExceptionHandler {
                      "Check server logs for details.");
     }
 
-    // =========================================================================
     // Helpers
-    // =========================================================================
 
-    /** Builds the response with both message (what) and reason (why). */
     private ResponseEntity<Map<String, Object>> error(String message, String reason) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status",  "error");
@@ -163,7 +155,7 @@ public class GlobalExceptionHandler {
      */
     private String[] resolveOracleMessage(TariffInsertException ex) {
 
-        String what = "Tariff package creation failed.";
+        String what = "Tariff package " + describeAction(ex.getStep()) + " failed.";
 
         SQLException sql = ex.getSqlCause();
         if (sql == null) {
@@ -269,6 +261,17 @@ public class GlobalExceptionHandler {
                         : "Unexpected database error. Check server logs for details."
                 };
         }
+    }
+
+    /** Maps a TariffInsertException step prefix (ADD_/UPDATE_/DELETE_/REMOVE_...) to a friendly action word. */
+    private String describeAction(String step) {
+        if (step == null) return "operation";
+        String s = step.toUpperCase();
+        if (s.startsWith("ADD") || s.startsWith("INSERT")) return "creation";
+        if (s.startsWith("UPDATE")) return "update";
+        if (s.startsWith("DELETE")) return "deletion";
+        if (s.startsWith("REMOVE")) return "removal";
+        return "operation";
     }
 
     /** Extracts "(SCHEMA.CONSTRAINT_NAME)" from ORA-00001 / ORA-02291 messages. */

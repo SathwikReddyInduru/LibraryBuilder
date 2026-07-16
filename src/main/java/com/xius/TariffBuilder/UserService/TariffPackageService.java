@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -16,9 +15,12 @@ import com.xius.TariffBuilder.Dto.TariffPackageDetailsDto;
 @Service
 public class TariffPackageService {
 
-	@Autowired
 	@Qualifier("oracleJdbcTemplate")
-	private JdbcTemplate jdbcTemplate;
+	private final JdbcTemplate jdbcTemplate;
+
+	TariffPackageService(JdbcTemplate jdbcTemplate) {
+		this.jdbcTemplate = jdbcTemplate;
+	}
 
 	public List<TariffPackageDetailsDto> getTariffPackageDetails(Integer networkId) {
 

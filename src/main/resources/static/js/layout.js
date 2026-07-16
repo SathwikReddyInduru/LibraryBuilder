@@ -695,6 +695,38 @@ function checkStepAccess(targetStep) {
         return false;
     }
 
+    // Priority is mandatory on every DATP (s3) package before moving past Step 3
+    const hasStep3Data = state.s3 && Array.isArray(state.s3) && state.s3.length > 0;
+ 
+    if (targetStep > 3 && hasStep3Data) {
+        const missing = state.s3.find(item =>
+            item.priority === "" || item.priority === null || item.priority === undefined || Number(item.priority) <= 0
+        );
+ 
+        if (missing) {
+            alert(`Please enter a priority for "${missing.name}" before proceeding.`);
+            const input = document.getElementById(`priority-s3-${missing.id}`);
+            if (input) input.focus();
+            return false;
+        }
+    }
+ 
+    // Priority is mandatory on every AATP (s4) package before moving past Step 4
+    const hasStep4Data = state.s4 && Array.isArray(state.s4) && state.s4.length > 0;
+ 
+    if (targetStep > 4 && hasStep4Data) {
+        const missing = state.s4.find(item =>
+            item.priority === "" || item.priority === null || item.priority === undefined || Number(item.priority) <= 0
+        );
+ 
+        if (missing) {
+            alert(`Please enter a priority for "${missing.name}" before proceeding.`);
+            const input = document.getElementById(`priority-s4-${missing.id}`);
+            if (input) input.focus();
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -747,6 +779,29 @@ async function saveConfiguration() {
 
     if (!state.publicityCode) {
         alert("Enter publicity code");
+        return;
+    }
+
+    // Priority is mandatory for every DATP (s3) and AATP (s4) package
+    const missingPriorityS3 = (state.s3 || []).find(item =>
+        item.priority === "" || item.priority === null || item.priority === undefined || Number(item.priority) <= 0
+    );
+ 
+    if (missingPriorityS3) {
+        alert(`Priority is required for "${missingPriorityS3.name}". Please enter a priority greater than 0.`);
+        const input = document.getElementById(`priority-s3-${missingPriorityS3.id}`);
+        if (input) input.focus();
+        return;
+    }
+ 
+    const missingPriorityS4 = (state.s4 || []).find(item =>
+        item.priority === "" || item.priority === null || item.priority === undefined || Number(item.priority) <= 0
+    );
+ 
+    if (missingPriorityS4) {
+        alert(`Priority is required for "${missingPriorityS4.name}". Please enter a priority greater than 0.`);
+        const input = document.getElementById(`priority-s4-${missingPriorityS4.id}`);
+        if (input) input.focus();
         return;
     }
 
@@ -1682,7 +1737,8 @@ async function loadApprovedPackage(index) {
                 renewal: a.renewal,
                 rental: a.rental,
                 maxCount: a.maxCount,
-                freeCycles: a.freeCycles
+                freeCycles: a.freeCycles,
+                priority: a.priority
             })),
             s4: (d.allowedAtps || []).map(a => ({
                 id: a.servicePackageId,
@@ -1694,7 +1750,8 @@ async function loadApprovedPackage(index) {
                 renewal: a.renewal,
                 rental: a.rental,
                 maxCount: a.maxCount,
-                freeCycles: a.freeCycles
+                freeCycles: a.freeCycles,
+                priority: a.priority
             })),
             price: d.charge || '',
             publicityCode: d.publicityId || '',
@@ -2836,7 +2893,8 @@ async function _cloneTreeAction(action) {
                 renewal: a.renewal,
                 rental: a.rental,
                 maxCount: a.maxCount,
-                freeCycles: a.freeCycles
+                freeCycles: a.freeCycles,
+                priority: a.priority
             })),
             s4: (d.allowedAtps || []).map(a => ({
                 id: a.servicePackageId,
@@ -2847,7 +2905,8 @@ async function _cloneTreeAction(action) {
                 renewal: a.renewal,
                 rental: a.rental,
                 maxCount: a.maxCount,
-                freeCycles: a.freeCycles
+                freeCycles: a.freeCycles,
+                priority: a.priority
             })),
             price: d.charge || '',
             publicityCode: d.publicityId || '',

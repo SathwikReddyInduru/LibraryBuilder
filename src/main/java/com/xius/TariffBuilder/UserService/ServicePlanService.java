@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -16,15 +15,13 @@ public class ServicePlanService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ServicePlanService.class);
 
-	@Autowired
 	@Qualifier("oracleJdbcTemplate")
-	private JdbcTemplate jdbcTemplate;
+	private final JdbcTemplate jdbcTemplate;
 
-	// Exclude service packages whose name ends with a cloned suffix:
-	// _TP<n> – step-2 service package clone
-	// _CL<n> – legacy clone suffix
-	// _ATP<n> – DATP / AATP clone
-	private static final String EXCLUDE_CLONED_CONDITION = "NOT REGEXP_LIKE(a.service_package_desc, '_(TP|CL|ATP)[0-9]+$')";
+
+	ServicePlanService(JdbcTemplate jdbcTemplate) {
+		this.jdbcTemplate = jdbcTemplate;
+	}
 
 	public List<ServicePlanPackMap> getPlans(Long networkId, String types) {
 
