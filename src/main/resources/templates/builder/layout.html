@@ -122,14 +122,19 @@
                 </div>
                 <div class="header-pill-controls" th:classappend="${activeStep == 0} ? ' hidden'">
                     <input type="text" placeholder="Name..." class="config-name" id="configName">
-                    <span class="material-icons reset-btn" id="resetBtn" onclick="resetBuilder()" title="Reset builder"
-                        th:classappend="${activeStep == 0} ? ' hidden'">
-                        restart_alt
-                    </span>
-                    <span class="material-icons save-draft-btn" id="saveDraftBtn" onclick="manualSaveDraft()"
-                        title="Save as Draft" th:classappend="${activeStep == 0} ? ' hidden'">
-                        save
-                    </span>
+                    <div class="header-icon-btn" th:classappend="${activeStep == 0} ? ' hidden'">
+                        <span class="material-icons reset-btn" id="resetBtn" onclick="resetBuilder()" title="Reset builder">
+                            restart_alt
+                        </span>
+                        <span class="header-icon-label">Reset</span>
+                    </div>
+                    <div class="header-icon-btn" th:classappend="${activeStep == 0} ? ' hidden'">
+                        <span class="material-icons save-draft-btn" id="saveDraftBtn" onclick="manualSaveDraft()"
+                            title="Save as Draft">
+                            save
+                        </span>
+                        <span class="header-icon-label">Draft</span>
+                    </div>
                 </div>
             </header>
 

@@ -10,31 +10,39 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
  
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.transaction.PlatformTransactionManager;
- 
 @Configuration
 public class DataSourceConfig {
  
     // ORACLE
     @Primary
-@Bean(name="oracleDataSource")
-@ConfigurationProperties(prefix="login.datasource")
-public DataSource oracleDataSource() {
-    return DataSourceBuilder.create().build();
-}
+    @Bean(name="oracleDataSource")
+    @ConfigurationProperties(prefix="spring.datasource")
+    public DataSource oracleDataSource(){
  
-@Primary
-@Bean(name="oracleJdbcTemplate")
-public JdbcTemplate oracleJdbcTemplate(
-        @Qualifier("oracleDataSource") DataSource ds) {
-    return new JdbcTemplate(ds);
-}
+        return DataSourceBuilder.create().build();
+    }
  
-@Primary
-@Bean(name="transactionManager")
-public PlatformTransactionManager transactionManager(
-        @Qualifier("oracleDataSource") DataSource ds) {
-    return new DataSourceTransactionManager(ds);
-}
+    @Primary
+    @Bean(name="oracleJdbcTemplate")
+    public JdbcTemplate oracleJdbcTemplate(
+            @Qualifier("oracleDataSource") DataSource ds){
+ 
+        return new JdbcTemplate(ds);
+    }
+ 
+ 
+    // POSTGRES (LOGIN)
+    @Bean(name="pgDataSource")
+    @ConfigurationProperties(prefix="postgredb.datasource")
+    public DataSource pgDataSource(){
+ 
+        return DataSourceBuilder.create().build();
+    }
+ 
+    @Bean(name="pgJdbcTemplate")
+    public JdbcTemplate pgJdbcTemplate(
+            @Qualifier("pgDataSource") DataSource ds){
+ 
+        return new JdbcTemplate(ds);
+    }
 }

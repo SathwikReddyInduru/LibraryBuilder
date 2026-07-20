@@ -318,6 +318,7 @@ public class TariffApprovalService {
 
 		int tpSuffixNumber = seriesGeneratorService.resolveNextTpSuffixNumber();
 		String tpSuffix = "TP" + tpSuffixNumber;
+		String publicity= (String) data.get("publicityId");
 
 
 		int atpSuffixCounter = seriesGeneratorService.resolveNextAtpSuffixNumber();
@@ -582,11 +583,11 @@ public class TariffApprovalService {
 				}
 				aatpIdx++;
 			}
-
+            
+			
 			if (!allowedAtpIds.isEmpty()) {
 
-				// One RC per RCATP: pair each new ATP id with its own MRP
-				// (addAtps is built in the exact same order as allowedAtpIds above).
+				
 				List<Map<String, Object>> rcAtpPayload = new ArrayList<>();
 				for (int i = 0; i < allowedAtpIds.size(); i++) {
 					Map<String, Object> rcEntry = new HashMap<>();
@@ -601,7 +602,7 @@ public class TariffApprovalService {
 						allowedAtpIds.size());
 				rcAtpRechargeService.createRcForRcAtps(
 						tariffId,
-						tpName,
+						publicity,
 						networkId,
 						rcAtpPayload);
 			}

@@ -96,11 +96,11 @@ async function clonePackageFromBuilder() {
       item.mrp === "" ||
       item.mrp === null ||
       item.mrp === undefined ||
-      Number(item.mrp) <= 0,
+      Number(item.mrp) < 0,
   );
   if (missingMrpS4Clone) {
     alert(
-      `MRP is required for "${missingMrpS4Clone.name}". Please enter an MRP greater than 0.`,
+      `MRP is required for "${missingMrpS4Clone.name}". Please enter a valid MRP.`,
     );
     return;
   }
@@ -271,11 +271,11 @@ async function updatePackage() {
       item.mrp === "" ||
       item.mrp === null ||
       item.mrp === undefined ||
-      Number(item.mrp) <= 0,
+      Number(item.mrp) < 0,
   );
   if (missingMrpS4Update) {
     alert(
-      `MRP is required for "${missingMrpS4Update.name}". Please enter an MRP greater than 0.`,
+      `MRP is required for "${missingMrpS4Update.name}". Please enter a valid MRP.`,
     );
     return;
   }

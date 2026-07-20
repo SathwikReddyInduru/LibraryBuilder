@@ -717,12 +717,12 @@ function checkStepAccess(targetStep) {
         item.mrp === "" ||
         item.mrp === null ||
         item.mrp === undefined ||
-        Number(item.mrp) <= 0,
+        Number(item.mrp) < 0,
     );
 
     if (missingMrp) {
       alert(
-        `Please enter an MRP greater than 0 for "${missingMrp.name}" before proceeding.`,
+        `Please enter a valid MRP for "${missingMrp.name}" before proceeding.`,
       );
       const input = document.getElementById(`mrp-s4-${missingMrp.id}`);
       if (input) input.focus();
@@ -828,12 +828,12 @@ async function saveConfiguration() {
       item.mrp === "" ||
       item.mrp === null ||
       item.mrp === undefined ||
-      Number(item.mrp) <= 0,
+      Number(item.mrp) < 0,
   );
 
   if (missingMrpS4) {
     alert(
-      `MRP is required for "${missingMrpS4.name}". Please enter an MRP greater than 0.`,
+      `MRP is required for "${missingMrpS4.name}". Please enter a valid MRP.`,
     );
     const input = document.getElementById(`mrp-s4-${missingMrpS4.id}`);
     if (input) input.focus();
@@ -1684,7 +1684,7 @@ function loadApproved() {
         .map(
           (p, i) => `
                 <div class="draft-item saved" style="--i:${i}">
-                    <div class="draft-info" onclick="loadApprovedPackage(${i})" style="cursor:pointer;">
+                    <div class="draft-info" onclick="openApprovedTpDetails(${i})" style="cursor:pointer;">
                         <span class="material-icons draft-icon" style="color:#22c55e;">check_circle</span>
                         <div class="draft-text">
                             <span class="draft-name">${p.tariffPackageDesc}</span>
@@ -1742,14 +1742,14 @@ function filterApproved(query) {
       const originalIndex = plans.indexOf(p);
       return `
         <div class="draft-item saved" style="--i:${i}">
-            <div class="draft-info" onclick="loadApprovedPackage(${originalIndex})" style="cursor:pointer;">
+            <div class="draft-info" onclick="openApprovedTpDetails(${originalIndex})" style="cursor:pointer;">
                 <span class="material-icons draft-icon" style="color:#22c55e;">check_circle</span>
                 <div class="draft-text">
                     <span class="draft-name">${p.tariffPackageDesc}</span>
                     <span class="draft-meta">${meta}</span>
                 </div>
             </div>
-            <span class="draft-delete" style="cursor:default;font-style:normal;font-size:13px;font-weight:600;color:var(--text-muted,#888);">₹${fee}</span>
+            <span class="draft-delete" style="cursor:default;font-style:normal;font-size:13px;font-weight:600;color:var(--text-muted,#888);">₸${fee}</span>
         </div>`;
     })
     .join("");
@@ -1767,100 +1767,19 @@ function clearApprovedSearch() {
   filterApproved("");
 }
 
-async function loadApprovedPackage(index) {
+// Clicking an approved TP card now opens the same details modal used in the
+// clone page's "Select" button (cloneTreeModal), instead of jumping straight
+// into the builder. The "approved" context is passed through so the modal's
+// Modify/Clone actions know this plan is an already-approved TP (see
+// _cloneTreeAction) rather than a plan being cloned from the clone page.
+function openApprovedTpDetails(index) {
   const plan = window.ALL_APPROVED[index];
-  const container = document.getElementById("approvedOverlayList");
-  container.innerHTML = '<p class="sidebar-text">Loading details…</p>';
-
-  try {
-    const networkId =
-      typeof NETWORK_ID !== "undefined" && NETWORK_ID ? NETWORK_ID : "";
-    const res = await fetch(
-      "/details?networkId=" +
-        networkId +
-        "&tariffPackageId=" +
-        plan.tariff_package_id,
-    );
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-
-    const d = data.data || data;
-
-    const svcsToJson = (val) => {
-      if (Array.isArray(val)) return JSON.stringify(val);
-      if (typeof val === "string") return val || "[]";
-      return "[]";
-    };
-
-    const state = {
-      s2: [{ id: d.tariffPlanId, name: d.tariffPlanName }],
-      s3: (d.defaultAtps || []).map((a) => ({
-        id: a.servicePackageId,
-        name: a.packageName,
-        chargeId: a.chargeId || "",
-        validity: a.validity,
-        rentalPeriod: a.rentalPeriod || "",
-        midnightExpiry: a.midnightExpiry,
-        renewal: a.renewal,
-        rental: a.rental,
-        maxCount: a.maxCount,
-        freeCycles: a.freeCycles,
-        priority: a.priority,
-      })),
-      s4: (d.allowedAtps || []).map((a) => ({
-        id: a.servicePackageId,
-        name: a.packageName,
-        chargeId: a.chargeId || "",
-        validity: a.validity,
-        rentalPeriod: a.rentalPeriod || "",
-        midnightExpiry: a.midnightExpiry,
-        renewal: a.renewal,
-        rental: a.rental,
-        maxCount: a.maxCount,
-        freeCycles: a.freeCycles,
-        priority: a.priority,
-        mrp: a.mrp,
-      })),
-      price: d.charge || "",
-      publicityCode: d.publicityId || "",
-      endDate: (function () {
-        if (!d.endDate) return "";
-        const p = d.endDate.split("/");
-        return p.length === 3 ? p[2] + "-" + p[0] + "-" + p[1] : d.endDate;
-      })(),
-      isCorporate: d.isCorporateYn || false,
-    };
-
-    sessionStorage.setItem("state", JSON.stringify(state));
-    sessionStorage.setItem(
-      "configName",
-      data.tpName || d.tariffPackageDesc || plan.tariffPackageDesc,
-    );
-    sessionStorage.setItem("pkgType", d.packageType || "");
-    sessionStorage.setItem("pkgSubType", d.tariffPackCategory || "GENERAL");
-    sessionStorage.setItem("periodicChargeID", d.periodicChargeID || "");
-    sessionStorage.setItem("selectedSvcs_s2", svcsToJson(d.selectedSvcs_s2));
-    sessionStorage.setItem("selectedSvcs_s3", svcsToJson(d.selectedSvcs_s3));
-    sessionStorage.setItem("selectedSvcs_s4", svcsToJson(d.selectedSvcs_s4));
-    sessionStorage.setItem("isUpdate", "true");
-    sessionStorage.setItem("approvedMode", "true");
-    sessionStorage.setItem(
-      "approvedTpName",
-      data.tpName || plan.tariffPackageDesc,
-    );
-    sessionStorage.setItem(
-      "approvedTariffPackageId",
-      String(plan.tariff_package_id || ""),
-    );
-
-    closeApproved();
-    window.isInternalNavigation = true;
-    window.location.href = "/builder/step1";
-  } catch (err) {
-    console.error("Approved package load error:", err);
-    container.innerHTML =
-      '<p class="sidebar-text" style="color:#e63946;">Failed to load plan details. Please try again.</p>';
-  }
+  if (!plan) return;
+  openCloneTree(
+    encodeURIComponent(plan.tariffPackageDesc),
+    plan.tariff_package_id,
+    "approved",
+  );
 }
 
 // ── REJECTED TPs OVERLAY ─────────────────────────────────────────
@@ -2692,6 +2611,8 @@ function _groupPlansByDesc(plans) {
         activationFee: p.activationFee,
         rentalType: p.rentalType,
         rentalPeriod: p.rentalPeriod,
+        isCorporateYn: p.isCorporateYn,
+        packageType: p.packageType,
         buckets,
         rateGroupNames: Array.isArray(p.rateGroupNames)
           ? [...p.rateGroupNames]
@@ -2738,7 +2659,7 @@ function _applyTpSearch(query) {
 
   const q = query.trim().toLowerCase();
 
-  // 1. Text search filter — include benefit columns in search scope
+  // 1. Text search filter — include benefit columns + package type/corp in scope
   let flatFiltered = q
     ? _allTpPlans.filter((p) => {
         const fee = String(p.activationFee ?? "");
@@ -2746,12 +2667,19 @@ function _applyTpSearch(query) {
         const data = (p.dataBenefit || "").toLowerCase();
         const sms = (p.smsBenefit || "").toLowerCase();
         const voice = (p.voiceBenefit || "").toLowerCase();
+        const packageType = (p.packageType || "").toLowerCase();
+        const corpText =
+          (p.isCorporateYn || "").toUpperCase() === "Y"
+            ? "corp corporate"
+            : "";
         return (
           fee.includes(q) ||
           desc.includes(q) ||
           data.includes(q) ||
           sms.includes(q) ||
-          voice.includes(q)
+          voice.includes(q) ||
+          packageType.includes(q) ||
+          corpText.includes(q)
         );
       })
     : _allTpPlans;
@@ -2801,7 +2729,7 @@ function _applyTpSearch(query) {
     const feeNum = Number(group.activationFee);
     const priceHtml = `
             <span class="tp-price-main">
-                <sup>₹</sup>${feeNum.toLocaleString("en-IN")}
+                <sup>₸</sup>${feeNum.toLocaleString("en-IN")}
             </span>
             <span class="tp-price-period">/m+GST</span>
         `;
@@ -2821,6 +2749,15 @@ function _applyTpSearch(query) {
       })
       .join('<div class="tp-meta-sep"></div>');
 
+    // Package type tag: always shown (Prepaid/Postpaid/whatever the API sends)
+    const pkgTypeRaw = (group.packageType || "").trim();
+    const pkgTypeLabel = pkgTypeRaw
+      ? pkgTypeRaw.charAt(0).toUpperCase() + pkgTypeRaw.slice(1).toLowerCase()
+      : "";
+
+    // Corp tag: only shown when isCorporateYn === "Y"
+    const isCorp = (group.isCorporateYn || "").toUpperCase() === "Y";
+
     const card = document.createElement("div");
     card.className = "tp-plan-card" + (selected ? " selected" : "");
     card.dataset.planId = planId;
@@ -2829,15 +2766,21 @@ function _applyTpSearch(query) {
     card.innerHTML = `
             <div class="tp-check-badge"><span class="material-icons">check</span></div>
 
-            <div class="tp-tag">${
-              (group.rentalType || "").toLowerCase() === "others"
-                ? group.rentalPeriod != null
-                  ? group.rentalPeriod +
-                    " Day" +
-                    (group.rentalPeriod !== 1 ? "s" : "")
-                  : "Others"
-                : group.rentalType || "Individual plan"
-            }</div>
+            <div class="tp-tag-row">
+                <div class="tp-tag-group-left">
+                    <div class="tp-tag">${
+                      (group.rentalType || "").toLowerCase() === "others"
+                        ? group.rentalPeriod != null
+                          ? group.rentalPeriod +
+                            " Day" +
+                            (group.rentalPeriod !== 1 ? "s" : "")
+                          : "Others"
+                        : group.rentalType || "Individual plan"
+                    }</div>
+                    ${pkgTypeLabel ? `<div class="tp-tag tp-tag--type">${pkgTypeLabel}</div>` : ""}
+                </div>
+                ${isCorp ? `<div class="tp-tag tp-tag--corp">Corp</div>` : ""}
+            </div>
 
             <div class="tp-price-only">
                 ${priceHtml}
@@ -2859,7 +2802,7 @@ function _applyTpSearch(query) {
 
                 <button
                     class="tp-btn-select"
-                    onclick="event.stopPropagation();openCloneTree('${encodeURIComponent(group.tariffPackageDesc)}', ${group.tariff_package_id || group._raw[0]?.tariff_package_id || "null"})"
+                    onclick="event.stopPropagation();openCloneTree('${encodeURIComponent(group.tariffPackageDesc)}', ${group.tariff_package_id || group._raw[0]?.tariff_package_id || "null"}, 'clone')"
                 >
                     Select
                 </button>
@@ -2898,7 +2841,7 @@ function handleCloneAction() {
 }
 
 // ── Clone Tree Modal ──────────────────────────────────────
-async function openCloneTree(encodedDesc, tariffPackageId) {
+async function openCloneTree(encodedDesc, tariffPackageId, context) {
   const tpDesc = decodeURIComponent(encodedDesc);
   const modal = document.getElementById("cloneTreeModal");
   const body = document.getElementById("cloneTreeBody");
@@ -2906,6 +2849,19 @@ async function openCloneTree(encodedDesc, tariffPackageId) {
   // Store for action buttons
   modal.dataset.tpDesc = tpDesc;
   modal.dataset.tpId = tariffPackageId || "";
+  // "clone" (default) = opened from the clone page's Select button.
+  // "approved" = opened from the Approved TPs overlay — Modify must save
+  // back into the existing approved package instead of creating a clone.
+  modal.dataset.context = context || "clone";
+
+  // Approved overlay only needs the Modify action — same behavior as the
+  // old direct-to-builder click, just shown inside this modal first.
+  // Clone page keeps all three buttons (Cancel / Modify / Clone).
+  const isApproved = modal.dataset.context === "approved";
+  const cancelBtn = modal.querySelector(".ctm-btn--cancel");
+  const cloneBtn = modal.querySelector(".ctm-btn--clone");
+  if (cancelBtn) cancelBtn.style.display = isApproved ? "none" : "";
+  if (cloneBtn) cloneBtn.style.display = isApproved ? "none" : "";
 
   // Store full plan object so Clone button can POST it directly
 
@@ -3118,14 +3074,20 @@ async function _cloneTreeAction(action) {
       return;
     }
 
+    const context = modal.dataset.context || "clone";
+    const isApproved = context === "approved";
     const d = payload.data || payload;
 
-    // Build builder state from the plan data (same shape as loadSavedPackage)
+    // Build builder state from the plan data (same shape as loadSavedPackage).
+    // Approved TPs additionally carry chargeId so step4 can filter dropdowns
+    // correctly for already-approved packages (see currentChargeId backend
+    // overload) — clone-page plans never had this field.
     const state = {
       s2: [{ id: d.tariffPlanId, name: d.tariffPlanName }],
       s3: (d.defaultAtps || []).map((a) => ({
         id: a.servicePackageId,
         name: a.packageName,
+        ...(isApproved ? { chargeId: a.chargeId || "" } : {}),
         validity: a.validity,
         rentalPeriod: a.rentalPeriod || "",
         midnightExpiry: a.midnightExpiry,
@@ -3138,6 +3100,7 @@ async function _cloneTreeAction(action) {
       s4: (d.allowedAtps || []).map((a) => ({
         id: a.servicePackageId,
         name: a.packageName,
+        ...(isApproved ? { chargeId: a.chargeId || "" } : {}),
         validity: a.validity,
         rentalPeriod: a.rentalPeriod || "",
         midnightExpiry: a.midnightExpiry,
@@ -3177,15 +3140,26 @@ async function _cloneTreeAction(action) {
     sessionStorage.setItem("selectedSvcs_s3", svcsToJson(d.selectedSvcs_s3));
     sessionStorage.setItem("selectedSvcs_s4", svcsToJson(d.selectedSvcs_s4));
 
-    // Flag: step5 will show "Clone Package" instead of "Save Config"
-    sessionStorage.setItem("cloneMode", "true");
-    // Store original tpName and networkId for the clone POST
-    sessionStorage.setItem(
-      "cloneTpName",
-      payload.tpName || d.tariffPackageDesc || "",
-    );
-    sessionStorage.setItem("cloneNetworkId", String(payload.networkId || ""));
-    // username is read from sessionStorage directly in step5 — no need to re-store it
+    if (isApproved) {
+      // Edit the existing approved package in place.
+      sessionStorage.setItem("isUpdate", "true");
+      sessionStorage.setItem("approvedMode", "true");
+      sessionStorage.setItem(
+        "approvedTpName",
+        payload.tpName || d.tariffPackageDesc || "",
+      );
+      sessionStorage.setItem("approvedTariffPackageId", String(tpId || ""));
+    } else {
+      // Flag: step5 will show "Clone Package" instead of "Save Config"
+      sessionStorage.setItem("cloneMode", "true");
+      // Store original tpName and networkId for the clone POST
+      sessionStorage.setItem(
+        "cloneTpName",
+        payload.tpName || d.tariffPackageDesc || "",
+      );
+      sessionStorage.setItem("cloneNetworkId", String(payload.networkId || ""));
+      // username is read from sessionStorage directly in step5 — no need to re-store it
+    }
 
     closeCloneTree();
     window.isInternalNavigation = true;
@@ -3224,7 +3198,7 @@ function openTpDetails(groupData) {
 
   // ── Price block ────────────────────────────────────────
   const priceSup = `
-        <div class="tp-modal-price"><sup>₹</sup>${fee.toLocaleString("en-IN")}</div>
+        <div class="tp-modal-price"><sup>₸</sup>${fee.toLocaleString("en-IN")}</div>
         <div class="tp-modal-price-gst">+GST</div>`;
 
   // ── Buckets: value on top, label below, no dividers ───

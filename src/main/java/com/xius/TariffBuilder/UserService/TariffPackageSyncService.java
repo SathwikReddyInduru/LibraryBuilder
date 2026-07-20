@@ -289,6 +289,10 @@ public class TariffPackageSyncService {
         } catch (Exception ex) {
             throw new TariffInsertException("UPDATE_TP", "CS_RAT_TPID_VS_PUBLICITYID", ex);
         }
+        rcAtpRechargeService.updateRcNamesByTariffPackage(
+        tariffPackageId,
+        networkId,
+        String.valueOf(data.get("publicityId")));
 
         logger.info("Direct attributes updated tariffPackageId={}", tariffPackageId);
     }

@@ -34,7 +34,7 @@ public class RcAtpRechargeService {
          */
         public void createRcForRcAtps(
                         Long tariffPackageId,
-                        String tariffPackageName,
+                        String publicity,
                         Long networkId,
                         List<Map<String, Object>> rcAtps) {
 
@@ -57,7 +57,7 @@ public class RcAtpRechargeService {
                                 continue;
                         }
 
-                        createSingleRc(tariffPackageId, tariffPackageName, networkId, atpId, mrp, rcSuffixCounter++);
+                        createSingleRc(tariffPackageId, publicity, networkId, atpId, mrp, rcSuffixCounter++);
                 }
 
                 logger.info(
@@ -72,31 +72,31 @@ public class RcAtpRechargeService {
          * to an existing Tariff Package (update flow).
          */
         public Long createSingleRc(
-                        Long tariffPackageId,
-                        String tariffPackageName,
-                        Long networkId,
-                        Long atpId,
-                        Double mrp) {
+        Long tariffPackageId,
+        String publicityId,
+        Long networkId,
+        Long atpId,
+        Double mrp) {
 
                 int rcSuffixNumber = seriesGeneratorService.resolveNextRcSuffixNumber();
-                return createSingleRc(tariffPackageId, tariffPackageName, networkId, atpId, mrp, rcSuffixNumber);
+                return createSingleRc(tariffPackageId, publicityId, networkId, atpId, mrp, rcSuffixNumber);
         }
 
         private Long createSingleRc(
                         Long tariffPackageId,
-                        String tariffPackageName,
+                        String publicity,
                         Long networkId,
                         Long atpId,
                         Double mrp,
                         int rcSuffixNumber) {
 
                 Long rcId = generateRcId();
-                String rcCode = tariffPackageName + "_RC" + rcSuffixNumber;
+                String rcCode = publicity + "_RC" + rcSuffixNumber;
 
                 createRechargeProduct(
                                 rcId,
                                 rcCode,
-                                tariffPackageName,
+                                publicity,
                                 tariffPackageId,
                                 networkId,
                                 mrp);
@@ -145,7 +145,7 @@ public class RcAtpRechargeService {
         private void createRechargeProduct(
                         Long rcId,
                         String rcCode,
-                        String tariffPackageName,
+                        String publicity,
                         Long tariffPackageId,
                         Long networkId,
                         Double mrp) {
@@ -175,8 +175,8 @@ public class RcAtpRechargeService {
                                                                     ?,
                                                                     ?,
                                                                     2,
-                                                                    TRUNC(SYSDATE + 1),
-                                                                    ADD_MONTHS(TRUNC(SYSDATE + 1), 24),
+                                                                    TRUNC(SYSDATE),
+                                                                    ADD_MONTHS(TRUNC(SYSDATE), 24),
                                                                     ?,
                                                                     ?,
                                                                     NULL,
@@ -438,4 +438,56 @@ public class RcAtpRechargeService {
                         return null;
                 }
         }
+        
+        public void updateRcNamesByTariffPackage(
+        Long tariffPackageId,
+        Long networkId,
+        String publicityId) {
+
+    List<Map<String, Object>> rcList = jdbcTemplate.queryForList("""
+        SELECT RC_ID,
+               RC_CODE
+        FROM CS_RECHARGE_PRODUCTS
+        WHERE TARIFF_PACKAGE_ID = ?
+          AND NETWORK_ID = ?
+        ORDER BY RC_ID
+        """, tariffPackageId, networkId);
+
+    for (Map<String, Object> rc : rcList) {
+
+        // RC_ID is VARCHAR2
+        String rcId = rc.get("RC_ID").toString();
+
+        String oldRcCode = rc.get("RC_CODE").toString();
+
+        int index = oldRcCode.lastIndexOf("_RC");
+
+        if (index < 0) {
+            logger.warn("Skipping RC {} because RC suffix not found.", oldRcCode);
+            continue;
+        }
+
+        String suffix = oldRcCode.substring(index);
+        String newRcCode = publicityId + suffix;
+
+        int rows = jdbcTemplate.update("""
+            UPDATE CS_RECHARGE_PRODUCTS
+               SET RC_CODE = ?,
+                   DESCRIPTION = ?
+             WHERE RC_ID = ?
+               AND NETWORK_ID = ?
+            """,
+            newRcCode,
+            newRcCode,
+            rcId,
+            networkId);
+
+        logger.info(
+                "Updated RC_ID={}, Old RC_CODE={}, New RC_CODE={}, Rows={}",
+                rcId,
+                oldRcCode,
+                newRcCode,
+                rows);
+    }
+}
 }

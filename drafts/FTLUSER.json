@@ -1,0 +1,48 @@
+[ {
+  "name" : "T0720",
+  "pkgType" : "POSTPAID",
+  "pkgSubType" : null,
+  "periodicChargeID" : "",
+  "savedOn" : "20 Jul 2026",
+  "savedTime" : "18:57",
+  "username" : "FTLUSER",
+  "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
+  "selectedSvcs_s3" : "[\"VOICE\"]",
+  "selectedSvcs_s4" : "[\"VOICE\"]",
+  "state" : {
+    "s2" : [ {
+      "id" : "1",
+      "name" : "FT_TRAIFF_PLAN",
+      "networkId" : "1"
+    } ],
+    "s3" : [ {
+      "id" : "5",
+      "name" : "F1 VC UL",
+      "validity" : "M",
+      "rentalPeriod" : "",
+      "renewal" : "No",
+      "midnightExpiry" : "No",
+      "rental" : "",
+      "maxCount" : "",
+      "freeCycles" : "0",
+      "priority" : "1"
+    } ],
+    "s4" : [ {
+      "id" : "2",
+      "name" : "VC DAILY 10M",
+      "validity" : "M",
+      "rentalPeriod" : "",
+      "renewal" : "No",
+      "midnightExpiry" : "No",
+      "rental" : "",
+      "maxCount" : "",
+      "freeCycles" : "0",
+      "priority" : "2",
+      "mrp" : "100"
+    } ],
+    "price" : "100",
+    "publicityCode" : "p7020",
+    "endDate" : "2026-07-29",
+    "isCorporate" : false
+  }
+} ]

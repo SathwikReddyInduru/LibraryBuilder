@@ -262,7 +262,7 @@ function renderCard(item) {
                 </div>
             </div>
 			<div class="card-field">
-			    <label>PRIORITY</label>
+			    <label>PRIORITY <span class="required">*</span></label>
 			        <input type="number"
                         id="priority-s3-${item.id}"
 			            value="${item.priority ?? ''}"

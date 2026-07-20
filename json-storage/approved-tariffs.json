@@ -1,4 +1,57 @@
 {
+  "test0720" : {
+    "tpName" : "test0720",
+    "username" : "USER1",
+    "networkId" : 16,
+    "data" : {
+      "username" : "USER1",
+      "isUpdate" : false,
+      "submittedOn" : "20 Jul 2026",
+      "packageType" : "PREPAID",
+      "tariffPackCategory" : "GENERAL",
+      "tariffPackageDesc" : "test0720",
+      "periodicChargeID" : "",
+      "charge" : "150",
+      "endDate" : "07/24/2026",
+      "publicityId" : "p0720",
+      "chargeId" : "test0720_PR",
+      "isCorporateYn" : false,
+      "tariffPlanId" : 1757,
+      "tariffPlanName" : "MI MUNDO L_V",
+      "selectedSvcs_s2" : "[\"VOICE\"]",
+      "selectedSvcs_s3" : "[\"VOICE\"]",
+      "selectedSvcs_s4" : "[\"VOICE\"]",
+      "defaultAtps" : [ {
+        "servicePackageId" : 1750,
+        "chargeId" : "test0720_ATP71",
+        "packageName" : "MI MUNDO M_VO",
+        "validity" : "M",
+        "rentalPeriod" : "",
+        "midnightExpiry" : "No",
+        "renewal" : "No",
+        "rental" : 0,
+        "maxCount" : 0,
+        "freeCycles" : "0",
+        "priority" : 1
+      } ],
+      "allowedAtps" : [ {
+        "servicePackageId" : 1744,
+        "chargeId" : "test0720_ATP72",
+        "packageName" : "MI MUNDO S_VO",
+        "validity" : "M",
+        "rentalPeriod" : "",
+        "midnightExpiry" : "No",
+        "renewal" : "No",
+        "rental" : 0,
+        "maxCount" : 0,
+        "freeCycles" : "0",
+        "priority" : 2,
+        "mrp" : "100"
+      } ]
+    },
+    "approvedOn" : "2026-07-20T17:53:25.193651800",
+    "tariffPackageId" : 1717
+  },
   "T_0716" : {
     "tpName" : "T_0716",
     "username" : "USER1",
