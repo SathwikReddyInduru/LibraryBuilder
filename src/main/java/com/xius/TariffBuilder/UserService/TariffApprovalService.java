@@ -585,15 +585,25 @@ public class TariffApprovalService {
 
 			if (!allowedAtpIds.isEmpty()) {
 
+				// One RC per RCATP: pair each new ATP id with its own MRP
+				// (addAtps is built in the exact same order as allowedAtpIds above).
+				List<Map<String, Object>> rcAtpPayload = new ArrayList<>();
+				for (int i = 0; i < allowedAtpIds.size(); i++) {
+					Map<String, Object> rcEntry = new HashMap<>();
+					rcEntry.put("atpId", allowedAtpIds.get(i));
+					rcEntry.put("mrp", addAtps.get(i).get("mrp"));
+					rcAtpPayload.add(rcEntry);
+				}
+
 				logger.info(
-						"Creating Recharge Product for RCATPs. tariffId={}, rcAtpCount={}",
+						"Creating Recharge Products for RCATPs (1 RC per RCATP). tariffId={}, rcAtpCount={}",
 						tariffId,
 						allowedAtpIds.size());
 				rcAtpRechargeService.createRcForRcAtps(
 						tariffId,
 						tpName,
 						networkId,
-						allowedAtpIds);
+						rcAtpPayload);
 			}
 
 			Map<String, Object> response = new HashMap<>();

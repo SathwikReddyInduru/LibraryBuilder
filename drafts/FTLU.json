@@ -1,14 +1,14 @@
 [ {
   "name" : "Untitled Draft",
-  "pkgType" : "PREPAID",
-  "pkgSubType" : "GENERAL",
+  "pkgType" : "POSTPAID",
+  "pkgSubType" : null,
   "periodicChargeID" : "",
-  "savedOn" : "15 Jul 2026",
-  "savedTime" : "11:49",
+  "savedOn" : "20 Jul 2026",
+  "savedTime" : "11:30",
   "username" : "FTLU",
   "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
-  "selectedSvcs_s3" : "[\"SMS\"]",
-  "selectedSvcs_s4" : "[\"SMS\"]",
+  "selectedSvcs_s3" : "[\"VOICE\"]",
+  "selectedSvcs_s4" : "[\"VOICE\"]",
   "state" : {
     "s2" : [ {
       "id" : "1",
@@ -16,8 +16,8 @@
       "networkId" : "1"
     } ],
     "s3" : [ {
-      "id" : "9",
-      "name" : "F1_SMS_100",
+      "id" : "2",
+      "name" : "VC DAILY 10M",
       "validity" : "M",
       "rentalPeriod" : "",
       "renewal" : "No",
@@ -25,11 +25,11 @@
       "rental" : "",
       "maxCount" : "",
       "freeCycles" : "0",
-      "priority" : ""
+      "priority" : "1"
     } ],
     "s4" : [ {
-      "id" : "7",
-      "name" : "F1 SMS 50",
+      "id" : "5",
+      "name" : "F1 VC UL",
       "validity" : "M",
       "rentalPeriod" : "",
       "renewal" : "No",
@@ -37,9 +37,10 @@
       "rental" : "",
       "maxCount" : "",
       "freeCycles" : "0",
-      "priority" : ""
+      "priority" : "",
+      "mrp" : ""
     } ],
-    "price" : "876",
+    "price" : "",
     "publicityCode" : "",
     "endDate" : "",
     "isCorporate" : false

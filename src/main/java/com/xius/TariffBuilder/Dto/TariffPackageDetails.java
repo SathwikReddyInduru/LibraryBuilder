@@ -58,4 +58,9 @@ public class TariffPackageDetails {
     private Integer maxRenewalCount;
     private String createdBy;
     private Integer priority;
+
+    /*
+     * CS_RECHARGE_PRODUCTS (via CS_RC_PRODUCT_ATP_MAP) — MRP for RCATP rows only
+     */
+    private Double mrp;
 }

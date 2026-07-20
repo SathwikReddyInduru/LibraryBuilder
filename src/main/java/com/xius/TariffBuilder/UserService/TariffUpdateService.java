@@ -75,7 +75,8 @@ public class TariffUpdateService {
                     pci.AUTO_RENEWAL            AS autoRenewal,
                     pci.PLAN_EXP_MIDNIGHT_YN    AS planExpMidnightYn,
                     pci.MAX_RENEWAL_COUNT       AS maxRenewalCount,
-                    pci.CREATED_BY              AS createdBy
+                    pci.CREATED_BY              AS createdBy,
+                    rp.LOW_VALUE                AS mrp
                 FROM CS_RAT_TARIFF_PACKAGE tp
                 LEFT JOIN CS_RAT_TARIFF_SERVICE_PACK_MAP tspm
                        ON tp.TARIFF_PACKAGE_ID = tspm.TARIFF_PACKAGE_ID
@@ -97,6 +98,13 @@ public class TariffUpdateService {
                     ON tspm.CHARGE_ID = pci.CHARGE_ID
                    AND tp.NETWORK_ID = pci.NETWORK_ID
                    AND pci.rn = 1
+                LEFT JOIN CS_RC_PRODUCT_ATP_MAP ram
+                       ON ram.ATP_ID = tspm.SERVICE_PACKAGE_ID
+                      AND ram.NETWORK_ID = tp.NETWORK_ID
+                      AND ram.ADD_DEL_FLAG = 'A'
+                LEFT JOIN CS_RECHARGE_PRODUCTS rp
+                       ON rp.RC_ID = ram.RC_ID
+                      AND rp.NETWORK_ID = tp.NETWORK_ID
                 WHERE tp.TARIFF_PACKAGE_ID = ?
                   AND tp.NETWORK_ID = ?
                 ORDER BY
@@ -281,6 +289,7 @@ public class TariffUpdateService {
                 row.getPriority() != null
                         ? row.getPriority()
                         : 0);
+        atp.put("mrp", row.getMrp() != null ? row.getMrp() : 0);
         return atp;
     }
 

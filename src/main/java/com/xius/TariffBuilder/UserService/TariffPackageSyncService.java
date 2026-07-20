@@ -417,7 +417,9 @@ public class TariffPackageSyncService {
 
         Set<Long> incomingIds = new LinkedHashSet<>();
 
-        Long rcId = rcAtpRechargeService.findRcIdByTariffPackageId(tariffPackageId, networkId);
+        // NOTE: RC:RCATP is now strictly 1:1 (one Recharge Product per RCATP),
+        // so there is no single shared "rcId" for the tariff package any more.
+        // Each RCATP's RC is looked up/created/deleted individually below.
 
         for (Map<String, Object> atp : incomingRcAtp) {
             if (atp.get("servicePackageId") == null) {
@@ -426,6 +428,7 @@ public class TariffPackageSyncService {
             Long id = Long.valueOf(atp.get("servicePackageId").toString());
 
             String incomingChargeId = asTrimmedStringOrNull(atp.get("chargeId"));
+            Double mrp = toDouble(atp.get("mrp"));
 
             if (incomingChargeId != null) {
 
@@ -436,23 +439,32 @@ public class TariffPackageSyncService {
                             tariffPackageId);
                 }
                 updateAtpPeriodicCharge(incomingChargeId, networkId, atp, data);
-                logger.info("RCATP updated in place servicePackageId={} chargeId={}", id, incomingChargeId);
+
+                // Keep the RC's MRP (LOW_VALUE/HIGH_VALUE) in sync with the UI edit.
+                Long existingRcIdForAtp = rcAtpRechargeService.findRcIdByAtpId(id, networkId);
+                if (existingRcIdForAtp != null) {
+                    rcAtpRechargeService.updateRcMrp(existingRcIdForAtp, mrp, networkId);
+                } else {
+                    logger.warn("No RC found for existing RCATP servicePackageId={} — MRP not updated", id);
+                }
+
+                logger.info("RCATP updated in place servicePackageId={} chargeId={} mrp={}", id, incomingChargeId,
+                        mrp);
             } else {
 
                 Long newAtpId = addNewAtp(tariffPackageId, networkId, username, id, "RCATP", atp, data);
                 incomingIds.add(newAtpId);
 
-                if (rcId != null) {
-                    rcAtpRechargeService.addAtpMapping(
-                            rcId,
-                            newAtpId,
-                            networkId);
-                } else {
-                    logger.warn(
-                            "No RC found for tariffPackageId={} while mapping RCATP={}",
-                            tariffPackageId,
-                            newAtpId);
-                }
+                // Every RCATP gets its own brand-new RC, with a unique RC_CODE series
+                // and this RCATP's MRP.
+                rcAtpRechargeService.createSingleRc(
+                        tariffPackageId,
+                        String.valueOf(data.get("tariffPackageDesc")),
+                        networkId,
+                        newAtpId,
+                        mrp);
+
+                logger.info("New RCATP added and RC created servicePackageId={} mrp={}", newAtpId, mrp);
             }
         }
 
@@ -461,8 +473,11 @@ public class TariffPackageSyncService {
             if (!incomingIds.contains(id)) {
                 removeMapping(tariffPackageId, networkId, id, "RCATP");
 
-                if (rcId != null) {
-                    rcAtpRechargeService.removeAtpMapping(rcId, id, networkId);
+                // Since RC:RCATP is 1:1, removing the RCATP means its RC no longer
+                // has a reason to exist — delete the RC and all its child rows too.
+                Long rcIdForRemovedAtp = rcAtpRechargeService.findRcIdByAtpId(id, networkId);
+                if (rcIdForRemovedAtp != null) {
+                    rcAtpRechargeService.deleteRc(rcIdForRemovedAtp, networkId);
                 }
 
                 if (!isServicePackageReferencedElsewhere(id, networkId, tariffPackageId)) {
@@ -741,5 +756,21 @@ public class TariffPackageSyncService {
         if (v.equalsIgnoreCase("Y") || v.equalsIgnoreCase("YES") || v.equalsIgnoreCase("TRUE"))
             return "Y";
         return "N";
+    }
+
+    /** Parses a Number/String MRP value from the request payload, or null if absent/invalid. */
+    private Double toDouble(Object value) {
+        if (value == null)
+            return null;
+        if (value instanceof Number n)
+            return n.doubleValue();
+        String s = value.toString().trim();
+        if (s.isEmpty())
+            return null;
+        try {
+            return Double.valueOf(s);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

@@ -68,4 +68,33 @@ public class SeriesGeneratorService {
 		logger.info("resolveNextAtpSuffixNumber existingMax={} nextNumber={}", max, max + 1);
 		return max + 1;
 	}
+
+
+    /**
+     * Resolves the next unique RC series number, e.g. "..._RC1", "..._RC2".
+     * Mirrors resolveNextTpSuffixNumber / resolveNextAtpSuffixNumber.
+     */
+    public int resolveNextRcSuffixNumber() {
+		List<String> existing = jdbcTemplate.queryForList("""
+				select RC_CODE
+				from CS_RECHARGE_PRODUCTS
+				where REGEXP_LIKE(RC_CODE, '_RC[0-9]+$')
+				""", String.class);
+
+		int max = 0;
+		for (String code : existing) {
+			java.util.regex.Matcher m = java.util.regex.Pattern.compile("_RC(\\d+)$").matcher(code);
+			if (m.find()) {
+				try {
+					int n = Integer.parseInt(m.group(1));
+					if (n > max)
+						max = n;
+				} catch (NumberFormatException ignored) {
+				}
+			}
+		}
+		logger.info("resolveNextRcSuffixNumber existingMax={} nextNumber={}", max, max + 1);
+		return max + 1;
+	}
 }
+
