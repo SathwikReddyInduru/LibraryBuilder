@@ -127,8 +127,7 @@ public class RcAtpRechargeService {
 
                 Long rcId = jdbcTemplate.queryForObject(
                                 """
-                                                SELECT NVL(MAX(TO_NUMBER(RC_ID)),0) + 1
-                                                FROM CS_RECHARGE_PRODUCTS
+                                                SELECT  seq_rct_id.NEXTVAL from DUAL
                                                 """,
                                 Long.class);
 

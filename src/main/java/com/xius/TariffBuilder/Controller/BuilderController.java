@@ -613,6 +613,14 @@ public class BuilderController {
         return ResponseEntity.ok(tariffUpdateService.getTariffPackageDetails(tariffPackageId, networkId));
     }
 
+
+     @GetMapping("/tariffpacks")
+    public ResponseEntity<List<TariffPackageDetailsDto>> getTariffPackages(
+            @RequestParam Integer networkId) {
+
+        List<TariffPackageDetailsDto> response = tariffPackageService.getTariffPackages(networkId);
+        return ResponseEntity.ok(response);
+    }
  @ResponseBody
    @PutMapping("/update/{tariffPackageId}")
    public ResponseEntity<Map<String, Object>> updateTariffPackage(

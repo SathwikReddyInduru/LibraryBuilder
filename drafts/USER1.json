@@ -1,23 +1,19 @@
 [ {
   "name" : "Untitled Draft",
-  "pkgType" : "POSTPAID",
-  "pkgSubType" : null,
+  "pkgType" : "PREPAID",
+  "pkgSubType" : "GENERAL",
   "periodicChargeID" : "",
-  "savedOn" : "20 Jul 2026",
-  "savedTime" : "18:25",
+  "savedOn" : "22 Jul 2026",
+  "savedTime" : "09:59",
   "username" : "USER1",
-  "selectedSvcs_s2" : "[\"VOICE\"]",
-  "selectedSvcs_s3" : "[\"VOICE\"]",
-  "selectedSvcs_s4" : "[\"VOICE\"]",
+  "selectedSvcs_s2" : "[\"DATA\"]",
+  "selectedSvcs_s3" : "[\"DATA\"]",
+  "selectedSvcs_s4" : "[\"SMS\"]",
   "state" : {
-    "s2" : [ {
-      "id" : "1743",
-      "name" : "MI MUNDO S_V",
-      "networkId" : "16"
-    } ],
+    "s2" : [ ],
     "s3" : [ {
-      "id" : "1744",
-      "name" : "MI MUNDO S_VO",
+      "id" : "1754",
+      "name" : "MI MUNDO L_DA",
       "validity" : "M",
       "rentalPeriod" : "",
       "renewal" : "No",
@@ -28,8 +24,8 @@
       "priority" : "1"
     } ],
     "s4" : [ {
-      "id" : "1750",
-      "name" : "MI MUNDO M_VO",
+      "id" : "1968",
+      "name" : "MI MUNDO_T1",
       "validity" : "M",
       "rentalPeriod" : "",
       "renewal" : "No",
@@ -38,7 +34,7 @@
       "maxCount" : "",
       "freeCycles" : "0",
       "priority" : "2",
-      "mrp" : "100"
+      "mrp" : "111"
     } ],
     "price" : "",
     "publicityCode" : "",

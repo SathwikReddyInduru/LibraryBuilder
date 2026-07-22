@@ -333,7 +333,10 @@ public class TariffApprovalService {
 			if (oldPlanId == null) {
 				throw new RuntimeException("Old plan not found for packageId=" + oldServicePackageId);
 			}
-			Long oldPlanZoneId = serviceCloneService.getPlanZoneId(oldPlanId);
+			ServiceCloneService.PlanZoneInfo oldPlanZoneInfo = serviceCloneService.getPlanZoneInfo(oldPlanId);
+			Long oldPlanZoneId = serviceCloneService.resolveOldPlanZoneId(oldPlanId, oldPlanZoneInfo);
+			ServiceplanZone.ZoneTable planZoneTable =
+					servicePlanZone.resolveZoneTableByTypeOfService(oldPlanZoneInfo.getTypeOfService());
 
 			// ── STEP 2 ──────────────────────────────────────────────────────
 			List<Map<String, Object>> defaultAtps = (List<Map<String, Object>>) data.get("defaultAtps");
@@ -347,6 +350,7 @@ public class TariffApprovalService {
 					hasAllowedAtps, hasAnyAtps);
 
 			Long oldBucketZoneId = null;
+			ServiceplanZone.ZoneTable bucketZoneTable = null;
 
 			if (hasAnyAtps) {
 				List<Map<String, Object>> firstAtpList = hasDefaultAtps ? defaultAtps : addAtps;
@@ -356,6 +360,8 @@ public class TariffApprovalService {
 					throw new RuntimeException("Old bucket not found for ATP=" + firstOldAtpId);
 				}
 				oldBucketZoneId = bundleService.getBucketZoneId(oldBucketId);
+				bucketZoneTable = servicePlanZone.resolveZoneTableByBalanceCategory(
+						bundleService.getBucketBalanceCategory(oldBucketId));
 				logger.info("Old mapping oldPlanId={} oldPlanZoneId={} oldBucketId={} oldBucketZoneId={}", oldPlanId,
 						oldPlanZoneId, oldBucketId, oldBucketZoneId);
 			} else {
@@ -369,19 +375,20 @@ public class TariffApprovalService {
 			if (hasAnyAtps) {
 				String firstAtpSuffix = "ATP" + atpSuffixCounter;
 				if (oldPlanZoneId != null && oldPlanZoneId.equals(oldBucketZoneId)) {
-					Long newZoneId = servicePlanZone.generateNewZoneId();
+					Long newZoneId = servicePlanZone.generateNewZoneId(planZoneTable);
 					newPlanZoneId = newZoneId;
 					newBucketZoneId = newZoneId;
-					servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newZoneId, networkId, tpSuffix);
+					servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newZoneId, networkId, tpSuffix, planZoneTable);
 				} else {
-					newPlanZoneId = servicePlanZone.generateNewZoneId();
-					servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, tpSuffix);
-					newBucketZoneId = servicePlanZone.generateNewZoneId();
-					servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, firstAtpSuffix);
+					newPlanZoneId = servicePlanZone.generateNewZoneId(planZoneTable);
+					servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, tpSuffix, planZoneTable);
+					newBucketZoneId = servicePlanZone.generateNewZoneId(bucketZoneTable);
+					servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, firstAtpSuffix,
+							bucketZoneTable);
 				}
 			} else {
-				newPlanZoneId = servicePlanZone.generateNewZoneId();
-				servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, tpSuffix);
+				newPlanZoneId = servicePlanZone.generateNewZoneId(planZoneTable);
+				servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, tpSuffix, planZoneTable);
 				newBucketZoneId = null;
 				logger.info("No ATPs present. newPlanZoneId={} newBucketZoneId=null.", newPlanZoneId);
 			}
@@ -484,14 +491,19 @@ public class TariffApprovalService {
 						    PACKAGE_TYPE,
 						    IS_CORPORATE_YN,
 						    TARIFF_PACK_CATEGORY,
-							CHARGE_ID
+							CHARGE_ID,
+							START_DATE
 						)
-						values (?,?,?,?,?,?,?,?,?)
+						values (?,?,?,?,?,?,?,?,?,?)
 						""", tariffId, data.get("tariffPackageDesc"), networkId,
 						Date.valueOf(LocalDate.parse(data.get("endDate").toString(), formatter)),
 						data.get("publicityId"), data.get("packageType"), convertYN(data.get("isCorporateYn")),
-						data.get("tariffPackCategory"), newChargeId);
+						data.get("tariffPackCategory"), newChargeId, Date.valueOf(LocalDate.parse(data.get("startDate").toString(), formatter)));
+
+
+
 			} catch (Exception ex) {
+
 				throw new TariffInsertException("STEP 7", "CS_RAT_TARIFF_PACKAGE", ex);
 			}
 
@@ -745,7 +757,7 @@ public class TariffApprovalService {
 					chargeId,
 					chargeId,
 					networkId,
-					"M",
+					"U",
 					1,
 					data.get("charge"),
 					0,

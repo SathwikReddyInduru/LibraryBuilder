@@ -1,16 +1,47 @@
-window.addEventListener("DOMContentLoaded", () => {
-  // Prevent picking a past date — floor the date picker at today
+// Returns today's date as a yyyy-mm-dd string (local time, no timezone drift)
+function getTodayStr() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+// Adds `days` days to a yyyy-mm-dd string and returns a yyyy-mm-dd string
+function addDaysToDateStr(dateStr, days) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// End date must always be strictly after start date (and never in the past) —
+// keep the endDate picker's floor in sync with whatever startDate is selected
+function syncEndDateMin() {
   const endDateInput = document.getElementById("endDate");
-  if (endDateInput) {
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    endDateInput.setAttribute("min", todayStr);
-  }
+  if (!endDateInput) return;
+  const todayStr = getTodayStr();
+  const state = getState();
+  endDateInput.setAttribute(
+    "min",
+    state.startDate && state.startDate >= todayStr
+      ? addDaysToDateStr(state.startDate, 1)
+      : todayStr,
+  );
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  // Prevent picking a past date — floor the date pickers at today
+  const todayStr = getTodayStr();
+  const startDateInput = document.getElementById("startDate");
+  if (startDateInput) startDateInput.setAttribute("min", todayStr);
 
   // Restore previously entered values
   const state = getState();
   if (state.price) document.getElementById("price").value = state.price;
+  if (state.startDate)
+    document.getElementById("startDate").value = state.startDate;
   if (state.endDate) document.getElementById("endDate").value = state.endDate;
+
+  // endDate's floor depends on startDate, so sync it after restoring state
+  syncEndDateMin();
+
   if (state.publicityCode)
     document.getElementById("publicityCode").value = state.publicityCode;
   if (state.isCorporate)
@@ -41,6 +72,34 @@ function onPriceChange(val) {
   saveState(state);
 }
 
+function onStartDateChange(val) {
+  const startDateInput = document.getElementById("startDate");
+  if (val) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selected = new Date(val + "T00:00:00");
+    if (selected < today) {
+      alert("Package start date cannot be in the past.");
+      val = "";
+      if (startDateInput) startDateInput.value = "";
+    }
+  }
+  const state = getState();
+  state.startDate = val;
+
+  // If the already-selected end date no longer falls after the new start
+  // date, clear it so a stale, now-invalid end date can't slip through.
+  if (state.endDate && val && state.endDate <= val) {
+    alert("Package end date has been cleared because it must be after the start date.");
+    state.endDate = "";
+    const endDateInput = document.getElementById("endDate");
+    if (endDateInput) endDateInput.value = "";
+  }
+
+  saveState(state);
+  syncEndDateMin();
+}
+
 function onEndDateChange(val) {
   const endDateInput = document.getElementById("endDate");
   if (val) {
@@ -54,6 +113,11 @@ function onEndDateChange(val) {
     }
   }
   const state = getState();
+  if (val && state.startDate && val <= state.startDate) {
+    alert("Package end date must be after the start date.");
+    val = "";
+    if (endDateInput) endDateInput.value = "";
+  }
   state.endDate = val;
   saveState(state);
 }
@@ -82,8 +146,16 @@ async function clonePackageFromBuilder() {
     alert("Enter charge amount");
     return;
   }
+  if (!state.startDate) {
+    alert("Select start date");
+    return;
+  }
   if (!state.endDate) {
     alert("Select end date");
+    return;
+  }
+  if (state.endDate <= state.startDate) {
+    alert("Package end date must be after the start date.");
     return;
   }
   if (!state.publicityCode) {
@@ -146,6 +218,7 @@ async function clonePackageFromBuilder() {
     packageType: sessionStorage.getItem("pkgType") || "",
     tariffPackCategory: sessionStorage.getItem("pkgSubType") || "NORMAL",
     charge: state.price,
+    startDate: formatDateToMMDDYYYY(state.startDate),
     endDate: formatDateToMMDDYYYY(state.endDate),
     publicityId: state.publicityCode,
     isCorporateYn: state.isCorporate || false,
@@ -257,8 +330,16 @@ async function updatePackage() {
     alert("Enter charge amount");
     return;
   }
+  if (!state.startDate) {
+    alert("Select start date");
+    return;
+  }
   if (!state.endDate) {
     alert("Select end date");
+    return;
+  }
+  if (state.endDate <= state.startDate) {
+    alert("Package end date must be after the start date.");
     return;
   }
   if (!state.publicityCode) {
@@ -336,6 +417,7 @@ async function updatePackage() {
       tariffPackageDesc: sessionStorage.getItem("configName") || "",
       periodicChargeID: sessionStorage.getItem("periodicChargeID") || "",
       charge: state.price,
+      startDate: formatDateToMMDDYYYY(state.startDate),
       endDate: formatDateToMMDDYYYY(state.endDate),
       publicityId: state.publicityCode,
       isCorporateYn: state.isCorporate || false,

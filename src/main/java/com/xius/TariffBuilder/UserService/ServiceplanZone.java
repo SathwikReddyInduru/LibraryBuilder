@@ -19,6 +19,45 @@ public class ServiceplanZone {
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceplanZone.class);
 
+    // TYPE_OF_SERVICE value that identifies a DATA plan/bucket.
+    private static final int DATA_TYPE_OF_SERVICE = 3;
+
+    // BALANCE_CATEGORY value that identifies a DATA bucket.
+    private static final String DATA_BALANCE_CATEGORY = "DATA";
+
+    /**
+     * Identifies which physical zone table a given source (service plan or
+     * bucket) should be cloned through. Introducing this enum is what lets the
+     * decision logic (TYPE_OF_SERVICE today, BALANCE_CATEGORY tomorrow) change
+     * without touching cloneZoneIfExists or anything downstream of it.
+     */
+    public enum ZoneTable {
+
+        RAT_ZONE_GROUPS("CS_RAT_ZONE_GROUPS", "seq_zone_group_id"),
+        DRE_RATING_GROUP_DETAILS("CS_DRE_RATING_GROUP_DETAILS", "seq_dre_zone_group_id");
+
+        private final String tableName;
+        private final String sequenceName;
+
+        ZoneTable(String tableName, String sequenceName) {
+            this.tableName = tableName;
+            this.sequenceName = sequenceName;
+        }
+
+        public String getTableName() {
+            return tableName;
+        }
+
+        // The sequence that actually feeds ZONE_GROUP_ID for this table. Tying
+        // the sequence to the table here means callers never again have to
+        // decide "which sequence" by hand (e.g. branching on BALANCE_CATEGORY
+        // at the call site) — resolving the ZoneTable is the only decision
+        // left, and generateNewZoneId(ZoneTable) takes it from there.
+        public String getSequenceName() {
+            return sequenceName;
+        }
+    }
+
     @Qualifier("oracleJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
 
@@ -29,121 +68,55 @@ public class ServiceplanZone {
         this.dayTypeCloneService = dayTypeCloneService;
     }
 
-    public Long generateNewZoneId() {
+    /**
+     * Current decision rule: TYPE_OF_SERVICE = 3 (DATA) -> DRE_RATING_GROUP_DETAILS,
+     * anything else -> RAT_ZONE_GROUPS.
+     * <p>
+     * To switch the decision to BALANCE_CATEGORY later, callers just need to
+     * call resolveZoneTableByBalanceCategory(...) instead — cloneZoneIfExists
+     * and everything after it stays the same.
+     */
+    public ZoneTable resolveZoneTableByTypeOfService(Integer typeOfService) {
+
+        if (typeOfService != null && typeOfService == DATA_TYPE_OF_SERVICE) {
+            return ZoneTable.DRE_RATING_GROUP_DETAILS;
+        }
+
+        return ZoneTable.RAT_ZONE_GROUPS;
+    }
+
+    /**
+     * Future-facing equivalent of resolveZoneTableByTypeOfService, keyed off
+     * BALANCE_CATEGORY instead (e.g. for buckets, which don't have
+     * TYPE_OF_SERVICE but do have BALANCE_CATEGORY).
+     */
+    public ZoneTable resolveZoneTableByBalanceCategory(String balanceCategory) {
+
+        if (balanceCategory != null && DATA_BALANCE_CATEGORY.equalsIgnoreCase(balanceCategory)) {
+            return ZoneTable.DRE_RATING_GROUP_DETAILS;
+        }
+
+        return ZoneTable.RAT_ZONE_GROUPS;
+    }
+
+    // Draws the next id from whichever sequence actually backs the target
+    // ZoneTable (see ZoneTable.getSequenceName()). Every caller already knows
+    // — or resolves via resolveZoneTableByTypeOfService /
+    // resolveZoneTableByBalanceCategory — which ZoneTable the id is destined
+    // for, so the sequence choice is derived from that, not hand-picked
+    // separately. This replaces the old GREATEST(seq_zone_group_id.NEXTVAL,
+    // seq_dre_zone_group_id.NEXTVAL) hack, which was invalid SQL (a
+    // PreparedStatement can't contain nested "SELECT ... FROM DUAL;"
+    // statements) and, even if it had run, would have picked the numerically
+    // higher of two unrelated sequences instead of the one that actually
+    // matches the table being inserted into.
+    public Long generateNewZoneId(ZoneTable zoneTable) {
         return jdbcTemplate.queryForObject(
-                """
-                        select nvl(max(ZONE_GROUP_ID), 0) + 1
-                        from CS_RAT_ZONE_GROUPS
-                        """,
+                "select " + zoneTable.getSequenceName() + ".NEXTVAL from dual",
                 Long.class);
     }
 
-    @Transactional
-    public void cloneZoneIfExists(Long oldZoneId, Long newZoneId, Long networkId, String tpName) {
-
-        if (oldZoneId == null || newZoneId == null) {
-            logger.info("Zone clone skipped oldZoneId={} newZoneId={}", oldZoneId, newZoneId);
-            return;
-        }
-
-        String suffix = "_" + tpName;
-
-        Integer oldRatCount = countZone("CS_RAT_ZONE_GROUPS", oldZoneId);
-        Integer oldDreCount = countZone("CS_DRE_RATING_GROUP_DETAILS", oldZoneId);
-
-        if (oldRatCount == 0 && oldDreCount == 0) {
-            logger.info("Old zone id {} not found in zone tables. Skipping zone clone.", oldZoneId);
-            return;
-        }
-
-        if (oldRatCount > 0) {
-
-            Integer newRatCount = countZone("CS_RAT_ZONE_GROUPS", newZoneId);
-
-            if (newRatCount == 0) {
-                try {
-                    jdbcTemplate.update(
-                            """
-                                    insert into CS_RAT_ZONE_GROUPS
-                                    (
-                                        ZONE_GROUP_ID,
-                                        ZONE_GROUP_DESC,
-                                        NETWORK_ID,
-                                        TYPE_OF_SERVICE,
-                                        RATING_YN
-                                    )
-                                    select
-                                        ?,
-                                        REGEXP_REPLACE(ZONE_GROUP_DESC,'_CL[0-9]+$','') || ?,
-                                        NETWORK_ID,
-                                        TYPE_OF_SERVICE,
-                                        RATING_YN
-                                    from CS_RAT_ZONE_GROUPS
-                                    where ZONE_GROUP_ID = ?
-                                    """,
-                            newZoneId,
-                            suffix,
-                            oldZoneId);
-                } catch (Exception ex) {
-                    throw new TariffInsertException("cloneZoneGroup", "CS_RAT_ZONE_GROUPS", ex);
-                }
-
-                logger.info("CS_RAT_ZONE_GROUPS cloned oldZoneId={} newZoneId={}", oldZoneId, newZoneId);
-            } else {
-                logger.info("CS_RAT_ZONE_GROUPS already has newZoneId={}. Skipping insert.", newZoneId);
-            }
-        }
-
-        if (oldDreCount > 0) {
-
-            Integer newDreCount = countZone("CS_DRE_RATING_GROUP_DETAILS", newZoneId);
-
-            if (newDreCount == 0) {
-                try {
-                    jdbcTemplate.update(
-                            """
-                                    insert into CS_DRE_RATING_GROUP_DETAILS
-                                    (
-                                        NETWORK_ID,
-                                        ROAMING_NETWORK_ID,
-                                        ZONE_GROUP_ID,
-                                        ZONE_GROUP_NAME,
-                                        APN_ID,
-                                        RATING_GROUP_ID,
-                                        CALENDAR_ID,
-                                        RATING_YN
-                                    )
-                                    select
-                                        NETWORK_ID,
-                                        ROAMING_NETWORK_ID,
-                                        ?,
-                                        REGEXP_REPLACE(ZONE_GROUP_NAME,'_CL[0-9]+$','') || ?,
-                                        APN_ID,
-                                        RATING_GROUP_ID,
-                                        CALENDAR_ID,
-                                        RATING_YN
-                                    from CS_DRE_RATING_GROUP_DETAILS
-                                    where ZONE_GROUP_ID = ?
-                                    """,
-                            newZoneId,
-                            suffix,
-                            oldZoneId);
-                } catch (Exception ex) {
-                    throw new TariffInsertException("cloneRatingGroupDetails", "CS_DRE_RATING_GROUP_DETAILS", ex);
-                }
-
-                logger.info("CS_DRE_RATING_GROUP_DETAILS cloned oldZoneId={} newZoneId={}", oldZoneId, newZoneId);
-            } else {
-                logger.info("CS_DRE_RATING_GROUP_DETAILS already has newZoneId={}. Skipping insert.", newZoneId);
-            }
-        }
-
-        cloneSlabAndCalendar(oldZoneId, newZoneId, networkId, suffix);
-
-        logger.info("Zone clone completed oldZoneId={} newZoneId={}", oldZoneId, newZoneId);
-    }
-
-    private Integer countZone(String tableName, Long zoneId) {
+     private Integer countZone(String tableName, Long zoneId) {
 
         if (zoneId == null) {
             return 0;
@@ -154,6 +127,118 @@ public class ServiceplanZone {
                 Integer.class,
                 zoneId);
     }
+
+    // Returns true if the old zone was found and (already-present-or-freshly)
+    // mapped to newZoneId; returns false if oldZoneId doesn't exist in
+    // zoneTable, meaning nothing was cloned. Callers should not attach
+    // newZoneId to any record when this returns false — doing so would leave
+    // a dangling reference to a zone that has no underlying data.
+    @Transactional
+    public boolean cloneZoneIfExists(Long oldZoneId, Long newZoneId, Long networkId, String tpName, ZoneTable zoneTable) {
+
+        if (oldZoneId == null || newZoneId == null) {
+            logger.info("Zone clone skipped oldZoneId={} newZoneId={}", oldZoneId, newZoneId);
+            return false;
+        }
+
+        String suffix = "_" + tpName;
+        String tableName = zoneTable.getTableName();
+
+        Integer oldCount = countZone(tableName, oldZoneId);
+
+        if (oldCount == 0) {
+            logger.info("Old zone id {} not found in {}. Skipping zone clone.", oldZoneId, tableName);
+            return false;
+        }
+
+        Integer newCount = countZone(tableName, newZoneId);
+
+        if (newCount == 0) {
+
+            switch (zoneTable) {
+                case RAT_ZONE_GROUPS -> cloneRatZoneGroup(oldZoneId, newZoneId, suffix);
+                case DRE_RATING_GROUP_DETAILS -> cloneDreRatingGroupDetails(oldZoneId, newZoneId, suffix);
+            }
+
+            logger.info("{} cloned oldZoneId={} newZoneId={}", tableName, oldZoneId, newZoneId);
+        } else {
+            logger.info("{} already has newZoneId={}. Skipping insert.", tableName, newZoneId);
+        }
+
+        cloneSlabAndCalendar(oldZoneId, newZoneId, networkId, suffix);
+
+        logger.info("Zone clone completed oldZoneId={} newZoneId={} table={}", oldZoneId, newZoneId, tableName);
+
+        return true;
+    }
+
+
+    private void cloneRatZoneGroup(Long oldZoneId, Long newZoneId, String suffix) {
+
+        try {
+            jdbcTemplate.update(
+                    """
+                            insert into CS_RAT_ZONE_GROUPS
+                            (
+                                ZONE_GROUP_ID,
+                                ZONE_GROUP_DESC,
+                                NETWORK_ID,
+                                TYPE_OF_SERVICE,
+                                RATING_YN
+                            )
+                            select
+                                ?,
+                                REGEXP_REPLACE(ZONE_GROUP_DESC,'_CL[0-9]+$','') || ?,
+                                NETWORK_ID,
+                                TYPE_OF_SERVICE,
+                                RATING_YN
+                            from CS_RAT_ZONE_GROUPS
+                            where ZONE_GROUP_ID = ?
+                            """,
+                    newZoneId,
+                    suffix,
+                    oldZoneId);
+        } catch (Exception ex) {
+            throw new TariffInsertException("cloneZoneGroup", "CS_RAT_ZONE_GROUPS", ex);
+        }
+    }
+
+    private void cloneDreRatingGroupDetails(Long oldZoneId, Long newZoneId, String suffix) {
+
+        try {
+            jdbcTemplate.update(
+                    """
+                            insert into CS_DRE_RATING_GROUP_DETAILS
+                            (
+                                NETWORK_ID,
+                                ROAMING_NETWORK_ID,
+                                ZONE_GROUP_ID,
+                                ZONE_GROUP_NAME,
+                                APN_ID,
+                                RATING_GROUP_ID,
+                                CALENDAR_ID,
+                                RATING_YN
+                            )
+                            select
+                                NETWORK_ID,
+                                ROAMING_NETWORK_ID,
+                                ?,
+                                REGEXP_REPLACE(ZONE_GROUP_NAME,'_CL[0-9]+$','') || ?,
+                                APN_ID,
+                                RATING_GROUP_ID,
+                                CALENDAR_ID,
+                                RATING_YN
+                            from CS_DRE_RATING_GROUP_DETAILS
+                            where ZONE_GROUP_ID = ?
+                            """,
+                    newZoneId,
+                    suffix,
+                    oldZoneId);
+        } catch (Exception ex) {
+            throw new TariffInsertException("cloneRatingGroupDetails", "CS_DRE_RATING_GROUP_DETAILS", ex);
+        }
+    }
+
 
     private void cloneSlabAndCalendar(Long oldZoneId, Long newZoneId, Long networkId, String suffix) {
 

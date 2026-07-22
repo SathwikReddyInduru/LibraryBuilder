@@ -1,13 +1,13 @@
 [ {
-  "name" : "T0720",
-  "pkgType" : "POSTPAID",
-  "pkgSubType" : null,
+  "name" : "Untitled Draft",
+  "pkgType" : "PREPAID",
+  "pkgSubType" : "GENERAL",
   "periodicChargeID" : "",
-  "savedOn" : "20 Jul 2026",
-  "savedTime" : "18:57",
+  "savedOn" : "22 Jul 2026",
+  "savedTime" : "20:16",
   "username" : "FTLUSER",
   "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
-  "selectedSvcs_s3" : "[\"VOICE\"]",
+  "selectedSvcs_s3" : "[\"DATA\"]",
   "selectedSvcs_s4" : "[\"VOICE\"]",
   "state" : {
     "s2" : [ {
@@ -16,8 +16,8 @@
       "networkId" : "1"
     } ],
     "s3" : [ {
-      "id" : "5",
-      "name" : "F1 VC UL",
+      "id" : "4",
+      "name" : "DATA DAILY 1GB",
       "validity" : "M",
       "rentalPeriod" : "",
       "renewal" : "No",
@@ -38,11 +38,11 @@
       "maxCount" : "",
       "freeCycles" : "0",
       "priority" : "2",
-      "mrp" : "100"
+      "mrp" : "121"
     } ],
-    "price" : "100",
-    "publicityCode" : "p7020",
-    "endDate" : "2026-07-29",
+    "price" : "",
+    "publicityCode" : "",
+    "endDate" : "",
     "isCorporate" : false
   }
 } ]

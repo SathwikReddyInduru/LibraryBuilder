@@ -57,6 +57,7 @@ public class TariffUpdateService {
                     tp.PACKAGE_TYPE             AS packageType,
                     tp.IS_CORPORATE_YN          AS isCorporateYn,
                     tp.TARIFF_PACK_CATEGORY     AS tariffPackCategory,
+                    tp.START_DATE               AS startDate,
                     tp.END_DATE                 AS endDate,
                     tp.NETWORK_ID               AS networkId,
                     tspm.SERVICE_PACKAGE_ID     AS servicePackageId,
@@ -130,6 +131,7 @@ public class TariffUpdateService {
         response.put("tpName", first.getTariffPackageDesc());
         response.put("username", first.getCreatedBy() != null ? first.getCreatedBy() : "");
         response.put("networkId", first.getNetworkId());
+        
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("username", first.getCreatedBy() != null ? first.getCreatedBy() : "");
@@ -150,6 +152,11 @@ public class TariffUpdateService {
                 .min(Double::compareTo)
                 .orElse(null);
         data.put("charge", minAtpCharge != null ? String.valueOf(minAtpCharge) : "");
+        data.put("startDate",
+                first.getEndDate() != null
+                        ? LocalDate.parse(first.getEndDate().toString().substring(0, 10))
+                                .format(DateTimeFormatter.ofPattern("MM/dd/yyyy"))
+                        : "");
 
         data.put("endDate",
                 first.getEndDate() != null

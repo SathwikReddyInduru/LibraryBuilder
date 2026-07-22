@@ -591,6 +591,7 @@ function getState() {
     s4: [],
     price: "",
     publicityCode: "",
+    startDate: "",
     endDate: "",
     isCorporate: false,
   };
@@ -774,6 +775,21 @@ async function saveConfiguration() {
     return;
   }
 
+  if (!state.startDate) {
+    alert("Select start date");
+    return;
+  }
+ 
+  if (!state.endDate) {
+    alert("Select end date");
+    return;
+  }
+ 
+  if (state.endDate <= state.startDate) {
+    alert("Package end date must be after the start date.");
+    return;
+  }
+
   if (!state.endDate) {
     alert("Select end date");
     return;
@@ -864,7 +880,7 @@ async function saveConfiguration() {
     packageType: sessionStorage.getItem("pkgType"),
 
     tariffPackCategory: sessionStorage.getItem("pkgSubType") || "GENERAL",
-
+    startDate: formatDateToMMDDYYYY(state.startDate),
     tariffPackageDesc: configName,
     periodicChargeID: sessionStorage.getItem("periodicChargeID") || "",
 
@@ -1079,8 +1095,7 @@ function viewTree() {
         </div>
     `;
   document.getElementById("treeCharge").innerHTML =
-    `<b>Charge: RM ${state.price || "0.00"}</b> | <b>Ends: ${state.endDate || "Permanent"}</b>`;
-
+   `<b>Charge: RM ${state.price || "0.00"}</b> | <b>Starts: ${state.startDate || "Immediate"}</b> | <b>Ends: ${state.endDate || "Permanent"}</b>`;  
   document.getElementById("treeModal").classList.add("open");
 }
 
@@ -1135,7 +1150,9 @@ function loadHierarchy(tpName) {
     O: "Others",
     D: "Daily",
     W: "Weekly",
-    F: "Fixed",
+    FM: "Fixed Month",
+    CW: "Calendar Week",
+    CM: "Calendar Month",
     U: "Unlimited",
     Y: "Yearly",
   };
@@ -1252,6 +1269,7 @@ function loadHierarchy(tpName) {
       // Footer
       document.getElementById("h-footer-bar").innerHTML = `
                 <div><b>Charge:</b> RM ${data.charge}</div>
+                ${data.startDate ? `<div><b>Starts:</b> ${data.startDate}</div>` : ""}
                 <div><b>Ends:</b> ${data.endDate}</div>
             `;
     })
@@ -1535,6 +1553,16 @@ function loadSavedPackage(index) {
 
     publicityCode: d.publicityId,
 
+    startDate: (function () {
+      if (!d.startDate) return "";
+ 
+      var p = d.startDate.split("/");
+ 
+      if (p.length === 3) return p[2] + "-" + p[0] + "-" + p[1];
+ 
+      return d.startDate;
+    })(),
+
     endDate: (function () {
       if (!d.endDate) return "";
 
@@ -1663,7 +1691,7 @@ function loadApproved() {
     return;
   }
 
-  fetch("/tariff-package-details?networkId=" + networkId)
+  fetch("/tariffpacks?networkId=" + networkId)
     .then((res) => {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
@@ -1898,6 +1926,14 @@ function loadRejectedPackage(index) {
     })),
 
     price: d.charge,
+
+    startDate: (function () {
+      if (!d.startDate) return "";
+      var p = d.startDate.split("/");
+      if (p.length === 3) return p[2] + "-" + p[0] + "-" + p[1];
+      return d.startDate;
+    })(),
+
     publicityCode: d.publicityId,
     endDate: (function () {
       if (!d.endDate) return "";
@@ -2919,7 +2955,9 @@ function _renderCloneTree(container, tpDesc, response) {
               O: "Others",
               D: "Daily",
               W: "Weekly",
-              F: "Fixed",
+              FM: "Fixed Month",
+              CW: "Calendar Week",
+              CM: "Calendar Month",
               U: "Unlimited",
               Y: "Yearly",
             }[r.validity] || r.validity
@@ -3113,6 +3151,11 @@ async function _cloneTreeAction(action) {
       })),
       price: d.charge || "",
       publicityCode: d.publicityId || "",
+      startDate: (function () {
+        if (!d.startDate) return "";
+        const p = d.startDate.split("/");
+        return p.length === 3 ? `${p[2]}-${p[0]}-${p[1]}` : d.startDate;
+      })(),
       endDate: (function () {
         if (!d.endDate) return "";
         const p = d.endDate.split("/");

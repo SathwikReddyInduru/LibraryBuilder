@@ -86,6 +86,13 @@ public class DayTypeCloneService {
 
         logger.info("Cloning RAT_MT_DAYTYPE oldDayTypeId={} -> newDayTypeId={} networkId={}",
                 oldDayTypeId, newDayTypeId, networkId);
+        Long newPriorityId = jdbcTemplate.queryForObject(
+    """
+    SELECT NVL(MAX(PRIORITY_ID), 0) + 1
+    FROM RAT_MT_DAYTYPE
+    """,
+    Long.class
+);
 
         try {
             jdbcTemplate.update(
@@ -102,13 +109,14 @@ public class DayTypeCloneService {
                         ?,
                         REGEXP_REPLACE(DAYTYPE_NAME, '_CL[0-9]+$', '') || ?,
                         NULL,
-                        PRIORITY_ID,
+                        ?,
                         ?
                     from RAT_MT_DAYTYPE
                     where DAYTYPE_ID = ?
                     """,
                     newDayTypeId,
                     suffix,
+                    newPriorityId,
                     networkId,
                     oldDayTypeId
             );

@@ -55,20 +55,20 @@ function toggleSvc(service, el) {
     sessionStorage.setItem('selectedSvcs_s3', JSON.stringify(selectedSvcs));
 
     if (selectedSvcs.length === 0) {
-        clearCenter();
+        // clearCenter();
     }
 
     refreshSidebar();
 }
 
-function clearCenter() {
+// function clearCenter() {
 
-    const state = getState();
-    state.s3 = [];
-    saveState(state);
+//     const state = getState();
+//     state.s3 = [];
+//     saveState(state);
 
-    document.getElementById('dropArea').innerHTML = '';
-}
+//     document.getElementById('dropArea').innerHTML = '';
+// }
 
 function validateCenterPlans() {
 
@@ -210,7 +210,9 @@ function renderCard(item) {
                     <option value="D"  ${item.validity === 'D' ? 'selected' : ''}>Daily</option>
                     <option value="W"  ${item.validity === 'W' ? 'selected' : ''}>Weekly</option>
                     <option value="Y"  ${item.validity === 'Y' ? 'selected' : ''}>Yearly</option>
-                    <option value="F"  ${item.validity === 'F' ? 'selected' : ''}>Fixed</option>
+                   <option value="FM"  ${item.validity === 'FM' ? 'selected' : ''}>Fixed Month</option>
+                <option value="CW"  ${item.validity === 'CW' ? 'selected' : ''}>Calendar Week</option>
+                <option value="CM"  ${item.validity === 'CM' ? 'selected' : ''}>Calendar Month</option>
                     <option value="U"  ${item.validity === 'U' ? 'selected' : ''}>Unlimited</option>
                     <option value="O"  ${item.validity === 'O' ? 'selected' : ''}>Others</option>
                 </select>
@@ -266,7 +268,8 @@ function renderCard(item) {
 			        <input type="number"
                         id="priority-s3-${item.id}"
 			            value="${item.priority ?? ''}"
-			            oninput="updateField('${item.id}', 'priority', this.value)">
+			            oninput="updateField('${item.id}', 'priority', this.value)"
+			            onblur="validatePriority('${item.id}', 's3')">
 			</div>
         </div>
     `;
@@ -280,38 +283,50 @@ function updateField(id, key, value) {
     const item = state.s3.find(i => String(i.id) === String(id));
     if (!item) return;
 
-    if (key === "priority" && value !== "") {
-
-        if (Number(value) <= 0) {
-            alert("Priority must be greater than 0.");
-            item.priority = "";
-            saveState(state);
-            const input = document.querySelector(`#card-s3-${id} input[oninput*="priority"]`);
-            if (input) input.value = "";
-            return;
-        }
-
-        const takenInS3 = (state.s3 || []).some(i =>
-            String(i.id) !== String(id) &&
-            String(i.priority).trim() === String(value).trim()
-        );
-
-        const takenInS4 = (state.s4 || []).some(i =>
-            String(i.priority).trim() === String(value).trim()
-        );
-
-        if (takenInS3 || takenInS4) {
-            alert(`Priority ${value} is already assigned to another package.`);
-            item.priority = "";
-            saveState(state);
-            const input = document.querySelector(`#card-s3-${id} input[oninput*="priority"]`);
-            if (input) input.value = "";
-            return;
-        }
-    }
+    // NOTE: priority is intentionally NOT validated here. This runs on every
+    // keystroke (oninput), so validating a partially-typed value (e.g. the "1"
+    // while typing "10") would incorrectly flag it as a duplicate/invalid.
+    // Priority validation happens on blur instead — see validatePriority().
     item[key] = value;
 
     saveState(state);
+}
+
+function validatePriority(id, table) {
+    const state = getState();
+    const item = (state[table] || []).find(i => String(i.id) === String(id));
+    if (!item) return;
+
+    const value = item.priority;
+    if (value === "" || value === undefined || value === null) return;
+
+    const input = document.getElementById(`priority-${table}-${id}`);
+
+    if (Number(value) <= 0) {
+        alert("Priority must be greater than 0.");
+        item.priority = "";
+        saveState(state);
+        if (input) input.value = "";
+        return;
+    }
+
+    const takenInS3 = (state.s3 || []).some(i =>
+        !(table === "s3" && String(i.id) === String(id)) &&
+        String(i.priority).trim() === String(value).trim()
+    );
+
+    const takenInS4 = (state.s4 || []).some(i =>
+        !(table === "s4" && String(i.id) === String(id)) &&
+        String(i.priority).trim() === String(value).trim()
+    );
+
+    if (takenInS3 || takenInS4) {
+        alert(`Priority ${value} is already assigned to another package.`);
+        item.priority = "";
+        saveState(state);
+        if (input) input.value = "";
+        return;
+    }
 }
 
 // ---------- VALIDITY ----------

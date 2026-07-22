@@ -1,5 +1,6 @@
 package com.xius.TariffBuilder.UserService;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -19,6 +20,8 @@ public class ServiceCloneService {
 
         @Qualifier("oracleJdbcTemplate")
         private final JdbcTemplate jdbcTemplate;
+
+        private final ServiceplanZone servicePlanZone;
 
         public static class CloneServiceResult {
 
@@ -45,8 +48,9 @@ public class ServiceCloneService {
                 }
         }
 
-        ServiceCloneService(JdbcTemplate jdbcTemplate) {
+        ServiceCloneService(JdbcTemplate jdbcTemplate, ServiceplanZone servicePlanZone) {
                 this.jdbcTemplate = jdbcTemplate;
+                this.servicePlanZone = servicePlanZone;
         }
 
         // Check TP name already exists.
@@ -115,16 +119,131 @@ public class ServiceCloneService {
                                 planId);
         }
 
-        // Generate new zone id based on plan table.
+        // Carries the zone id(s) and the TYPE_OF_SERVICE for a plan so the
+        // caller can decide (via ServiceplanZone.resolveZoneTableByTypeOfService)
+        // which zone table to clone into, instead of checking both tables.
+        // dataZoneGroupId is the legacy CS_RAT_SERVICE_PLANS.DATA_ZONE_GROUP_ID
+        // column — a second, independent zone reference distinct from both
+        // ZONE_GROUP_ID and the CS_RAT_SERVICE_DATA_ZONE_MAP table.
+        public static class PlanZoneInfo {
 
-        public Long generateNewPlanZoneId() {
+                private final Long zoneGroupId;
+                private final Integer typeOfService;
+                private final Long dataZoneGroupId;
 
-                return jdbcTemplate.queryForObject(
+                public PlanZoneInfo(Long zoneGroupId, Integer typeOfService, Long dataZoneGroupId) {
+                        this.zoneGroupId = zoneGroupId;
+                        this.typeOfService = typeOfService;
+                        this.dataZoneGroupId = dataZoneGroupId;
+                }
+
+                public Long getZoneGroupId() {
+                        return zoneGroupId;
+                }
+
+                public Integer getTypeOfService() {
+                        return typeOfService;
+                }
+
+                public Long getDataZoneGroupId() {
+                        return dataZoneGroupId;
+                }
+        }
+
+        // Get old plan zone id(s) + TYPE_OF_SERVICE from CS_RAT_SERVICE_PLANS in
+        // one read. Used by cloneServicePlans to resolve which zone table (RAT vs
+        // DRE) the plan's zone should be cloned through.
+        public PlanZoneInfo getPlanZoneInfo(Long planId) {
+
+                if (planId == null) {
+                        return new PlanZoneInfo(null, null, null);
+                }
+
+                return jdbcTemplate.query(
                                 """
-                                                select nvl(max(ZONE_GROUP_ID),0)+1
+                                                select ZONE_GROUP_ID, TYPE_OF_SERVICE, DATA_ZONE_GROUP_ID
                                                 from CS_RAT_SERVICE_PLANS
+                                                where SERVICE_PLAN_ID = ?
                                                 """,
-                                Long.class);
+                                rs -> rs.next()
+                                                ? new PlanZoneInfo(
+                                                                rs.getObject("ZONE_GROUP_ID", Long.class),
+                                                                rs.getObject("TYPE_OF_SERVICE", Integer.class),
+                                                                rs.getObject("DATA_ZONE_GROUP_ID", Long.class))
+                                                : new PlanZoneInfo(null, null, null),
+                                planId);
+        }
+
+        // TYPE 3 (DATA) plans don't carry their zone in
+        // CS_RAT_SERVICE_PLANS.ZONE_GROUP_ID — it's looked up separately via
+        // CS_RAT_SERVICE_DATA_ZONE_MAP (SERVICE_PLAN_ID -> DATA_ZONE_ID). This
+        // mapping is ONE-TO-MANY: a single plan can have multiple DATA_ZONE_ID
+        // rows, so every row for the plan must be fetched, not just the first.
+        public List<Long> getDataZoneIds(Long planId) {
+
+                if (planId == null) {
+                        return new ArrayList<>();
+                }
+
+                return jdbcTemplate.queryForList(
+                                """
+                                                select DATA_ZONE_ID
+                                                from CS_RAT_SERVICE_DATA_ZONE_MAP
+                                                where SERVICE_PLAN_ID = ?
+                                                """,
+                                Long.class,
+                                planId);
+        }
+
+        // Single-value convenience wrapper for callers (e.g. the top-level
+        // "preview" zone resolution in TariffApprovalService/TariffPackageSyncService)
+        // that only need one representative old zone id. The real, authoritative
+        // clone-and-remap of EVERY mapped zone happens in cloneServicePlans below via
+        // getDataZoneIds, not here.
+        public Long getDataZoneId(Long planId) {
+
+                List<Long> zoneIds = getDataZoneIds(planId);
+                return zoneIds.isEmpty() ? null : zoneIds.get(0);
+        }
+
+        // Single place that decides where a plan's *old* zone id comes from:
+        // TYPE 3 (DATA) -> CS_RAT_SERVICE_DATA_ZONE_MAP, everything else ->
+        // CS_RAT_SERVICE_PLANS.ZONE_GROUP_ID (already in planZoneInfo).
+        public Long resolveOldPlanZoneId(Long planId, PlanZoneInfo planZoneInfo) {
+
+                boolean isDataPlan = planZoneInfo.getTypeOfService() != null
+                                && planZoneInfo.getTypeOfService() == 3;
+
+                return isDataPlan ? getDataZoneId(planId) : planZoneInfo.getZoneGroupId();
+        }
+
+        // Counterpart of resolveOldPlanZoneId for the *new* plan: TYPE 3 (DATA)
+        // plans get a row in CS_RAT_SERVICE_DATA_ZONE_MAP instead of having
+        // ZONE_GROUP_ID populated on CS_RAT_SERVICE_PLANS.
+        private void mapDataZone(Long newPlanId, Long newZoneId) {
+
+                try {
+                        jdbcTemplate.update(
+                                        """
+                                                        insert into CS_RAT_SERVICE_DATA_ZONE_MAP
+                                                        (
+                                                            SERVICE_PLAN_ID,
+                                                            DATA_ZONE_ID
+                                                        )
+                                                        values (?,?)
+                                                        """,
+                                        newPlanId,
+                                        newZoneId);
+                } catch (Exception ex) {
+                        throw new TariffInsertException("cloneServicePlans", "CS_RAT_SERVICE_DATA_ZONE_MAP", ex);
+                }
+        }
+
+        // Generate new zone id based on plan table. Delegates to ServiceplanZone
+        // so there's one place (ZoneTable.getSequenceName()) that knows which
+        // sequence backs which table.
+        public Long generateNewPlanZoneId() {
+                return servicePlanZone.generateNewZoneId(ServiceplanZone.ZoneTable.RAT_ZONE_GROUPS);
         }
 
         // Clone service package and service plan.
@@ -140,10 +259,9 @@ public class ServiceCloneService {
 
                 Long newPackageId = jdbcTemplate.queryForObject(
                                 """
-                                                select nvl(max(SERVICE_PACKAGE_ID),0)+1
-                                                from CS_RAT_SERVICE_PACKAGE
-                                                """,
-                                Long.class);
+                                     SELECT SEQ_SERVICE_PACK_ID.NEXTVAL FROM DUAL
+                                                """,                          Long.class);
+                                                System.out.println("=====================>"+newPackageId);
 
                 try {
                         jdbcTemplate.update(
@@ -253,6 +371,38 @@ public class ServiceCloneService {
                                         ex);
                 }
 
+                List<Long> newPlanIds = cloneServicePlans(networkId, servicePackageId, newPackageId, tpName);
+
+                if (newPlanIds.isEmpty()) {
+                        throw new RuntimeException("No service plan found for servicePackageId=" + servicePackageId);
+                }
+
+                Long lastNewPlanId = newPlanIds.get(newPlanIds.size() - 1);
+
+                logger.info("Clone service completed newPackageId={} lastNewPlanId={}",
+                                newPackageId, lastNewPlanId);
+
+                return new CloneServiceResult(newPackageId, lastNewPlanId, newPlanZoneId);
+        }
+
+        /**
+         * Clones every CS_RAT_SERVICE_PLANS row mapped (via CS_RAT_SERVICE_PLAN_PACKAGE)
+         * to oldPackageId, and re-maps each new plan to newPackageId.
+         *
+         * Shared by both flows:
+         *  - TP packages (called from cloneService above)
+         *  - ATP packages (called from BundleService.cloneAtpData)
+         *
+         * Zone handling is per-plan: only when the source plan itself has a
+         * ZONE_GROUP_ID do we generate + clone a new zone and map it to the
+         * cloned plan. If the source plan has no zone, the cloned plan is left
+         * with ZONE_GROUP_ID = null — no zone is created for it.
+         */
+        public List<Long> cloneServicePlans(Long networkId,
+                        Long oldPackageId,
+                        Long newPackageId,
+                        String suffix) {
+
                 List<Long> oldPlanIds = jdbcTemplate.queryForList(
                                 """
                                                 select SERVICE_PLAN_ID
@@ -262,24 +412,103 @@ public class ServiceCloneService {
                                                 """,
                                 Long.class,
                                 networkId,
-                                servicePackageId);
+                                oldPackageId);
 
                 if (oldPlanIds.isEmpty()) {
-                        throw new RuntimeException("No service plan found for servicePackageId=" + servicePackageId);
+                        logger.info("No service plans found for packageId={}. Nothing to clone.", oldPackageId);
+                        return new ArrayList<>();
                 }
 
-                Long lastNewPlanId = null;
+                List<Long> newPlanIds = new ArrayList<>();
 
                 for (Long oldPlanId : oldPlanIds) {
 
+                        PlanZoneInfo planZoneInfo = getPlanZoneInfo(oldPlanId);
+                        boolean isDataPlan = planZoneInfo.getTypeOfService() != null
+                                        && planZoneInfo.getTypeOfService() == 3;
+
+                        // TYPE 1/2: single zone via ZONE_GROUP_ID -> RAT_ZONE_GROUPS.
+                        // TYPE 3 (DATA): CS_RAT_SERVICE_DATA_ZONE_MAP is one-to-many, so
+                        // every mapped zone for this plan is cloned, not just one.
+                        Long newZoneIdForPlan = null;
+                        List<Long> newDataZoneIds = new ArrayList<>();
+
+                        if (isDataPlan) {
+
+                                List<Long> oldDataZoneIds = getDataZoneIds(oldPlanId);
+
+                                if (oldDataZoneIds.isEmpty()) {
+                                        logger.info(
+                                                        "Plan oldPlanId={} (TYPE 3) has no zones in CS_RAT_SERVICE_DATA_ZONE_MAP. Skipping zone creation.",
+                                                        oldPlanId);
+                                } else {
+                                        for (Long oldDataZoneId : oldDataZoneIds) {
+
+                                                Long newDataZoneId = servicePlanZone.generateNewZoneId(
+                                                                ServiceplanZone.ZoneTable.DRE_RATING_GROUP_DETAILS);
+                                                servicePlanZone.cloneZoneIfExists(oldDataZoneId, newDataZoneId, networkId, suffix,
+                                                                ServiceplanZone.ZoneTable.DRE_RATING_GROUP_DETAILS);
+                                                newDataZoneIds.add(newDataZoneId);
+
+                                                logger.info(
+                                                                "DATA zone cloned for plan oldPlanId={} oldDataZoneId={} newDataZoneId={}",
+                                                                oldPlanId, oldDataZoneId, newDataZoneId);
+                                        }
+                                }
+
+                        } else {
+
+                                Long oldZoneId = planZoneInfo.getZoneGroupId();
+
+                                if (oldZoneId != null) {
+
+                                        ServiceplanZone.ZoneTable zoneTable =
+                                                        servicePlanZone.resolveZoneTableByTypeOfService(planZoneInfo.getTypeOfService());
+
+                                        newZoneIdForPlan = servicePlanZone.generateNewZoneId(zoneTable);
+                                        servicePlanZone.cloneZoneIfExists(oldZoneId, newZoneIdForPlan, networkId, suffix, zoneTable);
+
+                                        logger.info(
+                                                        "Zone cloned for plan oldPlanId={} oldZoneId={} newZoneId={} typeOfService={} table={}",
+                                                        oldPlanId, oldZoneId, newZoneIdForPlan,
+                                                        planZoneInfo.getTypeOfService(), zoneTable);
+                                } else {
+                                        logger.info("Plan oldPlanId={} has no zone mapped. Skipping zone creation.", oldPlanId);
+                                }
+                        }
+
                         Long newPlanId = jdbcTemplate.queryForObject(
                                         """
-                                                        select nvl(max(SERVICE_PLAN_ID),0)+1
-                                                        from CS_RAT_SERVICE_PLANS
+                                                        SELECT SEQ_SERVICE_PLAN_ID.NEXTVAL FROM DUAL
                                                         """,
                                         Long.class);
 
-                        lastNewPlanId = newPlanId;
+                        // ZONE_GROUP_ID on CS_RAT_SERVICE_PLANS only applies to TYPE 1/2
+                        // plans; TYPE 3 (DATA) plans are mapped separately below via
+                        // CS_RAT_SERVICE_DATA_ZONE_MAP, so the column stays null for them.
+                        Long zoneGroupIdColumnValue = isDataPlan ? null : newZoneIdForPlan;
+
+                        // DATA_ZONE_GROUP_ID is a second, independent zone reference on
+                        // CS_RAT_SERVICE_PLANS (separate from ZONE_GROUP_ID and from
+                        // CS_RAT_SERVICE_DATA_ZONE_MAP) and always clones into
+                        // CS_DRE_RATING_GROUP_DETAILS. Cloned whenever the source plan
+                        // has one, independent of TYPE_OF_SERVICE.
+                        Long oldDataZoneGroupId = planZoneInfo.getDataZoneGroupId();
+                        Long newDataZoneGroupIdForPlan = null;
+
+                        if (oldDataZoneGroupId != null) {
+
+                                newDataZoneGroupIdForPlan = servicePlanZone.generateNewZoneId(
+                                                ServiceplanZone.ZoneTable.DRE_RATING_GROUP_DETAILS);
+                                servicePlanZone.cloneZoneIfExists(oldDataZoneGroupId, newDataZoneGroupIdForPlan, networkId,
+                                                suffix, ServiceplanZone.ZoneTable.DRE_RATING_GROUP_DETAILS);
+
+                                logger.info(
+                                                "DATA_ZONE_GROUP_ID cloned for plan oldPlanId={} oldDataZoneGroupId={} newDataZoneGroupId={}",
+                                                oldPlanId, oldDataZoneGroupId, newDataZoneGroupIdForPlan);
+                        } else {
+                                logger.info("Plan oldPlanId={} has no DATA_ZONE_GROUP_ID mapped. Skipping.", oldPlanId);
+                        }
 
                         // Clone service plan.
 
@@ -319,7 +548,7 @@ public class ServiceCloneService {
                                                                     STATUS,
                                                                     FNF_MAX_GROUPS,
                                                                     GROUPS_ALLOWED,
-                                                                    DATA_ZONE_GROUP_ID,
+                                                                    ?,
                                                                     ALLOW_NTNL_RM_DATA,
                                                                     ALLOW_INT_RM_DATA,
                                                                     RENTAL_DEDUCTION_IN_GRACE,
@@ -335,11 +564,12 @@ public class ServiceCloneService {
                                                                 where SERVICE_PLAN_ID = ?
                                                                 """,
                                                 newPlanId,
-                                                tpName,
-                                                newPlanZoneId,
+                                                suffix,
+                                                zoneGroupIdColumnValue,
+                                                newDataZoneGroupIdForPlan,
                                                 oldPlanId);
                         } catch (Exception ex) {
-                                throw new TariffInsertException("cloneService", "CS_RAT_SERVICE_PLANS", ex);
+                                throw new TariffInsertException("cloneServicePlans", "CS_RAT_SERVICE_PLANS", ex);
                         }
 
                         try {
@@ -357,16 +587,26 @@ public class ServiceCloneService {
                                                 newPlanId,
                                                 networkId);
                         } catch (Exception ex) {
-                                throw new TariffInsertException("cloneService", "CS_RAT_SERVICE_PLAN_PACKAGE", ex);
+                                throw new TariffInsertException("cloneServicePlans", "CS_RAT_SERVICE_PLAN_PACKAGE", ex);
                         }
 
-                        logger.info("Service plan cloned oldPlanId={} newPlanId={} newPackageId={}",
-                                        oldPlanId, newPlanId, newPackageId);
+                        // TYPE 3 (DATA) plans: map the new plan to EVERY newly cloned
+                        // zone in CS_RAT_SERVICE_DATA_ZONE_MAP (one row per old mapping).
+                        for (Long newDataZoneId : newDataZoneIds) {
+                                mapDataZone(newPlanId, newDataZoneId);
+                        }
+                        if (!newDataZoneIds.isEmpty()) {
+                                logger.info("DATA zones mapped newPlanId={} newDataZoneIds={}", newPlanId, newDataZoneIds);
+                        }
+
+                        logger.info(
+                                        "Service plan cloned oldPlanId={} newPlanId={} oldPackageId={} newPackageId={} zoneId={} dataZoneGroupId={} dataZoneIds={}",
+                                        oldPlanId, newPlanId, oldPackageId, newPackageId, newZoneIdForPlan, newDataZoneGroupIdForPlan,
+                                        newDataZoneIds);
+
+                        newPlanIds.add(newPlanId);
                 }
 
-                logger.info("Clone service completed newPackageId={} lastNewPlanId={}",
-                                newPackageId, lastNewPlanId);
-
-                return new CloneServiceResult(newPackageId, lastNewPlanId, newPlanZoneId);
+                return newPlanIds;
         }
 }

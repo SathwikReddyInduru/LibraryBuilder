@@ -1,5 +1,6 @@
 package com.xius.TariffBuilder.UserService;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,8 +22,14 @@ public class BundleService {
 	@Qualifier("oracleJdbcTemplate")
 	private final JdbcTemplate jdbcTemplate;
 
-	BundleService(JdbcTemplate jdbcTemplate) {
+	private final ServiceCloneService serviceCloneService;
+
+	private final ServiceplanZone servicePlanZone;
+
+	BundleService(JdbcTemplate jdbcTemplate, ServiceCloneService serviceCloneService, ServiceplanZone servicePlanZone) {
 		this.jdbcTemplate = jdbcTemplate;
+		this.serviceCloneService = serviceCloneService;
+		this.servicePlanZone = servicePlanZone;
 	}
 
 	public static class CloneAtpResult {
@@ -31,12 +38,15 @@ public class BundleService {
 		private String oldBucketId;
 		private String newBucketId;
 		private Long newBucketZoneId;
+		private List<Long> newPlanIds;
 
-		public CloneAtpResult(Long newAtpId, String oldBucketId, String newBucketId, Long newBucketZoneId) {
+		public CloneAtpResult(Long newAtpId, String oldBucketId, String newBucketId, Long newBucketZoneId,
+				List<Long> newPlanIds) {
 			this.newAtpId = newAtpId;
 			this.oldBucketId = oldBucketId;
 			this.newBucketId = newBucketId;
 			this.newBucketZoneId = newBucketZoneId;
+			this.newPlanIds = newPlanIds;
 		}
 
 		public Long getNewAtpId() {
@@ -53,6 +63,10 @@ public class BundleService {
 
 		public Long getNewBucketZoneId() {
 			return newBucketZoneId;
+		}
+
+		public List<Long> getNewPlanIds() {
+			return newPlanIds;
 		}
 	}
 
@@ -90,13 +104,45 @@ public class BundleService {
 				""", rs -> rs.next() ? rs.getObject("ZONE_GROUP_ID", Long.class) : null, bucketId);
 	}
 
-	 // Generate new bucket zone id based on bucket table.
+	 // Generate new bucket zone id based on bucket table. Delegates to
+	 // ServiceplanZone so there's one place (ZoneTable.getSequenceName())
+	 // that knows which sequence backs which table.
 	public Long generateNewBucketZoneId() {
+		return servicePlanZone.generateNewZoneId(ServiceplanZone.ZoneTable.RAT_ZONE_GROUPS);
+	}
 
-		return jdbcTemplate.queryForObject("""
-				select nvl(max(ZONE_GROUP_ID),0)+1
+	// DATA_ZONE_GROUP_ID is a second, independent zone reference on
+	// BNDL_MT_BUCKETS — separate from ZONE_GROUP_ID — same pattern as
+	// CS_RAT_SERVICE_PLANS.DATA_ZONE_GROUP_ID in
+	// ServiceCloneService.cloneServicePlans. It always clones into
+	// CS_DRE_RATING_GROUP_DETAILS, whenever the source bucket has one.
+	public Long getBucketDataZoneGroupId(String bucketId) {
+
+		if (bucketId == null) {
+			return null;
+		}
+
+		return jdbcTemplate.query("""
+				select DATA_ZONE_GROUP_ID
 				from BNDL_MT_BUCKETS
-				""", Long.class);
+				where BUCKET_ID = ?
+				""", rs -> rs.next() ? rs.getObject("DATA_ZONE_GROUP_ID", Long.class) : null, bucketId);
+	}
+
+	// Buckets don't carry TYPE_OF_SERVICE, but they do carry BALANCE_CATEGORY,
+	// which is the discriminator ServiceplanZone.resolveZoneTableByBalanceCategory
+	// uses to decide which zone table (RAT vs DRE) to clone through.
+	public String getBucketBalanceCategory(String bucketId) {
+
+		if (bucketId == null) {
+			return null;
+		}
+
+		return jdbcTemplate.query("""
+				select BALANCE_CATEGORY
+				from BNDL_MT_BUCKETS
+				where BUCKET_ID = ?
+				""", rs -> rs.next() ? rs.getString("BALANCE_CATEGORY") : null, bucketId);
 	}
 
 	
@@ -109,8 +155,7 @@ public class BundleService {
 				newBucketZoneId);
 
 		Long newAtpId = jdbcTemplate.queryForObject("""
-				select nvl(max(SERVICE_PACKAGE_ID),0)+1
-				from CS_RAT_SERVICE_PACKAGE
+				SELECT SEQ_SERVICE_PACK_ID.NEXTVAL FROM DUAL
 				""", Long.class);
 
 		Map<String, Object> oldAtp = jdbcTemplate.queryForMap("""
@@ -186,6 +231,14 @@ public class BundleService {
 			throw new TariffInsertException("cloneAtpData", "CS_RAT_SERVICE_PACKAGE(ATP)", ex);
 		}
 
+		// Clone any CS_RAT_SERVICE_PLANS rows mapped to this ATP package, same as
+		// is already done for TP packages in ServiceCloneService.cloneService.
+		// Zone handling is per-plan inside cloneServicePlans: a new zone is only
+		// created when the source plan itself has one.
+		List<Long> newPlanIds = serviceCloneService.cloneServicePlans(networkId, atpId, newAtpId, tpName);
+
+		logger.info("ATP service plans cloned oldAtpId={} newAtpId={} newPlanIds={}", atpId, newAtpId, newPlanIds);
+
 		List<Long> bundleIds = jdbcTemplate.queryForList("""
 				select BUNDLE_OR_DISCOUNT_ID
 				from CS_ATP_ACCUMU_BON_DISC_MAP
@@ -195,6 +248,17 @@ public class BundleService {
 
 		String firstOldBucketId = null;
 		String firstNewBucketId = null;
+
+		// Distinct old bucket zone id -> new zone id, scoped to this cloneAtpData
+		// call. Buckets that share the same old zone are mapped to the same new
+		// zone; buckets on a different old zone get their own distinct new zone
+		// rather than being folded into someone else's zone (which would merge
+		// unrelated slab/calendar mappings together).
+		Map<Long, Long> bucketZoneIdCache = new HashMap<>();
+
+		// Same idea, but for DATA_ZONE_GROUP_ID — an independent zone reference
+		// from ZONE_GROUP_ID, tracked separately.
+		Map<Long, Long> bucketDataZoneIdCache = new HashMap<>();
 
 		for (Long oldBundleId : bundleIds) {
 
@@ -212,7 +276,102 @@ public class BundleService {
 
 				String newBucketId = generateNewBucketId();
 
-				cloneBucket(oldBucketId, newBucketId, tpName, networkId, newBucketZoneId);
+				// Zone handling is per-bucket: only create + map a zone (CS_RAT_ZONE_GROUPS ->
+				// CS_DRE_RATING_GROUP_DETAILS -> calendar -> day types) when the source
+				// bucket itself has a ZONE_GROUP_ID. Otherwise the cloned bucket is left
+				// with no zone mapped.
+				//
+				// Distinct old zones get distinct new zones (see bucketZoneIdCache
+				// above); buckets sharing the same old zone are mapped to the same
+				// new zone. The first distinct old zone encountered in this call
+				// uses the specific newBucketZoneId resolved by the caller, so the
+				// value reported back still matches what's actually mapped.
+				Long oldBucketZoneId = getBucketZoneId(oldBucketId);
+				Long newBucketZoneIdForBucket = null;
+
+				if (oldBucketZoneId != null) {
+
+					if (bucketZoneIdCache.containsKey(oldBucketZoneId)) {
+
+						newBucketZoneIdForBucket = bucketZoneIdCache.get(oldBucketZoneId);
+
+						logger.info("Reusing already-cloned zone for bucket oldBucketId={} oldZoneId={} newZoneId={}",
+								oldBucketId, oldBucketZoneId, newBucketZoneIdForBucket);
+					} else {
+
+						String balanceCategory = getBucketBalanceCategory(oldBucketId);
+						ServiceplanZone.ZoneTable zoneTable = servicePlanZone.resolveZoneTableByBalanceCategory(balanceCategory);
+
+						// zoneTable already encodes the VOICE/SMS -> RAT_ZONE_GROUPS vs.
+						// DATA -> DRE_RATING_GROUP_DETAILS decision (see
+						// resolveZoneTableByBalanceCategory), so the sequence to draw
+						// from follows directly from it — no separate branch needed.
+						Long candidateZoneId = servicePlanZone.generateNewZoneId(zoneTable);
+
+						boolean cloned = servicePlanZone.cloneZoneIfExists(oldBucketZoneId, candidateZoneId, networkId, tpName, zoneTable);
+
+						if (cloned) {
+							newBucketZoneIdForBucket = candidateZoneId;
+							bucketZoneIdCache.put(oldBucketZoneId, newBucketZoneIdForBucket);
+
+							logger.info("Zone cloned for bucket oldBucketId={} oldZoneId={} newZoneId={} balanceCategory={} table={}",
+									oldBucketId, oldBucketZoneId, newBucketZoneIdForBucket, balanceCategory, zoneTable);
+						} else {
+							// oldBucketZoneId doesn't actually exist in zoneTable — leave the
+							// bucket with no zone rather than pointing it at a new zone id
+							// that has no underlying zone data.
+							logger.info("Old zone oldZoneId={} not found in {} for bucket oldBucketId={}. Leaving bucket with no zone mapped.",
+									oldBucketZoneId, zoneTable, oldBucketId);
+						}
+					}
+				}
+				 else {
+					logger.info("Bucket oldBucketId={} has no zone mapped. Skipping zone creation.", oldBucketId);
+				 }
+				 
+					
+				
+
+				// DATA_ZONE_GROUP_ID is independent of ZONE_GROUP_ID (see
+				// getBucketDataZoneGroupId) and always clones into
+				// CS_DRE_RATING_GROUP_DETAILS. Tracked with its own cache so it
+				// doesn't collide with the ZONE_GROUP_ID cache above.
+				Long oldBucketDataZoneGroupId = getBucketDataZoneGroupId(oldBucketId);
+				Long newBucketDataZoneGroupId = null;
+
+				if (oldBucketDataZoneGroupId != null) {
+
+					if (bucketDataZoneIdCache.containsKey(oldBucketDataZoneGroupId)) {
+
+						newBucketDataZoneGroupId = bucketDataZoneIdCache.get(oldBucketDataZoneGroupId);
+
+						logger.info("Reusing already-cloned DATA_ZONE_GROUP_ID for bucket oldBucketId={} oldDataZoneGroupId={} newDataZoneGroupId={}",
+								oldBucketId, oldBucketDataZoneGroupId, newBucketDataZoneGroupId);
+					} else {
+
+						Long candidateDataZoneId = servicePlanZone.generateNewZoneId(ServiceplanZone.ZoneTable.DRE_RATING_GROUP_DETAILS);
+						boolean cloned = servicePlanZone.cloneZoneIfExists(oldBucketDataZoneGroupId, candidateDataZoneId, networkId,
+								tpName, ServiceplanZone.ZoneTable.DRE_RATING_GROUP_DETAILS);
+
+						if (cloned) {
+							newBucketDataZoneGroupId = candidateDataZoneId;
+							bucketDataZoneIdCache.put(oldBucketDataZoneGroupId, newBucketDataZoneGroupId);
+
+							logger.info("DATA_ZONE_GROUP_ID cloned for bucket oldBucketId={} oldDataZoneGroupId={} newDataZoneGroupId={}",
+									oldBucketId, oldBucketDataZoneGroupId, newBucketDataZoneGroupId);
+						} else {
+							// oldBucketDataZoneGroupId doesn't actually exist in
+							// CS_DRE_RATING_GROUP_DETAILS — leave the bucket with no
+							// DATA_ZONE_GROUP_ID rather than a dangling reference.
+							logger.info("Old DATA_ZONE_GROUP_ID={} not found for bucket oldBucketId={}. Leaving bucket with no DATA_ZONE_GROUP_ID mapped.",
+									oldBucketDataZoneGroupId, oldBucketId);
+						}
+					}
+				} else {
+					logger.info("Bucket oldBucketId={} has no DATA_ZONE_GROUP_ID mapped. Skipping.", oldBucketId);
+				}
+
+				cloneBucket(oldBucketId, newBucketId, tpName, networkId, newBucketZoneIdForBucket, newBucketDataZoneGroupId);
 
 				try {
 					jdbcTemplate.update("""
@@ -234,7 +393,7 @@ public class BundleService {
 				}
 
 				logger.info("Bucket cloned oldBucketId={} newBucketId={} newBucketZoneId={}", oldBucketId, newBucketId,
-						newBucketZoneId);
+						newBucketZoneIdForBucket);
 			}
 
 			try {
@@ -257,7 +416,7 @@ public class BundleService {
 
 		logger.info("ATP clone completed oldAtpId={} newAtpId={}", atpId, newAtpId);
 
-		return new CloneAtpResult(newAtpId, firstOldBucketId, firstNewBucketId, newBucketZoneId);
+		return new CloneAtpResult(newAtpId, firstOldBucketId, firstNewBucketId, newBucketZoneId, newPlanIds);
 	}
 
 	private Long cloneBundle(Long oldBundleId, Long networkId, String tpName) {
@@ -269,8 +428,7 @@ public class BundleService {
 				""", oldBundleId);
 
 		Long newBundleId = jdbcTemplate.queryForObject("""
-				select nvl(max(BUNDLE_ID),0)+1
-				from BNDL_MT_BUNDLE
+				SELECT seq_bundle_id.NEXTVAL FROM DUAL
 				""", Long.class);
 
 		try {
@@ -391,15 +549,19 @@ public class BundleService {
 
 	private String generateNewBucketId() {
 
-		return jdbcTemplate.queryForObject("""
-				select 'T' || (nvl(max(to_number(substr(BUCKET_ID,2))),0)+1)
-				from BNDL_MT_BUCKETS
-				where regexp_like(substr(BUCKET_ID,2),'^\\d+$')
-				""", String.class);
+		
+		Long bucketid= jdbcTemplate.queryForObject(
+                                """
+                                    SELECT seq_bucket_id.NEXTVAL FROM DUAL
+                                                """,
+                                Long.class);
+
+			return "T"+bucketid ;
+
 	}
 
 	private void cloneBucket(String oldBucketId, String newBucketId, String tpName, Long networkId,
-			Long newBucketZoneId) {
+			Long newBucketZoneId, Long newBucketDataZoneGroupId) {
 
 		try {
 			jdbcTemplate.update("""
@@ -497,7 +659,7 @@ public class BundleService {
 					   LIMITED_HOURS,
 					   BALANCE_ID,
 					   LIMITED_NETWORKS_YN,
-					   DATA_ZONE_GROUP_ID,
+					   ?,
 					   ?,
 					   COUNTRY_ISD_PREFIX,
 					   PRIORITY,
@@ -535,7 +697,7 @@ public class BundleService {
 
 					from BNDL_MT_BUCKETS
 					where BUCKET_ID = ?
-					""", newBucketId, tpName, networkId, newBucketZoneId, oldBucketId);
+					""", newBucketId, tpName, networkId, newBucketDataZoneGroupId, newBucketZoneId, oldBucketId);
 		} catch (Exception ex) {
 			throw new TariffInsertException("cloneBucket", "BNDL_MT_BUCKETS", ex);
 		}

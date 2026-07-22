@@ -338,11 +338,14 @@ public class TariffPackageSyncService {
     private void addNewTp(Long tariffPackageId, Long networkId, Long sourceServicePackageId) {
 
         Long oldPlanId = serviceCloneService.getOldPlanId(networkId, sourceServicePackageId);
-        Long oldPlanZoneId = serviceCloneService.getPlanZoneId(oldPlanId);
-        Long newPlanZoneId = servicePlanZone.generateNewZoneId();
+        ServiceCloneService.PlanZoneInfo oldPlanZoneInfo = serviceCloneService.getPlanZoneInfo(oldPlanId);
+        Long oldPlanZoneId = serviceCloneService.resolveOldPlanZoneId(oldPlanId, oldPlanZoneInfo);
+        ServiceplanZone.ZoneTable planZoneTable =
+                servicePlanZone.resolveZoneTableByTypeOfService(oldPlanZoneInfo.getTypeOfService());
+        Long newPlanZoneId = servicePlanZone.generateNewZoneId(planZoneTable);
         String suffix = "TP" + seriesGeneratorService.resolveNextTpSuffixNumber();
 
-        servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, suffix);
+        servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, suffix, planZoneTable);
 
         CloneServiceResult cloneResult = serviceCloneService.cloneService(networkId, sourceServicePackageId, suffix,
                 newPlanZoneId);
@@ -502,10 +505,12 @@ public class TariffPackageSyncService {
 
         String oldBucketId = bundleService.getOldBucketId(sourceAtpId, networkId);
         Long oldBucketZoneId = bundleService.getBucketZoneId(oldBucketId);
-        Long newBucketZoneId = servicePlanZone.generateNewZoneId();
+        ServiceplanZone.ZoneTable bucketZoneTable = servicePlanZone.resolveZoneTableByBalanceCategory(
+                bundleService.getBucketBalanceCategory(oldBucketId));
+        Long newBucketZoneId = servicePlanZone.generateNewZoneId(bucketZoneTable);
         String suffix = "ATP" + seriesGeneratorService.resolveNextAtpSuffixNumber();
 
-        servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, suffix);
+        servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, suffix, bucketZoneTable);
 
         CloneAtpResult atpResult = bundleService.cloneAtpData(sourceAtpId, networkId, suffix, newBucketZoneId);
         Long newAtpId = atpResult.getNewAtpId();

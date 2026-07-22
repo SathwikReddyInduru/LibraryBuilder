@@ -1,83 +1,89 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{builder/layout :: layout(~{::title}, ~{::section}, 5)}">
-
+ 
 <head>
     <title>Pricing</title>
 </head>
-
+ 
 <body>
     <section class="stage">
         <div class="step-guide modern">
-
+ 
             <div class="guide-header">
                 <span class="material-icons">payments</span>
                 <b>Finalize Configuration</b>
             </div>
-
-            
+ 
+           
             <div class="guide-steps">
-
+ 
                 <div class="guide-step">
                     <span class="guide-num">1</span>
                     <span>Enter package price and validity of the package.</span>
                 </div>
-
+ 
             </div>
-
+ 
             <div class="guide-points">
                 <span class="guide-pill">Charge → package price</span>
+                <span class="guide-pill">Start Date → activation</span>
                 <span class="guide-pill">End Date → validity</span>
             </div>
-
+ 
         </div>
-
+ 
         <div class="form-container">
             <div class="form-group">
                 <label>PACKAGE CHARGE</label>
                 <input type="number" id="price" oninput="onPriceChange(this.value)" placeholder="0.00">
             </div>
-
+ 
+            <div class="form-group">
+                <label>PACKAGE START DATE</label>
+                <input type="date" id="startDate" onchange="onStartDateChange(this.value)">
+            </div>
+ 
             <div class="form-group">
                 <label>PACKAGE END DATE</label>
                 <input type="date" id="endDate" onchange="onEndDateChange(this.value)">
             </div>
-
+ 
             <div class="form-group">
                 <label>PUBLICITY CODE</label>
                 <input type="text" id="publicityCode" oninput="onPublicityCodeChange(this.value)"
                     placeholder="Enter code">
             </div>
-
+ 
             <div class="checkbox-group">
                 <input type="checkbox" id="isCorporate" onchange="onCorporateChange(this.checked)">
                 <label for="isCorporate">IS CORPORATE PACK</label>
             </div>
         </div>
-
+ 
         <div class="step-actions">
             <button class="btn-secondary" onclick="goBack()" th:disabled="${activeStep == 1}">
                 <span class="material-icons">arrow_back</span>
                 Back
             </button>
-
+ 
             <button class="btn-primary" id="saveConfigBtn" onclick="saveConfiguration()">
                 SAVE CONFIG
                 <span class="material-icons">check</span>
             </button>
-
+ 
             <button class="btn-primary btn-clone-package" id="clonePackageBtn" style="display:none;" onclick="clonePackageFromBuilder()">
                 <span class="material-icons">content_copy</span>
                 CLONE PACKAGE
             </button>
-
+ 
             <button class="btn-primary btn-update-package" id="updatePackageBtn" style="display:none;" onclick="updatePackage()">
                 <span class="material-icons">save</span>
                 UPDATE PACKAGE
             </button>
         </div>
-
+ 
         <script th:src="@{/js/step5.js}"></script>
     </section>
 </body>
-
+ 
 </html>

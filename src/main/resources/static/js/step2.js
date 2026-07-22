@@ -44,20 +44,20 @@ function toggleSvc(service, el) {
     sessionStorage.setItem('selectedSvcs_s2', JSON.stringify(selectedSvcs));
 
     if (selectedSvcs.length === 0) {
-        clearCenter();
+        // clearCenter();
     }
 
     refreshSidebar();
 }
 
-function clearCenter() {
-    const state = getState();
+// function clearCenter() {
+//     const state = getState();
 
-    state.s2 = [];
-    saveState(state);
+//     state.s2 = [];
+//     saveState(state);
 
-    document.getElementById('main-area').innerHTML = '';
-}
+//     document.getElementById('main-area').innerHTML = '';
+// }
 
 // ---------- SIDEBAR ----------
 function refreshSidebar() {
