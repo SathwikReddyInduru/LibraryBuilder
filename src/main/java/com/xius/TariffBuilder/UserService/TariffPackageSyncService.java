@@ -464,12 +464,7 @@ public class TariffPackageSyncService {
 
                 // Every RCATP gets its own brand-new RC, with a unique RC_CODE series
                 // and this RCATP's MRP.
-                rcAtpRechargeService.createSingleRc(
-                        tariffPackageId,
-                        String.valueOf(data.get("tariffPackageDesc")),
-                        networkId,
-                        newAtpId,
-                        mrp);
+                rcAtpRechargeService.createSingleRc(tariffPackageId, String.valueOf(data.get("tariffPackageDesc")),networkId,newAtpId,mrp,String.valueOf(atp.get("type")));
 
                 logger.info("New RCATP added and RC created servicePackageId={} mrp={}", newAtpId, mrp);
             }

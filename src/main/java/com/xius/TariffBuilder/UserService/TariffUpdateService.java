@@ -153,8 +153,8 @@ public class TariffUpdateService {
                 .orElse(null);
         data.put("charge", minAtpCharge != null ? String.valueOf(minAtpCharge) : "");
         data.put("startDate",
-                first.getEndDate() != null
-                        ? LocalDate.parse(first.getEndDate().toString().substring(0, 10))
+                first.getStartDate() != null
+                        ? LocalDate.parse(first.getStartDate().toString().substring(0, 10))
                                 .format(DateTimeFormatter.ofPattern("MM/dd/yyyy"))
                         : "");
 

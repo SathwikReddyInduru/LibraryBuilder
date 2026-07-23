@@ -133,7 +133,7 @@ function refreshSidebar() {
 
 			                    data-network-id="${plan.networkId}"
 			                    data-package-id="${plan.servicePackageId}"
-			                    onclick="addToCenter('${plan.servicePackageId}','${plan.servicePackageName}','${plan.networkId}')">
+			                    onclick="addToCenter('${plan.servicePackageId}','${plan.servicePackageName}','${plan.networkId}','${plan.serviceTypes || ""}')">
 			                    ${plan.servicePackageName}
 							
 							</div>
@@ -148,8 +148,20 @@ function refreshSidebar() {
     });
 }
 
+// ---------- SERVICE TYPE HELPERS ----------
+// Converts the "1,2,3" style codes returned by the backend (SERVICE_TYPES)
+// into readable labels, e.g. "1" -> "VOICE", "1,2" -> "VOICE,SMS".
+const SVC_TYPE_LABELS = { '1': 'VOICE', '2': 'SMS', '3': 'DATA' };
+function typeLabelFromCodes(codes) {
+  if (!codes) return '';
+  return String(codes)
+    .split(',')
+    .map((c) => SVC_TYPE_LABELS[c.trim()] || c.trim())
+    .join(',');
+}
+
 // ---------- ADD ----------
-function addToCenter(id, name) {
+function addToCenter(id, name, networkId, serviceTypes) {
   const state = getState();
   if (!state.s4) state.s4 = [];
 
@@ -166,6 +178,7 @@ function addToCenter(id, name) {
   const item = {
     id: String(id),
     name: name,
+    type: typeLabelFromCodes(serviceTypes),
     validity: "M",
     rentalPeriod: "",
     renewal: "No",
@@ -280,7 +293,7 @@ function renderCard(item) {
     </div>
     `;
 
-  container.appendChild(card);
+  container.prepend(card);
 }
 
 function updateField(id, key, value) {

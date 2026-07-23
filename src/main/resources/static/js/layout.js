@@ -911,6 +911,8 @@ async function saveConfiguration() {
 
       packageName: item.name,
 
+      type: item.type || "",
+
       validity: item.validity,
 
       rentalPeriod: item.validity === "O" ? item.rentalPeriod || 1 : "",
@@ -937,6 +939,8 @@ async function saveConfiguration() {
       chargeId: chargeId,
 
       packageName: item.name,
+
+      type: item.type || "",
 
       validity: item.validity,
 
@@ -1525,6 +1529,7 @@ function loadSavedPackage(index) {
     s3: (d.defaultAtps || []).map((a) => ({
       id: a.servicePackageId,
       name: a.packageName,
+      type: a.type || "",
       validity: a.validity,
       rentalPeriod: a.rentalPeriod || "",
       midnightExpiry: a.midnightExpiry,
@@ -1538,6 +1543,7 @@ function loadSavedPackage(index) {
     s4: (d.allowedAtps || d.additionalAtps || []).map((a) => ({
       id: a.servicePackageId,
       name: a.packageName,
+      type: a.type || "",
       validity: a.validity,
       rentalPeriod: a.rentalPeriod || "",
       midnightExpiry: a.midnightExpiry,
@@ -1901,6 +1907,7 @@ function loadRejectedPackage(index) {
     s3: (d.defaultAtps || []).map((a) => ({
       id: a.servicePackageId,
       name: a.packageName,
+      type: a.type || "",
       validity: a.validity,
       rentalPeriod: a.rentalPeriod || "",
       midnightExpiry: a.midnightExpiry,
@@ -1914,6 +1921,7 @@ function loadRejectedPackage(index) {
     s4: (d.allowedAtps || d.additionalAtps || []).map((a) => ({
       id: a.servicePackageId,
       name: a.packageName,
+      type: a.type || "",
       validity: a.validity,
       rentalPeriod: a.rentalPeriod || "",
       midnightExpiry: a.midnightExpiry,
@@ -3125,6 +3133,7 @@ async function _cloneTreeAction(action) {
       s3: (d.defaultAtps || []).map((a) => ({
         id: a.servicePackageId,
         name: a.packageName,
+        type: a.type || "",
         ...(isApproved ? { chargeId: a.chargeId || "" } : {}),
         validity: a.validity,
         rentalPeriod: a.rentalPeriod || "",
@@ -3138,6 +3147,7 @@ async function _cloneTreeAction(action) {
       s4: (d.allowedAtps || []).map((a) => ({
         id: a.servicePackageId,
         name: a.packageName,
+        type: a.type || "",
         ...(isApproved ? { chargeId: a.chargeId || "" } : {}),
         validity: a.validity,
         rentalPeriod: a.rentalPeriod || "",

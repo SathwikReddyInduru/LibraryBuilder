@@ -18,6 +18,7 @@ public class TariffPackageDetails {
     private String packageType;
     private String isCorporateYn;
     private String tariffPackCategory;
+    private Date startDate;
     private Date endDate;
     private Long networkId;
 

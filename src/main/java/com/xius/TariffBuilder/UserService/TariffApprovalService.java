@@ -605,6 +605,7 @@ public class TariffApprovalService {
 					Map<String, Object> rcEntry = new HashMap<>();
 					rcEntry.put("atpId", allowedAtpIds.get(i));
 					rcEntry.put("mrp", addAtps.get(i).get("mrp"));
+					rcEntry.put("type", String.valueOf(addAtps.get(i).get("type")));
 					rcAtpPayload.add(rcEntry);
 				}
 
@@ -614,7 +615,7 @@ public class TariffApprovalService {
 						allowedAtpIds.size());
 				rcAtpRechargeService.createRcForRcAtps(
 						tariffId,
-						publicity,
+						tpName,
 						networkId,
 						rcAtpPayload);
 			}
