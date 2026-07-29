@@ -22,12 +22,15 @@ public class ServicePlanService {
 	ServicePlanService(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
 	}
+public List<ServicePlanPackMap> getPlans(Long networkId, String types) {
 
-	public List<ServicePlanPackMap> getPlans(Long networkId, String types) {
 
 		logger.info("Fetching TP plans networkId={} types={}", networkId, types);
+    if ("B".equalsIgnoreCase(types)) {
+        return getBillingPlans(networkId);
+    }
 
-		String sql = """
+    String sql = """
 			SELECT *
 				FROM (
 				    SELECT
@@ -65,9 +68,49 @@ public class ServicePlanService {
 				)
 				WHERE SERVICE_TYPES = ?
 								            """;
+    return map(sql, networkId, types);
+}
 
-		return map(sql, networkId, types);
-	}
+	
+
+	public List<ServicePlanPackMap> getBillingPlans(Long networkId) {
+
+    String sql = """
+        SELECT DISTINCT
+            spkg.service_package_id AS SERVICE_PACKAGE_ID,
+            spkg.service_package_desc AS SERVICE_PACKAGE_NAME,
+            spkg.network_id AS NETWORK_ID,
+            'TP' AS TARIFF_PLAN_TYPE,
+            'B' AS SERVICE_TYPES
+        FROM cs_rat_service_package spkg
+        JOIN cs_rat_service_plan_package spp
+            ON spkg.service_package_id = spp.service_package_id
+           AND spkg.network_id = spp.network_id
+        JOIN cs_rat_service_plans spl
+            ON spp.service_plan_id = spl.service_plan_id
+           AND spp.network_id = spl.network_id
+        WHERE spkg.network_id = ?
+          AND spkg.add_pack_yn = 'N'
+          AND spl.service_plan_type = 'B'
+          AND NOT REGEXP_LIKE(
+                spkg.service_package_desc,
+                '_(TP|CL|ATP)[0-9]+$'
+          )
+        """;
+
+    return jdbcTemplate.query(sql, (rs, rowNum) -> {
+
+        ServicePlanPackMap s = new ServicePlanPackMap();
+        s.setServicePackageId(rs.getString("SERVICE_PACKAGE_ID"));
+        s.setServicePackageName(rs.getString("SERVICE_PACKAGE_NAME"));
+        s.setNetworkId(rs.getInt("NETWORK_ID"));
+        s.setTariffPlanType(rs.getString("TARIFF_PLAN_TYPE"));
+        s.setServiceTypes(rs.getString("SERVICE_TYPES"));
+
+        return s;
+
+    }, networkId);
+}
 
 	public List<ServicePlanPackMap> getDAtpPlans(Long networkId, String types) {
 

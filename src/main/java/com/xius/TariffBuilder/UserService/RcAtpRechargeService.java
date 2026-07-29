@@ -1,5 +1,6 @@
 package com.xius.TariffBuilder.UserService;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -16,7 +17,6 @@ public class RcAtpRechargeService {
 
         @Qualifier("oracleJdbcTemplate")
         private final JdbcTemplate jdbcTemplate;
-
         private final SeriesGeneratorService seriesGeneratorService;
 
         RcAtpRechargeService(JdbcTemplate jdbcTemplate, SeriesGeneratorService seriesGeneratorService) {
@@ -24,28 +24,13 @@ public class RcAtpRechargeService {
                 this.seriesGeneratorService = seriesGeneratorService;
         }
 
-        /**
-         * Creates ONE Recharge Product (RC) PER RCATP, i.e. numberOfRcs ==
-         * numberOfRcAtps. Each RC gets its own unique RC_CODE series
-         * (tariffPackageName_RC1, _RC2, ...) and its LOW_VALUE / HIGH_VALUE is
-         * set from that RCATP's MRP.
-         *
-         * @param rcAtps each map must contain "atpId" (Long) and "mrp" (Number/String,
-         *               optional)
-         */
-        public void createRcForRcAtps(
-                        Long tariffPackageId,
-                        String tpName,
-                        Long networkId,
-                        List<Map<String, Object>> rcAtps) {
+
+        public void createRcForRcAtps( Long tariffPackageId,String tpName,Long networkId,List<Map<String, Object>> rcAtps,Date startDate,Date endDate) {
 
                 if (rcAtps == null || rcAtps.isEmpty()) {
                         logger.info("No RCATP ids found. Skipping RC creation.");
                         return;
                 }
-
-                // Resolve the starting RC series number ONCE, then increment locally so
-                // every RC created in this batch gets a unique, sequential RC_CODE.
                 int rcSuffixCounter = seriesGeneratorService.resolveNextRcSuffixNumber();
 
                 for (Map<String, Object> rcAtp : rcAtps) {
@@ -59,20 +44,11 @@ public class RcAtpRechargeService {
                                 continue;
                         }
 
-                        createSingleRc(
-                                        tariffPackageId,
-                                        tpName,
-                                        networkId,
-                                        atpId,
-                                        mrp,
-                                        type,
-                                        rcSuffixCounter++);
+                        createSingleRc( tariffPackageId,tpName,networkId,atpId, mrp,type,rcSuffixCounter++,startDate,endDate);
                 }
 
                 logger.info(
-                                "RC creation completed. tariffPackageId={}, totalRcsCreated={}",
-                                tariffPackageId,
-                                rcAtps.size());
+                                "RC creation completed. tariffPackageId={}, totalRcsCreated={}",  tariffPackageId, rcAtps.size());
         }
 
         /**
@@ -80,95 +56,42 @@ public class RcAtpRechargeService {
          * unique RC series number for it. Used when a single new RCATP is added
          * to an existing Tariff Package (update flow).
          */
-        public Long createSingleRc(
-                        Long tariffPackageId,
-                        String tpName,
-                        Long networkId,
-                        Long atpId,
-                        Double mrp,
-                        String type) {
+        public Long createSingleRc(Long tariffPackageId,String tpName,Long networkId,Long atpId,Double mrp,String type,Date startDate,Date endDate) {
 
                 int rcSuffixNumber = seriesGeneratorService.resolveNextRcSuffixNumber();
-                return createSingleRc(
-                                tariffPackageId,
-                                tpName,
-                                networkId,
-                                atpId,
-                                mrp,
-                                type,
-                                rcSuffixNumber);
+                return createSingleRc(tariffPackageId,tpName,networkId,atpId,mrp,type,rcSuffixNumber,startDate,endDate);
         }
 
-        private Long createSingleRc(
-                        Long tariffPackageId,
-                        String tpName,
-                        Long networkId,
-                        Long atpId,
-                        Double mrp,
-                        String type,
-                        int rcSuffixNumber) {
+        private Long createSingleRc(Long tariffPackageId,String tpName,Long networkId,Long atpId,Double mrp,String type,int rcSuffixNumber,Date startDate,Date endDate) {
 
                 Long rcId = generateRcId();
                 String rcCode = tpName + getTypeSuffix(type) + rcSuffixNumber;
 
-                createRechargeProduct(
-                                rcId,
-                                rcCode,
-                                tpName,
-                                tariffPackageId,
-                                networkId,
-                                mrp);
-
+                createRechargeProduct(rcId,rcCode,tpName,tariffPackageId,networkId,mrp,startDate,endDate);
                 insertBalanceType(rcId, networkId);
-
                 mapRcAtps(rcId, networkId, List.of(atpId));
-
                 insertDefaultSubscriberCategory(rcId, networkId);
-
                 insertDefaultChannel(rcId, networkId);
 
                 logger.info(
-                                "RC created rcId={}, rcCode={}, tariffPackageId={}, atpId={}, mrp={}",
-                                rcId,
-                                rcCode,
-                                tariffPackageId,
-                                atpId,
-                                mrp);
+                                "RC created rcId={}, rcCode={}, tariffPackageId={}, atpId={}, mrp={}", rcId,rcCode,tariffPackageId,atpId,mrp);
 
                 return rcId;
         }
-
-        /**
-         * Generate next RC ID
-         */
+  
         private Long generateRcId() {
-
                 Long rcId = jdbcTemplate.queryForObject(
                                 """
-                                                SELECT  seq_rct_id.NEXTVAL from DUAL
-                                                """,
+                                SELECT  seq_rct_id.NEXTVAL from DUAL """,
                                 Long.class);
 
                 logger.info("Generated RC_ID={}", rcId);
-
                 return rcId;
         }
 
-        /**
-         * Insert into CS_RECHARGE_PRODUCTS. LOW_VALUE / HIGH_VALUE are both set to
-         * the RCATP's MRP (falls back to 1 if no/invalid MRP was supplied, to
-         * preserve prior behaviour).
-         */
-        private void createRechargeProduct(
-                        Long rcId,
-                        String rcCode,
-                        String tpName,
-                        Long tariffPackageId,
-                        Long networkId,
-                        Double mrp) {
+        private void createRechargeProduct(Long rcId,String rcCode,String tpName,Long tariffPackageId,Long networkId,Double mrp,Date startDate,Date endDate) {
 
                 double mrpValue = (mrp != null && mrp > 0) ? mrp : 1;
-
                 jdbcTemplate.update(
                                 """
                                                 INSERT INTO CS_RECHARGE_PRODUCTS
@@ -192,8 +115,8 @@ public class RcAtpRechargeService {
                                                                     ?,
                                                                     ?,
                                                                     2,
-                                                                    TRUNC(SYSDATE),
-                                                                    ADD_MONTHS(TRUNC(SYSDATE), 24),
+                                                                    ?,
+                                                                    ?,
                                                                     ?,
                                                                     ?,
                                                                     NULL,
@@ -204,87 +127,34 @@ public class RcAtpRechargeService {
                                                                     ?
                                                                 )
                                                                 """,
-                                rcId,
-                                rcCode,
-                                mrpValue,
-                                mrpValue,
-                                tariffPackageId,
-                                networkId,
-                                rcCode);
+                                rcId,rcCode,startDate,endDate,mrpValue,mrpValue,tariffPackageId,networkId,rcCode);
 
                 logger.info(
-                                "Inserted CS_RECHARGE_PRODUCTS rcId={}, rcCode={}, mrp={}",
-                                rcId,
-                                rcCode,
-                                mrpValue);
+                                "Inserted CS_RECHARGE_PRODUCTS rcId={}, rcCode={}, mrp={}",rcId,rcCode,mrpValue);
         }
 
-        /**
-         * Insert into CS_RC_PRODUCT_ATP_MAP
-         */
-        private void mapRcAtps(
-                        Long rcId,
-                        Long networkId,
-                        List<Long> rcAtpIds) {
+        private void mapRcAtps(Long rcId,Long networkId,List<Long> rcAtpIds) {
 
                 for (Long atpId : rcAtpIds) {
-
                         jdbcTemplate.update(
                                         """
-                                                        INSERT INTO CS_RC_PRODUCT_ATP_MAP
-                                                        (
-                                                            RC_ID,
-                                                            ATP_ID,
-                                                            ADD_DEL_FLAG,
-                                                            NETWORK_ID
-                                                        )
-                                                        VALUES
-                                                        (
-                                                            ?,
-                                                            ?,
-                                                            'A',
-                                                            ?
-                                                        )
-                                                        """,
-                                        rcId,
-                                        atpId,
-                                        networkId);
+                                        INSERT INTO CS_RC_PRODUCT_ATP_MAP (RC_ID,ATP_ID,ADD_DEL_FLAG,NETWORK_ID)
+                                                        VALUES( ?,?,'A',? )""",rcId,atpId,networkId);
 
-                        logger.info(
-                                        "Inserted CS_RC_PRODUCT_ATP_MAP rcId={}, atpId={}",
-                                        rcId,
-                                        atpId);
+                        logger.info(   "Inserted CS_RC_PRODUCT_ATP_MAP rcId={}, atpId={}", rcId,atpId);
                 }
         }
 
-        /**
-         * Insert default subscriber category = 1
-         */
         private void insertDefaultSubscriberCategory(
                         Long rcId,
                         Long networkId) {
 
                 jdbcTemplate.update(
                                 """
-                                                INSERT INTO CS_RC_PRODUCT_SUB_CATEGORY_MAP
-                                                (
-                                                    NETWORK_ID,
-                                                    RC_ID,
-                                                    SUBS_CATEGORY_ID
-                                                )
-                                                VALUES
-                                                (
-                                                    ?,
-                                                    ?,
-                                                    1
-                                                )
-                                                """,
-                                networkId,
-                                rcId);
+                                        INSERT INTO CS_RC_PRODUCT_SUB_CATEGORY_MAP ( NETWORK_ID, RC_ID,SUBS_CATEGORY_ID )
+                                                VALUES( ?,?, 1 )""",networkId, rcId);
 
-                logger.info(
-                                "Inserted CS_RC_PRODUCT_SUB_CATEGORY_MAP rcId={}",
-                                rcId);
+                logger.info("Inserted CS_RC_PRODUCT_SUB_CATEGORY_MAP rcId={}",rcId);
         }
 
         /**
@@ -292,30 +162,11 @@ public class RcAtpRechargeService {
          */
         private void insertDefaultChannel(Long rcId, Long networkId) {
 
-                List<String> channels = List.of(
-                                "CIERTO",
-                                "DEALER",
-                                "MSPAPIGW",
-                                "Portal",
-                                "CORPORATE",
-                                "IVR",
-                                "OTHER",
-                                "USSD");
+                List<String> channels = List.of("CIERTO","DEALER","MSPAPIGW","Portal","CORPORATE","IVR","OTHER","USSD");
 
                 String sql = """
-                                INSERT INTO CS_RC_PRODUCT_CHANNEL_MAP
-                                (
-                                    NETWORK_ID,
-                                    RC_ID,
-                                    CHANNEL_ID
-                                )
-                                VALUES
-                                (
-                                    ?,
-                                    ?,
-                                    ?
-                                )
-                                """;
+                                INSERT INTO CS_RC_PRODUCT_CHANNEL_MAP(NETWORK_ID, RC_ID, CHANNEL_ID)
+                                       VALUES( ?,?,?)  """;
 
                 for (String channel : channels) {
                         jdbcTemplate.update(sql, networkId, rcId, channel);
@@ -333,46 +184,16 @@ public class RcAtpRechargeService {
 
                 jdbcTemplate.update(
                                 """
-                                                INSERT INTO CS_RC_PRODUCT_BALTYPE_MAP
-                                                (
-                                                    RC_ID,
-                                                    BALANCE_ID,
-                                                    BALANCE_AMOUNT,
-                                                    BALANCE_VALIDITY,
-                                                    NETWORK_ID
-                                                )
-                                                VALUES
-                                                (
-                                                    ?,
-                                                    1,
-                                                    NULL,
-                                                    0,
-                                                    ?
-                                                )
-                                                """,
-                                rcId,
-                                networkId);
+                                        INSERT INTO CS_RC_PRODUCT_BALTYPE_MAP( RC_ID, BALANCE_ID, BALANCE_AMOUNT, BALANCE_VALIDITY,NETWORK_ID)
+                                                       VALUES(?,1, NULL,0,?)""",rcId,networkId);
 
-                logger.info(
-                                "Inserted CS_RC_PRODUCT_BALTYPE_MAP rcId={}, balanceId=1",
-                                rcId);
+                logger.info( "Inserted CS_RC_PRODUCT_BALTYPE_MAP rcId={}, balanceId=1",rcId);
         }
 
-        // =====================================================================
-        // LOOKUP / UPDATE / DELETE — used by the update (sync) flow, where
-        // RC:RCATP is now strictly 1:1.
-        // =====================================================================
-
-        /**
-         * Finds the RC_ID for one specific RCATP (ATP_ID). Since RC:RCATP is now
-         * 1:1, this replaces the old "one shared RC per tariff package" lookup.
-         * Returns null if this RCATP has no active RC mapping.
-         */
         public Long findRcIdByAtpId(Long atpId, Long networkId) {
 
                 return jdbcTemplate.query("""
-                                SELECT RC_ID
-                                FROM CS_RC_PRODUCT_ATP_MAP
+                                SELECT RC_ID FROM CS_RC_PRODUCT_ATP_MAP
                                 WHERE ATP_ID = ?
                                   AND NETWORK_ID = ?
                                   AND ADD_DEL_FLAG = 'A'
@@ -380,10 +201,6 @@ public class RcAtpRechargeService {
                                 """, rs -> rs.next() ? rs.getLong("RC_ID") : null, atpId, networkId);
         }
 
-        /**
-         * Updates LOW_VALUE / HIGH_VALUE (MRP) on an existing RC. Used when an
-         * RCATP is edited in place via the update/modify UI.
-         */
         public void updateRcMrp(Long rcId, Double mrp, Long networkId) {
 
                 double mrpValue = (mrp != null && mrp > 0) ? mrp : 1;
@@ -399,10 +216,7 @@ public class RcAtpRechargeService {
                 logger.info("Updated CS_RECHARGE_PRODUCTS MRP rcId={} mrp={} rowsAffected={}", rcId, mrpValue, rows);
         }
 
-        /**
-         * Deletes an RC and all of its child mappings. Used when the single
-         * RCATP that "owns" this RC is removed from the Tariff Package.
-         */
+       
         public void deleteRc(Long rcId, Long networkId) {
 
                 jdbcTemplate.update(
@@ -423,10 +237,7 @@ public class RcAtpRechargeService {
                 logger.info("Deleted RC and all child mappings rcId={} networkId={}", rcId, networkId);
         }
 
-        // =====================================================================
-        // Small parsing helpers
-        // =====================================================================
-
+  
         private Long toLong(Object value) {
                 if (value == null)
                         return null;
@@ -457,15 +268,10 @@ public class RcAtpRechargeService {
                 }
         }
 
-        public void updateRcNamesByTariffPackage(
-                        Long tariffPackageId,
-                        Long networkId,
-                        String tpName) {
+        public void updateRcNamesByTariffPackage(Long tariffPackageId,Long networkId,String tpName) {
 
                 List<Map<String, Object>> rcList = jdbcTemplate.queryForList("""
-                                SELECT RC_ID,
-                                       RC_CODE
-                                FROM CS_RECHARGE_PRODUCTS
+                                SELECT RC_ID, RC_CODE FROM CS_RECHARGE_PRODUCTS
                                 WHERE TARIFF_PACKAGE_ID = ?
                                   AND NETWORK_ID = ?
                                 ORDER BY RC_ID
@@ -473,15 +279,11 @@ public class RcAtpRechargeService {
 
                 for (Map<String, Object> rc : rcList) {
 
-                        // RC_ID is VARCHAR2
                         String rcId = rc.get("RC_ID").toString();
-
                         String oldRcCode = rc.get("RC_CODE").toString();
-
                         int index = oldRcCode.lastIndexOf("_RC");
-
                         if (index < 0) {
-                                logger.warn("Skipping RC {} because RC suffix not found.", oldRcCode);
+                                logger.warn("Skipping RC {} because RC suffix not found.", oldRcCode); 
                                 continue;
                         }
 
@@ -501,11 +303,7 @@ public class RcAtpRechargeService {
                                         networkId);
 
                         logger.info(
-                                        "Updated RC_ID={}, Old RC_CODE={}, New RC_CODE={}, Rows={}",
-                                        rcId,
-                                        oldRcCode,
-                                        newRcCode,
-                                        rows);
+                                        "Updated RC_ID={}, Old RC_CODE={}, New RC_CODE={}, Rows={}", rcId,oldRcCode,newRcCode, rows);
                 }
         }
 

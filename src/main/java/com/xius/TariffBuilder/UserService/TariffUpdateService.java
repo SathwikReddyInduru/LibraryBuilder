@@ -19,9 +19,6 @@ import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import com.xius.TariffBuilder.Dto.TariffPackageDetails;
 
@@ -29,16 +26,13 @@ import com.xius.TariffBuilder.Dto.TariffPackageDetails;
 public class TariffUpdateService {
 
     private static final Logger logger = LoggerFactory.getLogger(TariffUpdateService.class);
-    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
     @Qualifier("oracleJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
 
-    private final PlatformTransactionManager transactionManager;
 
     TariffUpdateService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager) {
         this.jdbcTemplate = jdbcTemplate;
-        this.transactionManager = transactionManager;
     }
 
     // GET TARIFF PACKAGE DETAILS

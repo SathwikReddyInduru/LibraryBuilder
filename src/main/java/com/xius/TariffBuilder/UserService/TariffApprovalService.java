@@ -318,7 +318,9 @@ public class TariffApprovalService {
 
 		int tpSuffixNumber = seriesGeneratorService.resolveNextTpSuffixNumber();
 		String tpSuffix = "TP" + tpSuffixNumber;
-		String publicity= (String) data.get("publicityId");
+		Date startDate = Date.valueOf(LocalDate.parse(data.get("startDate").toString(), formatter));
+
+		Date endDate = Date.valueOf(LocalDate.parse(data.get("endDate").toString(), formatter));
 
 
 		int atpSuffixCounter = seriesGeneratorService.resolveNextAtpSuffixNumber();
@@ -394,8 +396,7 @@ public class TariffApprovalService {
 			}
 
 			// ── STEP 4 ──────────────────────────────────────────────────────
-			CloneServiceResult serviceResult = serviceCloneService.cloneService(networkId, oldServicePackageId,
-					tpSuffix, newPlanZoneId);
+			CloneServiceResult serviceResult = serviceCloneService.cloneService(networkId,oldServicePackageId,tpSuffix,newPlanZoneId,startDate,endDate);
 
 			Long newServicePackageId = serviceResult.getNewPackageId();
 			Long newServicePlanId = serviceResult.getNewPlanId();
@@ -419,8 +420,7 @@ public class TariffApprovalService {
 						atp.put("chargeId", chargeId);
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
-						CloneAtpResult atpResult = bundleService.cloneAtpData(
-								oldAtpId, networkId, atpSuffix, newBucketZoneId);
+						CloneAtpResult atpResult =bundleService.cloneAtpData( oldAtpId, networkId, atpSuffix, newBucketZoneId, startDate, endDate);
 
 						defaultAtpIds.add(atpResult.getNewAtpId());
 						newAtpIds.add(atpResult.getNewAtpId());
@@ -439,7 +439,7 @@ public class TariffApprovalService {
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
 						CloneAtpResult atpResult = bundleService.cloneAtpData(
-								oldAtpId, networkId, atpSuffix, newBucketZoneId);
+								oldAtpId, networkId, atpSuffix, newBucketZoneId,startDate,endDate);
 
 						allowedAtpIds.add(atpResult.getNewAtpId());
 						newAtpIds.add(atpResult.getNewAtpId());
@@ -617,7 +617,7 @@ public class TariffApprovalService {
 						tariffId,
 						tpName,
 						networkId,
-						rcAtpPayload);
+						rcAtpPayload,startDate,endDate);
 			}
 
 			Map<String, Object> response = new HashMap<>();

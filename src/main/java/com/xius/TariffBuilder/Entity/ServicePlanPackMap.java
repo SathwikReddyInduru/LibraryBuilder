@@ -8,7 +8,7 @@ import lombok.Data;
 
 @Entity
 @Data
-@Table(name = "CS_SERVICE_PLAN_PACK_MAP")
+// @Table(name = "CS_SERVICE_PLAN_PACK_MAP")
 public class ServicePlanPackMap {
 
 	@Id

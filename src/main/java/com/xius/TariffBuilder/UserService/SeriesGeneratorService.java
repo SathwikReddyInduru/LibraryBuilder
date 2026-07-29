@@ -70,10 +70,6 @@ public class SeriesGeneratorService {
 	}
 
 
-    /**
-     * Resolves the next unique RC series number, e.g. "..._RC1", "..._RC2".
-     * Mirrors resolveNextTpSuffixNumber / resolveNextAtpSuffixNumber.
-     */
     public int resolveNextRcSuffixNumber() {
 		List<String> existing = jdbcTemplate.queryForList("""
 				select RC_CODE
@@ -97,4 +93,3 @@ public class SeriesGeneratorService {
 		return max + 1;
 	}
 }
-

@@ -22,7 +22,6 @@ public class SaveConfigService {
 
 	private static final Logger logger = LoggerFactory.getLogger(SaveConfigService.class);
 	private final SaveConfigDao dao;
-
 	private final JsonStorage jsonStorage;
 
 	SaveConfigService(SaveConfigDao dao, JsonStorage jsonStorage) {
@@ -30,27 +29,16 @@ public class SaveConfigService {
 		this.jsonStorage = jsonStorage;
 	}
 
-	public Map<String, Object> prepareConfig(
-
-			Map<String, Object> request,
-
-			String username,
-
-			Long networkId) {
+	public Map<String, Object> prepareConfig(Map<String, Object> request,String username,Long networkId) {
 
 		logger.info("Preparing config for user={} networkId={}", username, networkId);
-
 		Map<String, Object> response = new HashMap<>();
-
-		// Read required fields
 		String tpName = (String) request.get("tariffPackageDesc");
 		String publicityId = (String) request.get("publicityId");
 		Number tariffPlanId = (Number) request.get("tariffPlanId");
 
-		logger.debug("Extracted fields tpName={} publicityId={} tariffPlanId={}",
-				tpName, publicityId, tariffPlanId);
+		logger.debug("Extracted fields tpName={} publicityId={} tariffPlanId={}",tpName, publicityId, tariffPlanId);
 
-		// DB VALIDATION
 		if (dao.checkTariffExists(networkId, tpName)) {
 
 			logger.warn("DB validation failed: tariff exists tpName={} networkId={}", tpName, networkId);
@@ -67,27 +55,21 @@ public class SaveConfigService {
 
 		boolean isUpdate = Boolean.TRUE.equals(request.get("isUpdate"));
 
-		// JSON DUPLICATE CHECK — skip if this is an update
 		if (!isUpdate && jsonStorage.exists(tpName)) {
 			logger.warn("JSON validation failed: config already exists tpName={}", tpName);
 			response.put("error", "Tariff Package already exists in JSON");
 			return response;
 		}
 
-		// STORE JSON
-		logger.info("Storing config tpName={} username={} networkId={}",
-				tpName, username, networkId);
+		logger.info("Storing config tpName={} username={} networkId={}",tpName, username, networkId);
 		jsonStorage.store(tpName, username, networkId, request);
 
 		// SUCCESS RESPONSE
 		logger.info("Config prepared successfully tpName={} username={} networkId={}", tpName, username, networkId);
 
 		response.put("message",
-                isUpdate ? "Tariff Package updated successfully, " + tpName
-                        : "Tariff Package created successfully, " + tpName);
-
+                isUpdate ? "Tariff Package updated successfully, " + tpName: "Tariff Package created successfully, " + tpName);
 		response.put("tpName", tpName);
-
 		return response;
 	}
 
@@ -97,13 +79,9 @@ public class SaveConfigService {
 
 		try {
 			ObjectMapper mapper = new ObjectMapper();
-
 			Path path = Paths.get("drafts", username + ".json");
-
 			logger.debug("Draft file path={}", path);
-
 			Files.createDirectories(path.getParent());
-
 			List<Map<String, Object>> drafts = new ArrayList<>();
 
 			if (Files.exists(path) && Files.size(path) > 0) {
@@ -123,7 +101,6 @@ public class SaveConfigService {
 				return;
 			}
 			drafts.add(0, draft);
-
 			mapper.writerWithDefaultPrettyPrinter()
 					.writeValue(path.toFile(), drafts);
 

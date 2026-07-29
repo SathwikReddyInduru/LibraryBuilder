@@ -25,10 +25,7 @@ public class DayTypeCloneService {
     }
 
    
-    public Long cloneDayType(Long oldDayTypeId,
-                             Long networkId,
-                             String suffix,
-                             Map<Long, Long> dayTypeCache) {
+    public Long cloneDayType(Long oldDayTypeId,  Long networkId, String suffix, Map<Long, Long> dayTypeCache) {
 
         logger.info("Starting DayType clone for DAYTYPE_ID={} networkId={}", oldDayTypeId, networkId);
 

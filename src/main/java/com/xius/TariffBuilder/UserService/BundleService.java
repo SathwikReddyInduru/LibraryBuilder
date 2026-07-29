@@ -1,5 +1,6 @@
 package com.xius.TariffBuilder.UserService;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,9 +22,7 @@ public class BundleService {
 
 	@Qualifier("oracleJdbcTemplate")
 	private final JdbcTemplate jdbcTemplate;
-
 	private final ServiceCloneService serviceCloneService;
-
 	private final ServiceplanZone servicePlanZone;
 
 	BundleService(JdbcTemplate jdbcTemplate, ServiceCloneService serviceCloneService, ServiceplanZone servicePlanZone) {
@@ -39,7 +38,6 @@ public class BundleService {
 		private String newBucketId;
 		private Long newBucketZoneId;
 		private List<Long> newPlanIds;
-
 		public CloneAtpResult(Long newAtpId, String oldBucketId, String newBucketId, Long newBucketZoneId,
 				List<Long> newPlanIds) {
 			this.newAtpId = newAtpId;
@@ -70,13 +68,8 @@ public class BundleService {
 		}
 	}
 
-
-
-	
 	 // Get first old bucket id from ATP.
-	 
 	public String getOldBucketId(Long atpId, Long networkId) {
-
 		return jdbcTemplate.query("""
 				select bm.BUCKET_ID
 				from CS_ATP_ACCUMU_BON_DISC_MAP am
@@ -88,9 +81,7 @@ public class BundleService {
 				""", rs -> rs.next() ? rs.getString("BUCKET_ID") : null, atpId, networkId);
 	}
 
-	
 	 //Get zone id from old bucket.
-	 
 	public Long getBucketZoneId(String bucketId) {
 
 		if (bucketId == null) {
@@ -104,9 +95,7 @@ public class BundleService {
 				""", rs -> rs.next() ? rs.getObject("ZONE_GROUP_ID", Long.class) : null, bucketId);
 	}
 
-	 // Generate new bucket zone id based on bucket table. Delegates to
-	 // ServiceplanZone so there's one place (ZoneTable.getSequenceName())
-	 // that knows which sequence backs which table.
+
 	public Long generateNewBucketZoneId() {
 		return servicePlanZone.generateNewZoneId(ServiceplanZone.ZoneTable.RAT_ZONE_GROUPS);
 	}
@@ -116,12 +105,12 @@ public class BundleService {
 	// CS_RAT_SERVICE_PLANS.DATA_ZONE_GROUP_ID in
 	// ServiceCloneService.cloneServicePlans. It always clones into
 	// CS_DRE_RATING_GROUP_DETAILS, whenever the source bucket has one.
+
 	public Long getBucketDataZoneGroupId(String bucketId) {
 
 		if (bucketId == null) {
 			return null;
 		}
-
 		return jdbcTemplate.query("""
 				select DATA_ZONE_GROUP_ID
 				from BNDL_MT_BUCKETS
@@ -149,7 +138,7 @@ public class BundleService {
 	 //Clone ATP, bundle, and bucket. Bucket will use newBucketZoneId.
 
 	@Transactional
-	public CloneAtpResult cloneAtpData(Long atpId, Long networkId, String tpName, Long newBucketZoneId) {
+	public CloneAtpResult cloneAtpData(Long atpId, Long networkId, String tpName, Long newBucketZoneId,Date startDate,Date endDate) {
 
 		logger.info("ATP clone started atpId={} networkId={} tpName={} newBucketZoneId={}", atpId, networkId, tpName,
 				newBucketZoneId);
@@ -158,11 +147,9 @@ public class BundleService {
 				SELECT SEQ_SERVICE_PACK_ID.NEXTVAL FROM DUAL
 				""", Long.class);
 
-		Map<String, Object> oldAtp = jdbcTemplate.queryForMap("""
-				select *
-				from CS_RAT_SERVICE_PACKAGE
-				where SERVICE_PACKAGE_ID = ?
-				""", atpId);
+		Map<String, Object> oldAtp = jdbcTemplate.queryForMap(
+			""" 
+			select * from CS_RAT_SERVICE_PACKAGE where SERVICE_PACKAGE_ID = ?	""", atpId);
 
 		try {
 			jdbcTemplate.update("""
@@ -211,7 +198,7 @@ public class BundleService {
 					oldAtp.get("RENTAL_TYPE"),
 					oldAtp.get("RENTAL_PERIOD"),
 					oldAtp.get("ASP_TYPE"),
-					oldAtp.get("END_DATE"),
+					endDate,
 					oldAtp.get("SERVICE_DURATION"),
 					oldAtp.get("ATP_CATEGORY"),
 					oldAtp.get("TRANSFEROR_CHARGE"),
@@ -231,10 +218,6 @@ public class BundleService {
 			throw new TariffInsertException("cloneAtpData", "CS_RAT_SERVICE_PACKAGE(ATP)", ex);
 		}
 
-		// Clone any CS_RAT_SERVICE_PLANS rows mapped to this ATP package, same as
-		// is already done for TP packages in ServiceCloneService.cloneService.
-		// Zone handling is per-plan inside cloneServicePlans: a new zone is only
-		// created when the source plan itself has one.
 		List<Long> newPlanIds = serviceCloneService.cloneServicePlans(networkId, atpId, newAtpId, tpName);
 
 		logger.info("ATP service plans cloned oldAtpId={} newAtpId={} newPlanIds={}", atpId, newAtpId, newPlanIds);
@@ -249,20 +232,13 @@ public class BundleService {
 		String firstOldBucketId = null;
 		String firstNewBucketId = null;
 
-		// Distinct old bucket zone id -> new zone id, scoped to this cloneAtpData
-		// call. Buckets that share the same old zone are mapped to the same new
-		// zone; buckets on a different old zone get their own distinct new zone
-		// rather than being folded into someone else's zone (which would merge
-		// unrelated slab/calendar mappings together).
-		Map<Long, Long> bucketZoneIdCache = new HashMap<>();
 
-		// Same idea, but for DATA_ZONE_GROUP_ID — an independent zone reference
-		// from ZONE_GROUP_ID, tracked separately.
+		Map<Long, Long> bucketZoneIdCache = new HashMap<>();
 		Map<Long, Long> bucketDataZoneIdCache = new HashMap<>();
 
 		for (Long oldBundleId : bundleIds) {
 
-			Long newBundleId = cloneBundle(oldBundleId, networkId, tpName);
+			Long newBundleId = cloneBundle(oldBundleId, networkId, tpName,startDate,endDate);
 
 			cloneImsiRanges(oldBundleId, newBundleId, networkId);
 
@@ -276,16 +252,6 @@ public class BundleService {
 
 				String newBucketId = generateNewBucketId();
 
-				// Zone handling is per-bucket: only create + map a zone (CS_RAT_ZONE_GROUPS ->
-				// CS_DRE_RATING_GROUP_DETAILS -> calendar -> day types) when the source
-				// bucket itself has a ZONE_GROUP_ID. Otherwise the cloned bucket is left
-				// with no zone mapped.
-				//
-				// Distinct old zones get distinct new zones (see bucketZoneIdCache
-				// above); buckets sharing the same old zone are mapped to the same
-				// new zone. The first distinct old zone encountered in this call
-				// uses the specific newBucketZoneId resolved by the caller, so the
-				// value reported back still matches what's actually mapped.
 				Long oldBucketZoneId = getBucketZoneId(oldBucketId);
 				Long newBucketZoneIdForBucket = null;
 
@@ -301,11 +267,6 @@ public class BundleService {
 
 						String balanceCategory = getBucketBalanceCategory(oldBucketId);
 						ServiceplanZone.ZoneTable zoneTable = servicePlanZone.resolveZoneTableByBalanceCategory(balanceCategory);
-
-						// zoneTable already encodes the VOICE/SMS -> RAT_ZONE_GROUPS vs.
-						// DATA -> DRE_RATING_GROUP_DETAILS decision (see
-						// resolveZoneTableByBalanceCategory), so the sequence to draw
-						// from follows directly from it — no separate branch needed.
 						Long candidateZoneId = servicePlanZone.generateNewZoneId(zoneTable);
 
 						boolean cloned = servicePlanZone.cloneZoneIfExists(oldBucketZoneId, candidateZoneId, networkId, tpName, zoneTable);
@@ -317,9 +278,6 @@ public class BundleService {
 							logger.info("Zone cloned for bucket oldBucketId={} oldZoneId={} newZoneId={} balanceCategory={} table={}",
 									oldBucketId, oldBucketZoneId, newBucketZoneIdForBucket, balanceCategory, zoneTable);
 						} else {
-							// oldBucketZoneId doesn't actually exist in zoneTable — leave the
-							// bucket with no zone rather than pointing it at a new zone id
-							// that has no underlying zone data.
 							logger.info("Old zone oldZoneId={} not found in {} for bucket oldBucketId={}. Leaving bucket with no zone mapped.",
 									oldBucketZoneId, zoneTable, oldBucketId);
 						}
@@ -329,13 +287,6 @@ public class BundleService {
 					logger.info("Bucket oldBucketId={} has no zone mapped. Skipping zone creation.", oldBucketId);
 				 }
 				 
-					
-				
-
-				// DATA_ZONE_GROUP_ID is independent of ZONE_GROUP_ID (see
-				// getBucketDataZoneGroupId) and always clones into
-				// CS_DRE_RATING_GROUP_DETAILS. Tracked with its own cache so it
-				// doesn't collide with the ZONE_GROUP_ID cache above.
 				Long oldBucketDataZoneGroupId = getBucketDataZoneGroupId(oldBucketId);
 				Long newBucketDataZoneGroupId = null;
 
@@ -360,9 +311,7 @@ public class BundleService {
 							logger.info("DATA_ZONE_GROUP_ID cloned for bucket oldBucketId={} oldDataZoneGroupId={} newDataZoneGroupId={}",
 									oldBucketId, oldBucketDataZoneGroupId, newBucketDataZoneGroupId);
 						} else {
-							// oldBucketDataZoneGroupId doesn't actually exist in
-							// CS_DRE_RATING_GROUP_DETAILS — leave the bucket with no
-							// DATA_ZONE_GROUP_ID rather than a dangling reference.
+
 							logger.info("Old DATA_ZONE_GROUP_ID={} not found for bucket oldBucketId={}. Leaving bucket with no DATA_ZONE_GROUP_ID mapped.",
 									oldBucketDataZoneGroupId, oldBucketId);
 						}
@@ -375,14 +324,8 @@ public class BundleService {
 
 				try {
 					jdbcTemplate.update("""
-							insert into CS_BNDL_MT_BNDL_BUCKET_MAP
-							(
-							    BUNDLE_ID,
-							    BUCKET_ID,
-							    NETWORK_ID
-							)
-							values (?,?,?)
-							""", newBundleId, newBucketId, networkId);
+							insert into CS_BNDL_MT_BNDL_BUCKET_MAP	( BUNDLE_ID,  BUCKET_ID, NETWORK_ID)	values (?,?,?)	""",
+							 newBundleId, newBucketId, networkId);
 				} catch (Exception ex) {
 					throw new TariffInsertException("cloneAtpData", "CS_BNDL_MT_BNDL_BUCKET_MAP", ex);
 				}
@@ -398,38 +341,24 @@ public class BundleService {
 
 			try {
 				jdbcTemplate.update("""
-						insert into CS_ATP_ACCUMU_BON_DISC_MAP
-						(
-						    BUNDLE_OR_DISCOUNT_ID,
-						    ATP_ID,
-						    PLAN_TYPE,
-						    NETWORK_ID
-						)
-						values (?,?,?,?)
-						""", newBundleId, newAtpId, "B", networkId);
+						insert into CS_ATP_ACCUMU_BON_DISC_MAP(    BUNDLE_OR_DISCOUNT_ID,    ATP_ID, PLAN_TYPE,  NETWORK_ID)values (?,?,?,?)""", 
+						newBundleId, newAtpId, "B", networkId);
 			} catch (Exception ex) {
 				throw new TariffInsertException("cloneAtpData", "CS_ATP_ACCUMU_BON_DISC_MAP", ex);
 			}
 
 		}
 		copyServiceAtpMap(atpId, newAtpId, networkId);
-
 		logger.info("ATP clone completed oldAtpId={} newAtpId={}", atpId, newAtpId);
-
 		return new CloneAtpResult(newAtpId, firstOldBucketId, firstNewBucketId, newBucketZoneId, newPlanIds);
 	}
 
-	private Long cloneBundle(Long oldBundleId, Long networkId, String tpName) {
-
+	private Long cloneBundle(Long oldBundleId, Long networkId, String tpName,Date startDate,Date endDate) {
 		Map<String, Object> bundle = jdbcTemplate.queryForMap("""
-				select *
-				from BNDL_MT_BUNDLE
-				where BUNDLE_ID = ?
-				""", oldBundleId);
+				select * from BNDL_MT_BUNDLE where BUNDLE_ID = ? """, oldBundleId);
 
 		Long newBundleId = jdbcTemplate.queryForObject("""
-				SELECT seq_bundle_id.NEXTVAL FROM DUAL
-				""", Long.class);
+				SELECT seq_bundle_id.NEXTVAL FROM DUAL""", Long.class);
 
 		try {
 			jdbcTemplate.update("""
@@ -474,14 +403,13 @@ public class BundleService {
 					bundle.get("BUNDLE_NAME").toString().replaceAll("_(CL|TP|ATP)\\d+$", "") + "_" + tpName,
 					bundle.get("BUNDLE_CHARGE"),
 					bundle.get("PURCHAGE_TYPE"),
-					bundle.get("VALID_FROM"),
-					bundle.get("VALID_UPTO"),
+					startDate,
+					endDate,
 					bundle.get("CUSTOMER_GROUP_ID"),
 					bundle.get("BUNDLE_STATUS"),
 					bundle.get("STATUS_DATE"),
 					bundle.get("CREATED_BY"),
 					networkId,
-
 					bundle.get("ACTIVATION_NOTIFICATION_TYPE"),
 					bundle.get("ACTIVATION_CHARGE"),
 					bundle.get("EXPIRY_NOTIFICATION_TYPE"),

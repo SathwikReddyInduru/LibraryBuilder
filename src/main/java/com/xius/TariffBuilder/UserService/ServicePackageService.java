@@ -25,11 +25,7 @@ public class ServicePackageService {
 		logger.info("getDescription called servicePackageId={} networkId={}", servicePackageId, networkId);
 
 		String sql = """
-				SELECT DESCRIPTION
-				FROM CS_RAT_SERVICE_PACKAGE
-				WHERE SERVICE_PACKAGE_ID = ?
-				AND NETWORK_ID = ?
-				""";
+				SELECT DESCRIPTION	FROM CS_RAT_SERVICE_PACKAGE	WHERE SERVICE_PACKAGE_ID = ?AND NETWORK_ID = ? """;
 
 		logger.debug("Executing SQL to fetch DESCRIPTION");
 

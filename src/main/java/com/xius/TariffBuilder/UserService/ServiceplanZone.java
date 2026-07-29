@@ -19,18 +19,11 @@ public class ServiceplanZone {
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceplanZone.class);
 
-    // TYPE_OF_SERVICE value that identifies a DATA plan/bucket.
     private static final int DATA_TYPE_OF_SERVICE = 3;
 
-    // BALANCE_CATEGORY value that identifies a DATA bucket.
     private static final String DATA_BALANCE_CATEGORY = "DATA";
 
-    /**
-     * Identifies which physical zone table a given source (service plan or
-     * bucket) should be cloned through. Introducing this enum is what lets the
-     * decision logic (TYPE_OF_SERVICE today, BALANCE_CATEGORY tomorrow) change
-     * without touching cloneZoneIfExists or anything downstream of it.
-     */
+
     public enum ZoneTable {
 
         RAT_ZONE_GROUPS("CS_RAT_ZONE_GROUPS", "seq_zone_group_id"),
@@ -47,12 +40,6 @@ public class ServiceplanZone {
         public String getTableName() {
             return tableName;
         }
-
-        // The sequence that actually feeds ZONE_GROUP_ID for this table. Tying
-        // the sequence to the table here means callers never again have to
-        // decide "which sequence" by hand (e.g. branching on BALANCE_CATEGORY
-        // at the call site) — resolving the ZoneTable is the only decision
-        // left, and generateNewZoneId(ZoneTable) takes it from there.
         public String getSequenceName() {
             return sequenceName;
         }
@@ -68,14 +55,7 @@ public class ServiceplanZone {
         this.dayTypeCloneService = dayTypeCloneService;
     }
 
-    /**
-     * Current decision rule: TYPE_OF_SERVICE = 3 (DATA) -> DRE_RATING_GROUP_DETAILS,
-     * anything else -> RAT_ZONE_GROUPS.
-     * <p>
-     * To switch the decision to BALANCE_CATEGORY later, callers just need to
-     * call resolveZoneTableByBalanceCategory(...) instead — cloneZoneIfExists
-     * and everything after it stays the same.
-     */
+  
     public ZoneTable resolveZoneTableByTypeOfService(Integer typeOfService) {
 
         if (typeOfService != null && typeOfService == DATA_TYPE_OF_SERVICE) {
@@ -85,11 +65,7 @@ public class ServiceplanZone {
         return ZoneTable.RAT_ZONE_GROUPS;
     }
 
-    /**
-     * Future-facing equivalent of resolveZoneTableByTypeOfService, keyed off
-     * BALANCE_CATEGORY instead (e.g. for buckets, which don't have
-     * TYPE_OF_SERVICE but do have BALANCE_CATEGORY).
-     */
+  
     public ZoneTable resolveZoneTableByBalanceCategory(String balanceCategory) {
 
         if (balanceCategory != null && DATA_BALANCE_CATEGORY.equalsIgnoreCase(balanceCategory)) {
@@ -99,17 +75,6 @@ public class ServiceplanZone {
         return ZoneTable.RAT_ZONE_GROUPS;
     }
 
-    // Draws the next id from whichever sequence actually backs the target
-    // ZoneTable (see ZoneTable.getSequenceName()). Every caller already knows
-    // — or resolves via resolveZoneTableByTypeOfService /
-    // resolveZoneTableByBalanceCategory — which ZoneTable the id is destined
-    // for, so the sequence choice is derived from that, not hand-picked
-    // separately. This replaces the old GREATEST(seq_zone_group_id.NEXTVAL,
-    // seq_dre_zone_group_id.NEXTVAL) hack, which was invalid SQL (a
-    // PreparedStatement can't contain nested "SELECT ... FROM DUAL;"
-    // statements) and, even if it had run, would have picked the numerically
-    // higher of two unrelated sequences instead of the one that actually
-    // matches the table being inserted into.
     public Long generateNewZoneId(ZoneTable zoneTable) {
         return jdbcTemplate.queryForObject(
                 "select " + zoneTable.getSequenceName() + ".NEXTVAL from dual",
@@ -128,11 +93,7 @@ public class ServiceplanZone {
                 zoneId);
     }
 
-    // Returns true if the old zone was found and (already-present-or-freshly)
-    // mapped to newZoneId; returns false if oldZoneId doesn't exist in
-    // zoneTable, meaning nothing was cloned. Callers should not attach
-    // newZoneId to any record when this returns false — doing so would leave
-    // a dangling reference to a zone that has no underlying data.
+
     @Transactional
     public boolean cloneZoneIfExists(Long oldZoneId, Long newZoneId, Long networkId, String tpName, ZoneTable zoneTable) {
 
@@ -166,7 +127,6 @@ public class ServiceplanZone {
         }
 
         cloneSlabAndCalendar(oldZoneId, newZoneId, networkId, suffix);
-
         logger.info("Zone clone completed oldZoneId={} newZoneId={} table={}", oldZoneId, newZoneId, tableName);
 
         return true;
@@ -188,7 +148,7 @@ public class ServiceplanZone {
                             )
                             select
                                 ?,
-                                REGEXP_REPLACE(ZONE_GROUP_DESC,'_CL[0-9]+$','') || ?,
+                                REGEXP_REPLACE(ZONE_GROUP_DESC,'_(CL|TP|ATP)[0-9]+$','') || ?,
                                 NETWORK_ID,
                                 TYPE_OF_SERVICE,
                                 RATING_YN
@@ -223,7 +183,7 @@ public class ServiceplanZone {
                                 NETWORK_ID,
                                 ROAMING_NETWORK_ID,
                                 ?,
-                                REGEXP_REPLACE(ZONE_GROUP_NAME,'_CL[0-9]+$','') || ?,
+                                REGEXP_REPLACE(ZONE_GROUP_NAME,'_(CL|TP|ATP)[0-9]+$','') || ?,
                                 APN_ID,
                                 RATING_GROUP_ID,
                                 CALENDAR_ID,
@@ -255,13 +215,8 @@ public class ServiceplanZone {
         for (Map<String, Object> row : mappings) {
 
             Long oldSlabId = ((Number) row.get("SLAB_ID")).longValue();
-
-            Long oldCalendarId = row.get("AIRTIME_CALENDAR") == null
-                    ? null
-                    : ((Number) row.get("AIRTIME_CALENDAR")).longValue();
-
+            Long oldCalendarId = row.get("AIRTIME_CALENDAR") == null   ? null   : ((Number) row.get("AIRTIME_CALENDAR")).longValue();
             Long newCalendarId = cloneCalendar(oldCalendarId, suffix, networkId, calendarCache);
-
             Integer mappingCount = jdbcTemplate.queryForObject(
                     """
                             select count(*)
@@ -278,15 +233,7 @@ public class ServiceplanZone {
             if (mappingCount == null || mappingCount == 0) {
                 jdbcTemplate.update(
                         """
-                                insert into CS_RAT_ZONEGROUP_SLAB_MAPPING
-                                (
-                                    ZONE_GROUP_ID,
-                                    SLAB_ID,
-                                    AIRTIME_CALENDAR,
-                                    NETWORK_ID
-                                )
-                                values (?,?,?,?)
-                                """,
+                                insert into CS_RAT_ZONEGROUP_SLAB_MAPPING (   ZONE_GROUP_ID,  SLAB_ID,  AIRTIME_CALENDAR,   NETWORK_ID  ) values (?,?,?,?)   """,
                         newZoneId,
                         oldSlabId,
                         newCalendarId,
@@ -328,9 +275,7 @@ public class ServiceplanZone {
 
         logger.info(
                 "Original calendar CALENDAR_ID={} DayTypes: Sun={} Mon={} Tue={} Wed={} Thu={} Fri={} Sat={}",
-                oldCalendarId,
-                oldSunday, oldMonday, oldTuesday, oldWednesday,
-                oldThursday, oldFriday, oldSaturday);
+                oldCalendarId,oldSunday, oldMonday, oldTuesday, oldWednesday,oldThursday, oldFriday, oldSaturday);
 
         // ── Clone each distinct DayType; cache prevents duplicate cloning ────
         Map<Long, Long> dayTypeCache = new HashMap<>();
@@ -357,16 +302,11 @@ public class ServiceplanZone {
         // ── Generate new CALENDAR_ID ─────────────────────────────────────────
         Long newCalendarId = jdbcTemplate.queryForObject(
                 """
-                        select nvl(max(CALENDAR_ID),0)+1
-                        from RAT_MT_CALENDAR
-                        """,
-                Long.class);
+                        select nvl(max(CALENDAR_ID),0)+1 from RAT_MT_CALENDAR  """,  Long.class);
 
         logger.info(
                 "Inserting RAT_MT_CALENDAR newCalendarId={} with newDayTypes: Sun={} Mon={} Tue={} Wed={} Thu={} Fri={} Sat={}",
-                newCalendarId,
-                newSunday, newMonday, newTuesday, newWednesday,
-                newThursday, newFriday, newSaturday);
+                newCalendarId,  newSunday, newMonday, newTuesday, newWednesday,  newThursday, newFriday, newSaturday);
 
         // ── Insert the cloned calendar row using NEW DayType IDs ─────────────
         try {
@@ -396,32 +336,20 @@ public class ServiceplanZone {
                                 ?,
                                 ?,
                                 ?,
-                                REGEXP_REPLACE(CALENDAR_NAME,'_CL[0-9]+$','') || ?,
-                                REGEXP_REPLACE(DESCRIPTION,'_CL[0-9]+$','') || ?,
+                                REGEXP_REPLACE(CALENDAR_NAME,'_(CL|TP|ATP)[0-9]+$','') || ?,
+                                REGEXP_REPLACE(DESCRIPTION,'_(CL|TP|ATP)[0-9]+$','') || ?,
                                 ?,
                                 DURATION_VOLUME_FLAG
                             from RAT_MT_CALENDAR
                             where CALENDAR_ID = ?
                             """,
-                    newCalendarId,
-                    newSunday,
-                    newMonday,
-                    newTuesday,
-                    newWednesday,
-                    newThursday,
-                    newFriday,
-                    newSaturday,
-                    suffix,
-                    suffix,
-                    networkId,
-                    oldCalendarId);
+                    newCalendarId,  newSunday,  newMonday,  newTuesday, newWednesday,   newThursday, newFriday, newSaturday, suffix, suffix, networkId, oldCalendarId);
         } catch (Exception ex) {
             logger.error("Error cloning RAT_MT_CALENDAR oldCalendarId={}", oldCalendarId, ex);
             throw new TariffInsertException("cloneCalendar", "RAT_MT_CALENDAR", ex);
         }
 
         calendarCache.put(oldCalendarId, newCalendarId);
-
         logger.info("RAT_MT_CALENDAR cloned oldCalendarId={} newCalendarId={}", oldCalendarId, newCalendarId);
 
         return newCalendarId;

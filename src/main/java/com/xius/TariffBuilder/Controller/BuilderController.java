@@ -1,637 +1,637 @@
-package com.xius.TariffBuilder.Controller;
+// package com.xius.TariffBuilder.Controller;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+// import java.nio.file.Files;
+// import java.nio.file.Path;
+// import java.nio.file.Paths;
+// import java.util.ArrayList;
+// import java.util.List;
+// import java.util.Map;
+// import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+// import org.slf4j.Logger;
+// import org.slf4j.LoggerFactory;
+// import org.springframework.http.ResponseEntity;
+// import org.springframework.stereotype.Controller;
+// import org.springframework.ui.Model;
+// import org.springframework.web.bind.annotation.CrossOrigin;
+// import org.springframework.web.bind.annotation.GetMapping;
+// import org.springframework.web.bind.annotation.ModelAttribute;
+// import org.springframework.web.bind.annotation.PathVariable;
+// import org.springframework.web.bind.annotation.PostMapping;
+// import org.springframework.web.bind.annotation.PutMapping;
+// import org.springframework.web.bind.annotation.RequestBody;
+// import org.springframework.web.bind.annotation.RequestParam;
+// import org.springframework.web.bind.annotation.ResponseBody;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xius.TariffBuilder.Dto.LoginRequestDto;
-import com.xius.TariffBuilder.Dto.TariffPackageDetailsDto;
-import com.xius.TariffBuilder.Dto.UsrPrivilegeDTO;
-import com.xius.TariffBuilder.Entity.ServicePlanPackMap;
-import com.xius.TariffBuilder.UserService.SaveConfigService;
-import com.xius.TariffBuilder.UserService.ServicePackageService;
-import com.xius.TariffBuilder.UserService.ServicePlanService;
-import com.xius.TariffBuilder.UserService.TariffApprovalService;
-import com.xius.TariffBuilder.UserService.TariffPackageService;
-import com.xius.TariffBuilder.UserService.TariffPackageSyncService;
-import com.xius.TariffBuilder.UserService.TariffService;
-import com.xius.TariffBuilder.UserService.UserLoginService;
-import com.xius.TariffBuilder.util.JsonStorage;
-import com.xius.TariffBuilder.UserService.TariffUpdateService;
+// import com.fasterxml.jackson.core.type.TypeReference;
+// import com.fasterxml.jackson.databind.ObjectMapper;
+// import com.xius.TariffBuilder.Dto.LoginRequestDto;
+// import com.xius.TariffBuilder.Dto.TariffPackageDetailsDto;
+// import com.xius.TariffBuilder.Dto.UsrPrivilegeDTO;
+// import com.xius.TariffBuilder.Entity.ServicePlanPackMap;
+// import com.xius.TariffBuilder.UserService.SaveConfigService;
+// import com.xius.TariffBuilder.UserService.ServicePackageService;
+// import com.xius.TariffBuilder.UserService.ServicePlanService;
+// import com.xius.TariffBuilder.UserService.TariffApprovalService;
+// import com.xius.TariffBuilder.UserService.TariffPackageService;
+// import com.xius.TariffBuilder.UserService.TariffPackageSyncService;
+// import com.xius.TariffBuilder.UserService.TariffService;
+// import com.xius.TariffBuilder.UserService.UserLoginService;
+// import com.xius.TariffBuilder.util.JsonStorage;
+// import com.xius.TariffBuilder.UserService.TariffUpdateService;
 
-import jakarta.servlet.http.HttpSession;
+// import jakarta.servlet.http.HttpSession;
 
-@Controller
-@CrossOrigin(origins = "*")
-public class BuilderController {
+// @Controller
+// @CrossOrigin(origins = "*")
+// public class BuilderController {
 
-    private static final Logger logger = LoggerFactory.getLogger(BuilderController.class);
+//     private static final Logger logger = LoggerFactory.getLogger(BuilderController.class);
 
-    private final ServicePlanService service;
+//     private final ServicePlanService service;
 
-    private final TariffService tariffService;
+//     private final TariffService tariffService;
 
-    private final SaveConfigService saveConfigService;
+//     private final SaveConfigService saveConfigService;
 
-    private final UserLoginService userLoginService;
-
-
-    private final ServicePackageService servicePackageService;
+//     private final UserLoginService userLoginService;
 
 
-    private final TariffApprovalService tariffApprovalService;
+//     private final ServicePackageService servicePackageService;
 
-    private final JsonStorage jsonStorage;
 
-    private final TariffPackageService tariffPackageService;
+//     private final TariffApprovalService tariffApprovalService;
 
-    private final TariffUpdateService tariffUpdateService;
-    private final TariffPackageSyncService tariffPackageSyncService;
+//     private final JsonStorage jsonStorage;
+
+//     private final TariffPackageService tariffPackageService;
+
+//     private final TariffUpdateService tariffUpdateService;
+//     private final TariffPackageSyncService tariffPackageSyncService;
     
 
-    BuilderController(ServicePlanService service, TariffService tariffService, SaveConfigService saveConfigService, UserLoginService userLoginService, ServicePackageService servicePackageService, TariffApprovalService tariffApprovalService, JsonStorage jsonStorage, TariffPackageService tariffPackageService, TariffUpdateService tariffUpdateService,TariffPackageSyncService tariffPackageSyncService) {
-        this.service = service;
-        this.tariffService = tariffService;
-        this.saveConfigService = saveConfigService;
-        this.userLoginService = userLoginService;
-        this.servicePackageService = servicePackageService;
-        this.tariffApprovalService = tariffApprovalService;
-        this.jsonStorage = jsonStorage;
-        this.tariffPackageService = tariffPackageService;
-        this.tariffUpdateService = tariffUpdateService;
-        this.tariffPackageSyncService = tariffPackageSyncService;
-    }
+//     BuilderController(ServicePlanService service, TariffService tariffService, SaveConfigService saveConfigService, UserLoginService userLoginService, ServicePackageService servicePackageService, TariffApprovalService tariffApprovalService, JsonStorage jsonStorage, TariffPackageService tariffPackageService, TariffUpdateService tariffUpdateService,TariffPackageSyncService tariffPackageSyncService) {
+//         this.service = service;
+//         this.tariffService = tariffService;
+//         this.saveConfigService = saveConfigService;
+//         this.userLoginService = userLoginService;
+//         this.servicePackageService = servicePackageService;
+//         this.tariffApprovalService = tariffApprovalService;
+//         this.jsonStorage = jsonStorage;
+//         this.tariffPackageService = tariffPackageService;
+//         this.tariffUpdateService = tariffUpdateService;
+//         this.tariffPackageSyncService = tariffPackageSyncService;
+//     }
 
-    // ================= LOGIN =================
+//     // ================= LOGIN =================
 
-    @GetMapping("/loginform")
-    public String showLoginPage(HttpSession session, Model model) {
+//     @GetMapping("/loginform")
+//     public String showLoginPage(HttpSession session, Model model) {
 
-        model.addAttribute("sessionId", session.getId());
+//         model.addAttribute("sessionId", session.getId());
 
-        if (!isNotLoggedIn(session)) {
-            return "redirect:/builder";
-        }
+//         if (!isNotLoggedIn(session)) {
+//             return "redirect:/builder";
+//         }
 
-        model.addAttribute("loginForm", new LoginRequestDto());
-        return "login";
-    }
+//         model.addAttribute("loginForm", new LoginRequestDto());
+//         return "login";
+//     }
 
-    @PostMapping("/login")
-    public String login(@ModelAttribute("loginForm") LoginRequestDto request, HttpSession session, Model model) {
+//     @PostMapping("/login")
+//     public String login(@ModelAttribute("loginForm") LoginRequestDto request, HttpSession session, Model model) {
 
-        logger.info("Login request received for user={}", request.getLoginId());
+//         logger.info("Login request received for user={}", request.getLoginId());
 
-        if (request.getNetworkLoginName() == null || request.getNetworkLoginName().isBlank()) {
+//         if (request.getNetworkLoginName() == null || request.getNetworkLoginName().isBlank()) {
 
-            logger.warn("Network name missing");
+//             logger.warn("Network name missing");
 
-            model.addAttribute("message", "Please enter Network Name");
+//             model.addAttribute("message", "Please enter Network Name");
 
-            return "login";
-        }
+//             return "login";
+//         }
 
-        if (request.getLoginId() == null || request.getLoginId().isBlank()) {
+//         if (request.getLoginId() == null || request.getLoginId().isBlank()) {
 
-            logger.warn("LoginId missing");
+//             logger.warn("LoginId missing");
 
-            model.addAttribute("message", "Please enter Username");
+//             model.addAttribute("message", "Please enter Username");
 
-            return "login";
-        }
+//             return "login";
+//         }
 
-        if (request.getPassword() == null || request.getPassword().isBlank()) {
+//         if (request.getPassword() == null || request.getPassword().isBlank()) {
 
-            logger.warn("Password missing");
+//             logger.warn("Password missing");
 
-            model.addAttribute("message", "Please enter Password");
+//             model.addAttribute("message", "Please enter Password");
 
-            return "login";
-        }
+//             return "login";
+//         }
 
-        try {
+//         try {
 
-            Map<String, Object> loginData = userLoginService.authenticate(request);
+//             Map<String, Object> loginData = userLoginService.authenticate(request);
 
-            List<UsrPrivilegeDTO> privileges = (List<UsrPrivilegeDTO>) loginData.get("privileges");
+//             List<UsrPrivilegeDTO> privileges = (List<UsrPrivilegeDTO>) loginData.get("privileges");
 
-            List<String> privilegeIds = privileges.stream().map(UsrPrivilegeDTO::getPrivilegeId).distinct()
-                    .collect(Collectors.toList());
+//             List<String> privilegeIds = privileges.stream().map(UsrPrivilegeDTO::getPrivilegeId).distinct()
+//                     .collect(Collectors.toList());
 
-            session.setAttribute("username", request.getLoginId());
+//             session.setAttribute("username", request.getLoginId());
 
-            session.setAttribute("networkId", loginData.get("networkId"));
+//             session.setAttribute("networkId", loginData.get("networkId"));
 
-            session.setAttribute("privileges", privileges);
+//             session.setAttribute("privileges", privileges);
 
-            session.setAttribute("privilegeIds", privilegeIds);
+//             session.setAttribute("privilegeIds", privilegeIds);
 
-            logger.info("Login successful user={} networkId={} privilegesCount={}", request.getLoginId(),
-                    loginData.get("networkId"), privileges.size());
+//             logger.info("Login successful user={} networkId={} privilegesCount={}", request.getLoginId(),
+//                     loginData.get("networkId"), privileges.size());
 
-            return "redirect:/builder";
-        }
+//             return "redirect:/builder";
+//         }
 
-        catch (Exception ex) {
+//         catch (Exception ex) {
 
-            logger.error("Login failed user={} error={}", request.getLoginId(), ex.getMessage(), ex);
+//             logger.error("Login failed user={} error={}", request.getLoginId(), ex.getMessage(), ex);
 
-            model.addAttribute("message", ex.getMessage());
+//             model.addAttribute("message", ex.getMessage());
 
-            return "login";
-        }
-    }
+//             return "login";
+//         }
+//     }
 
-    @GetMapping("/builder")
-    public String builderHome(HttpSession session, Model model) {
+//     @GetMapping("/builder")
+//     public String builderHome(HttpSession session, Model model) {
 
-        logger.info("Opening builder home");
+//         logger.info("Opening builder home");
 
-        if (isNotLoggedIn(session)) {
+//         if (isNotLoggedIn(session)) {
 
-            logger.warn("Unauthorized access to builder home");
+//             logger.warn("Unauthorized access to builder home");
 
-            return "redirect:/loginform";
-        }
+//             return "redirect:/loginform";
+//         }
 
-        setCommonData(session, model);
+//         setCommonData(session, model);
 
-        return "builder/step1";
-    }
+//         return "builder/step1";
+//     }
 
-    // ================= ADMIN =================
+//     // ================= ADMIN =================
 
-    @GetMapping("/builder/admin")
-    public String adminPage(HttpSession session, Model model) {
+//     @GetMapping("/builder/admin")
+//     public String adminPage(HttpSession session, Model model) {
 
-        logger.info("Opening admin page");
+//         logger.info("Opening admin page");
 
-        if (isNotLoggedIn(session)) {
+//         if (isNotLoggedIn(session)) {
 
-            logger.warn("Unauthorized admin page access");
+//             logger.warn("Unauthorized admin page access");
 
-            return "redirect:/loginform";
-        }
+//             return "redirect:/loginform";
+//         }
 
-        setCommonData(session, model);
+//         setCommonData(session, model);
 
-        List<String> tariffList = tariffService.getTariffPackages();
+//         List<String> tariffList = tariffService.getTariffPackages();
 
-        // log request info
-        logger.info("Fetching TP list for admin user={} networkId={}",
-                session.getAttribute("username"),
-                session.getAttribute("networkId"));
+//         // log request info
+//         logger.info("Fetching TP list for admin user={} networkId={}",
+//                 session.getAttribute("username"),
+//                 session.getAttribute("networkId"));
 
-        // log response data
-        logger.info("TP list response size={}", tariffList.size());
+//         // log response data
+//         logger.info("TP list response size={}", tariffList.size());
 
-        logger.debug("TP list data={}", tariffList);
+//         logger.debug("TP list data={}", tariffList);
 
-        model.addAttribute("tariff", tariffList);
+//         model.addAttribute("tariff", tariffList);
 
-        return "builder/admin";
-    }
+//         return "builder/admin";
+//     }
 
-    // ================= STEPS =================
+//     // ================= STEPS =================
 
-    @GetMapping("/builder/step1")
-    public String step1(HttpSession session, Model model) {
+//     @GetMapping("/builder/step1")
+//     public String step1(HttpSession session, Model model) {
 
-        logger.info("Opening step1");
+//         logger.info("Opening step1");
 
-        if (isNotLoggedIn(session)) {
+//         if (isNotLoggedIn(session)) {
 
-            logger.warn("Unauthorized step1 access");
+//             logger.warn("Unauthorized step1 access");
 
-            return "redirect:/loginform";
-        }
+//             return "redirect:/loginform";
+//         }
 
-        setCommonData(session, model);
+//         setCommonData(session, model);
 
-        return "builder/step1";
-    }
+//         return "builder/step1";
+//     }
 
-    @GetMapping("/builder/step2")
-    public String step2(HttpSession session, Model model) {
+//     @GetMapping("/builder/step2")
+//     public String step2(HttpSession session, Model model) {
 
-        logger.info("Opening step2");
+//         logger.info("Opening step2");
 
-        if (isNotLoggedIn(session)) {
+//         if (isNotLoggedIn(session)) {
 
-            logger.warn("Unauthorized step2 access");
+//             logger.warn("Unauthorized step2 access");
 
-            return "redirect:/loginform";
-        }
+//             return "redirect:/loginform";
+//         }
 
-        setCommonData(session, model);
+//         setCommonData(session, model);
 
-        return "builder/step2";
-    }
+//         return "builder/step2";
+//     }
 
-    @GetMapping("/builder/step2/filter")
-    @ResponseBody
-    public List<ServicePlanPackMap> getTpPlans(@RequestParam String types, HttpSession session) {
+//     @GetMapping("/builder/step2/filter")
+//     @ResponseBody
+//     public List<ServicePlanPackMap> getTpPlans(@RequestParam String types, HttpSession session) {
 
-        Long networkId = (Long) session.getAttribute("networkId");
+//         Long networkId = (Long) session.getAttribute("networkId");
 
-        logger.info("Fetching TP plans networkId={} types={}", networkId, types);
+//         logger.info("Fetching TP plans networkId={} types={}", networkId, types);
 
-        return service.getPlans(networkId, types);
-    }
+//         return service.getPlans(networkId, types);
+//     }
 
-    @GetMapping("/builder/step3")
-    public String step3(HttpSession session, Model model) {
+//     @GetMapping("/builder/step3")
+//     public String step3(HttpSession session, Model model) {
 
-        logger.info("Opening step3");
+//         logger.info("Opening step3");
 
-        if (isNotLoggedIn(session)) {
+//         if (isNotLoggedIn(session)) {
 
-            logger.warn("Unauthorized step3 access");
+//             logger.warn("Unauthorized step3 access");
 
-            return "redirect:/loginform";
-        }
+//             return "redirect:/loginform";
+//         }
 
-        setCommonData(session, model);
+//         setCommonData(session, model);
 
-        return "builder/step3";
-    }
+//         return "builder/step3";
+//     }
 
-    @GetMapping("/builder/step3/filter")
-    @ResponseBody
-    public List<ServicePlanPackMap> getDAtpPlans(@RequestParam String types, HttpSession session) {
+//     @GetMapping("/builder/step3/filter")
+//     @ResponseBody
+//     public List<ServicePlanPackMap> getDAtpPlans(@RequestParam String types, HttpSession session) {
 
-        Long networkId = (Long) session.getAttribute("networkId");
+//         Long networkId = (Long) session.getAttribute("networkId");
 
-        logger.info("Fetching DATP plans networkId={} types={}", networkId, types);
+//         logger.info("Fetching DATP plans networkId={} types={}", networkId, types);
 
-        return service.getDAtpPlans(networkId, types);
-    }
+//         return service.getDAtpPlans(networkId, types);
+//     }
 
-    @GetMapping("/builder/step4")
-    public String step4(HttpSession session, Model model) {
+//     @GetMapping("/builder/step4")
+//     public String step4(HttpSession session, Model model) {
 
-        logger.info("Opening step4");
+//         logger.info("Opening step4");
 
-        if (isNotLoggedIn(session)) {
+//         if (isNotLoggedIn(session)) {
 
-            logger.warn("Unauthorized step4 access");
+//             logger.warn("Unauthorized step4 access");
 
-            return "redirect:/loginform";
-        }
+//             return "redirect:/loginform";
+//         }
 
-        setCommonData(session, model);
+//         setCommonData(session, model);
 
-        return "builder/step4";
-    }
+//         return "builder/step4";
+//     }
 
-    @GetMapping("/builder/step4/filter")
-    @ResponseBody
-    public List<ServicePlanPackMap> getAAtpPlans(@RequestParam String types, HttpSession session) {
+//     @GetMapping("/builder/step4/filter")
+//     @ResponseBody
+//     public List<ServicePlanPackMap> getAAtpPlans(@RequestParam String types, HttpSession session) {
 
-        Long networkId = (Long) session.getAttribute("networkId");
+//         Long networkId = (Long) session.getAttribute("networkId");
 
-        logger.info("Fetching AATP plans networkId={} types={}", networkId, types);
+//         logger.info("Fetching AATP plans networkId={} types={}", networkId, types);
 
-        return service.getAAtpPlans(networkId, types);
-    }
+//         return service.getAAtpPlans(networkId, types);
+//     }
 
-    @GetMapping("/builder/step5")
-    public String step5(HttpSession session, Model model) {
+//     @GetMapping("/builder/step5")
+//     public String step5(HttpSession session, Model model) {
 
-        logger.info("Opening step5");
+//         logger.info("Opening step5");
 
-        if (isNotLoggedIn(session)) {
+//         if (isNotLoggedIn(session)) {
 
-            logger.warn("Unauthorized step5 access");
+//             logger.warn("Unauthorized step5 access");
 
-            return "redirect:/loginform";
-        }
+//             return "redirect:/loginform";
+//         }
 
-        setCommonData(session, model);
+//         setCommonData(session, model);
 
-        return "builder/step5";
-    }
+//         return "builder/step5";
+//     }
 
-    // ================= HIERARCHY =================
+//     // ================= HIERARCHY =================
 
-    @GetMapping("/admin/hierarchy/{tpName}")
-    @ResponseBody
-    public Object getHierarchy(@PathVariable String tpName) {
+//     @GetMapping("/admin/hierarchy/{tpName}")
+//     @ResponseBody
+//     public Object getHierarchy(@PathVariable String tpName) {
 
-        // logger.info("Fetching hierarchy for tpName={}", tpName);
+//         // logger.info("Fetching hierarchy for tpName={}", tpName);
 
-        return tariffService.getHierarchy(tpName);
-    }
+//         return tariffService.getHierarchy(tpName);
+//     }
 
-    // ================= SAVE CONFIG =================
+//     // ================= SAVE CONFIG =================
 
-    @PostMapping("/prepareSaveConfig")
-    public ResponseEntity<?> prepareSaveConfig(@RequestBody Map<String, Object> request, HttpSession session) {
+//     @PostMapping("/prepareSaveConfig")
+//     public ResponseEntity<?> prepareSaveConfig(@RequestBody Map<String, Object> request, HttpSession session) {
 
-        String username = (String) session.getAttribute("username");
+//         String username = (String) session.getAttribute("username");
 
-        Long networkId = (Long) session.getAttribute("networkId");
+//         Long networkId = (Long) session.getAttribute("networkId");
 
-        logger.info("Prepare config called username={} networkId={}", username, networkId);
+//         logger.info("Prepare config called username={} networkId={}", username, networkId);
 
-        Map<String, Object> response = saveConfigService.prepareConfig(request, username, networkId);
+//         Map<String, Object> response = saveConfigService.prepareConfig(request, username, networkId);
 
-        logger.info("Prepare config completed");
+//         logger.info("Prepare config completed");
 
-        return ResponseEntity.ok(response);
-    }
+//         return ResponseEntity.ok(response);
+//     }
 
-    // ================= COMMON =================
+//     // ================= COMMON =================
 
-    private void setCommonData(HttpSession session, Model model) {
+//     private void setCommonData(HttpSession session, Model model) {
 
-        logger.debug("Setting common session attributes");
+//         logger.debug("Setting common session attributes");
 
-        model.addAttribute("username", session.getAttribute("username"));
+//         model.addAttribute("username", session.getAttribute("username"));
 
-        model.addAttribute("networkId", session.getAttribute("networkId"));
+//         model.addAttribute("networkId", session.getAttribute("networkId"));
 
-        model.addAttribute("privileges", session.getAttribute("privileges"));
+//         model.addAttribute("privileges", session.getAttribute("privileges"));
 
-        model.addAttribute("privilegeIds", session.getAttribute("privilegeIds"));
+//         model.addAttribute("privilegeIds", session.getAttribute("privilegeIds"));
 
-        model.addAttribute("sessionId", session.getId());
-    }
+//         model.addAttribute("sessionId", session.getId());
+//     }
 
-    private boolean isNotLoggedIn(HttpSession session) {
+//     private boolean isNotLoggedIn(HttpSession session) {
 
-        boolean result = session.getAttribute("username") == null;
+//         boolean result = session.getAttribute("username") == null;
 
-        if (result) {
+//         if (result) {
 
-            logger.debug("User not logged in");
+//             logger.debug("User not logged in");
 
-        }
+//         }
 
-        return result;
-    }
+//         return result;
+//     }
 
-    @GetMapping("/logout")
-    public String logout(HttpSession session) {
+//     @GetMapping("/logout")
+//     public String logout(HttpSession session) {
 
-        logger.info("User logout username={}", session.getAttribute("username"));
+//         logger.info("User logout username={}", session.getAttribute("username"));
 
-        session.invalidate();
+//         session.invalidate();
 
-        return "redirect:/loginform";
-    }
+//         return "redirect:/loginform";
+//     }
 
-    // ================= CLONE =================
+//     // ================= CLONE =================
 
-    /*
-     * POST /clone/validate
-     * Validates tpName and publicityId before a modify-mode clone.
-     */
-    @ResponseBody
-    @PostMapping("/clone/validate")
-    public ResponseEntity<Map<String, Object>> validateClone(
-            @RequestBody Map<String, Object> requestBody) {
+//     /*
+//      * POST /clone/validate
+//      * Validates tpName and publicityId before a modify-mode clone.
+//      */
+//     @ResponseBody
+//     @PostMapping("/clone/validate")
+//     public ResponseEntity<Map<String, Object>> validateClone(
+//             @RequestBody Map<String, Object> requestBody) {
 
-        Long networkId = Long.valueOf(requestBody.get("networkId").toString());
-        String tpName = requestBody.get("tpName").toString();
-        String publicityId = requestBody.get("publicityId").toString();
+//         Long networkId = Long.valueOf(requestBody.get("networkId").toString());
+//         String tpName = requestBody.get("tpName").toString();
+//         String publicityId = requestBody.get("publicityId").toString();
 
-        logger.info("Clone validate request networkId={} tpName={} publicityId={}", networkId, tpName, publicityId);
+//         logger.info("Clone validate request networkId={} tpName={} publicityId={}", networkId, tpName, publicityId);
 
-        Map<String, Object> result = tariffApprovalService.validateClone(networkId, tpName, publicityId);
+//         Map<String, Object> result = tariffApprovalService.validateClone(networkId, tpName, publicityId);
 
-        return ResponseEntity.ok(result);
-    }
+//         return ResponseEntity.ok(result);
+//     }
 
-    /*
-     * POST /clone
-     * Supports cloneMode=direct (add _CLn suffix) and cloneMode=modify
-     * (use overrideTpName / overridePublicityId supplied by the frontend).
-     * Always returns HTTP 200 with { status: "success"|"error", ... }.
-     */
-    @ResponseBody
-    @PostMapping("/clone")
-    public ResponseEntity<Map<String, Object>> clone(@RequestBody Map<String, Object> requestBody) {
+//     /*
+//      * POST /clone
+//      * Supports cloneMode=direct (add _CLn suffix) and cloneMode=modify
+//      * (use overrideTpName / overridePublicityId supplied by the frontend).
+//      * Always returns HTTP 200 with { status: "success"|"error", ... }.
+//      */
+//     @ResponseBody
+//     @PostMapping("/clone")
+//     public ResponseEntity<Map<String, Object>> clone(@RequestBody Map<String, Object> requestBody) {
 
-        String tpName = requestBody.get("tpName").toString();
+//         String tpName = requestBody.get("tpName").toString();
 
-        logger.info("Clone request received tpName={}", tpName);
+//         logger.info("Clone request received tpName={}", tpName);
 
-        Map<String, Object> result = tariffApprovalService.clone(requestBody);
+//         Map<String, Object> result = tariffApprovalService.clone(requestBody);
 
-        logger.info("Clone completed tpName={} status={}", tpName, result.get("status"));
+//         logger.info("Clone completed tpName={} status={}", tpName, result.get("status"));
 
-        return ResponseEntity.ok(result);
-    }
+//         return ResponseEntity.ok(result);
+//     }
 
-    // ================= APPROVE / REJECT =================
+//     // ================= APPROVE / REJECT =================
 
-    @ResponseBody
-    @PostMapping("/approve/{tpName}")
-    public ResponseEntity<Map<String, Object>> approve(
-            @PathVariable String tpName) {
+//     @ResponseBody
+//     @PostMapping("/approve/{tpName}")
+//     public ResponseEntity<Map<String, Object>> approve(
+//             @PathVariable String tpName) {
 
-        Map<String, Object> result = tariffApprovalService.approve(tpName);
-        return ResponseEntity.ok(result);
-    }
+//         Map<String, Object> result = tariffApprovalService.approve(tpName);
+//         return ResponseEntity.ok(result);
+//     }
 
-    @ResponseBody
-    @PostMapping("/reject/{tpName}")
-    public ResponseEntity<Map<String, Object>> reject(
-            @PathVariable String tpName,
-            @RequestBody(required = false) Map<String, Object> body) {
+//     @ResponseBody
+//     @PostMapping("/reject/{tpName}")
+//     public ResponseEntity<Map<String, Object>> reject(
+//             @PathVariable String tpName,
+//             @RequestBody(required = false) Map<String, Object> body) {
 
-        String remarks = (body != null && body.get("remarks") != null)
-                ? body.get("remarks").toString()
-                : "";
-        Map<String, Object> result = tariffApprovalService.reject(tpName, remarks);
-        return ResponseEntity.ok(result);
-    }
+//         String remarks = (body != null && body.get("remarks") != null)
+//                 ? body.get("remarks").toString()
+//                 : "";
+//         Map<String, Object> result = tariffApprovalService.reject(tpName, remarks);
+//         return ResponseEntity.ok(result);
+//     }
 
-    @GetMapping("/approved/list")
-    @ResponseBody
-    public Map<String, Object> getApprovedList() {
-        return jsonStorage.readApproved();
-    }
+//     @GetMapping("/approved/list")
+//     @ResponseBody
+//     public Map<String, Object> getApprovedList() {
+//         return jsonStorage.readApproved();
+//     }
 
-    @GetMapping("/rejected/list")
-    @ResponseBody
-    public Map<String, Object> getRejectedList() {
-        return jsonStorage.readRejected();
-    }
+//     @GetMapping("/rejected/list")
+//     @ResponseBody
+//     public Map<String, Object> getRejectedList() {
+//         return jsonStorage.readRejected();
+//     }
 
-    @PostMapping("/rejected/delete/{tpName}")
-    @ResponseBody
-    public ResponseEntity<?> deleteRejected(
-            @PathVariable String tpName,
-            HttpSession session) {
+//     @PostMapping("/rejected/delete/{tpName}")
+//     @ResponseBody
+//     public ResponseEntity<?> deleteRejected(
+//             @PathVariable String tpName,
+//             HttpSession session) {
 
-        String username = (String) session.getAttribute("username");
-        if (username == null) {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
+//         String username = (String) session.getAttribute("username");
+//         if (username == null) {
+//             return ResponseEntity.status(401).body("Unauthorized");
+//         }
 
-        jsonStorage.removeRejected(tpName);
-        logger.info("Rejected TP removed after re-submission tpName={} username={}", tpName, username);
-        return ResponseEntity.ok().build();
-    }
+//         jsonStorage.removeRejected(tpName);
+//         logger.info("Rejected TP removed after re-submission tpName={} username={}", tpName, username);
+//         return ResponseEntity.ok().build();
+//     }
 
-    @GetMapping("/saved/list")
-    @ResponseBody
-    public Map<String, Object> getSavedList(HttpSession session) {
+//     @GetMapping("/saved/list")
+//     @ResponseBody
+//     public Map<String, Object> getSavedList(HttpSession session) {
 
-        String username = (String) session.getAttribute("username");
+//         String username = (String) session.getAttribute("username");
 
-        return jsonStorage.getByUser(username);
-    }
+//         return jsonStorage.getByUser(username);
+//     }
 
-    @PostMapping("/saved/delete/{tpName}")
-    @ResponseBody
-    public ResponseEntity<?> deleteSaved(
-            @PathVariable String tpName,
-            HttpSession session) {
+//     @PostMapping("/saved/delete/{tpName}")
+//     @ResponseBody
+//     public ResponseEntity<?> deleteSaved(
+//             @PathVariable String tpName,
+//             HttpSession session) {
 
-        String username = (String) session.getAttribute("username");
+//         String username = (String) session.getAttribute("username");
 
-        if (username == null) {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
+//         if (username == null) {
+//             return ResponseEntity.status(401).body("Unauthorized");
+//         }
 
-        jsonStorage.remove(tpName);
+//         jsonStorage.remove(tpName);
 
-        return ResponseEntity.ok().build();
-    }
+//         return ResponseEntity.ok().build();
+//     }
 
-    @PostMapping("/draft/save")
-    @ResponseBody
-    public ResponseEntity<?> saveDraft(
-            @RequestBody(required = false) String draftJson,
-            HttpSession session) {
+//     @PostMapping("/draft/save")
+//     @ResponseBody
+//     public ResponseEntity<?> saveDraft(
+//             @RequestBody(required = false) String draftJson,
+//             HttpSession session) {
 
-        if (draftJson == null || draftJson.isBlank()) {
-            return ResponseEntity.ok().build();
-        }
+//         if (draftJson == null || draftJson.isBlank()) {
+//             return ResponseEntity.ok().build();
+//         }
 
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            Map<String, Object> draft = mapper.readValue(draftJson, Map.class);
+//         try {
+//             ObjectMapper mapper = new ObjectMapper();
+//             Map<String, Object> draft = mapper.readValue(draftJson, Map.class);
 
-            // prefer session username, fall back to payload username, then guest
-            String username = (String) session.getAttribute("username");
-            if (username == null) {
-                username = (String) draft.get("username");
-            }
-            if (username == null) {
-                username = "guest";
-            }
+//             // prefer session username, fall back to payload username, then guest
+//             String username = (String) session.getAttribute("username");
+//             if (username == null) {
+//                 username = (String) draft.get("username");
+//             }
+//             if (username == null) {
+//                 username = "guest";
+//             }
 
-            saveConfigService.saveDraft(draft, username);
+//             saveConfigService.saveDraft(draft, username);
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//         } catch (Exception e) {
+//             e.printStackTrace();
+//         }
 
-        return ResponseEntity.ok().build();
-    }
+//         return ResponseEntity.ok().build();
+//     }
 
-    @GetMapping("/draft/list")
-    @ResponseBody
-    public List<Map<String, Object>> getDrafts(HttpSession session) {
+//     @GetMapping("/draft/list")
+//     @ResponseBody
+//     public List<Map<String, Object>> getDrafts(HttpSession session) {
 
-        String username = (String) session.getAttribute("username");
+//         String username = (String) session.getAttribute("username");
 
-        if (username == null) {
-            username = "guest";
-        }
+//         if (username == null) {
+//             username = "guest";
+//         }
 
-        try {
-            Path path = Paths.get("drafts", username + ".json");
+//         try {
+//             Path path = Paths.get("drafts", username + ".json");
 
-            if (!Files.exists(path))
-                return new ArrayList<>();
+//             if (!Files.exists(path))
+//                 return new ArrayList<>();
 
-            return new ObjectMapper().readValue(
-                    path.toFile(),
-                    new TypeReference<List<Map<String, Object>>>() {
-                    });
+//             return new ObjectMapper().readValue(
+//                     path.toFile(),
+//                     new TypeReference<List<Map<String, Object>>>() {
+//                     });
 
-        } catch (Exception e) {
-            return new ArrayList<>();
-        }
-    }
+//         } catch (Exception e) {
+//             return new ArrayList<>();
+//         }
+//     }
 
-    @ResponseBody
-    @PostMapping("/description")
-    public Map<String, String> getDescription(@RequestBody Map<String, Object> request) {
+//     @ResponseBody
+//     @PostMapping("/description")
+//     public Map<String, String> getDescription(@RequestBody Map<String, Object> request) {
 
-        Long servicePackageId = Long.valueOf(request.get("servicePackageId").toString());
+//         Long servicePackageId = Long.valueOf(request.get("servicePackageId").toString());
 
-        Long networkId = Long.valueOf(request.get("networkId").toString());
+//         Long networkId = Long.valueOf(request.get("networkId").toString());
 
-        String desc = servicePackageService.getDescription(servicePackageId, networkId);
+//         String desc = servicePackageService.getDescription(servicePackageId, networkId);
 
-        // FIX → handle null
-        if (desc == null) {
-            desc = "Description not found";
-        }
-        return Map.of("description", desc);
-    }
+//         // FIX → handle null
+//         if (desc == null) {
+//             desc = "Description not found";
+//         }
+//         return Map.of("description", desc);
+//     }
 
-    @GetMapping("/tariff-package-details")
-    public ResponseEntity<List<TariffPackageDetailsDto>> getTariffPackageDetails(
-            @RequestParam Integer networkId) {
+//     @GetMapping("/tariff-package-details")
+//     public ResponseEntity<List<TariffPackageDetailsDto>> getTariffPackageDetails(
+//             @RequestParam Integer networkId) {
 
-        List<TariffPackageDetailsDto> response = tariffPackageService.getTariffPackageDetails(networkId);
+//         List<TariffPackageDetailsDto> response = tariffPackageService.getTariffPackageDetails(networkId);
 
-        return ResponseEntity.ok(response);
-    }
+//         return ResponseEntity.ok(response);
+//     }
 
-    @GetMapping("/details")
-    public ResponseEntity<?> getTariffPackageDetails(@RequestParam Long networkId, @RequestParam Long tariffPackageId) {
+//     @GetMapping("/details")
+//     public ResponseEntity<?> getTariffPackageDetails(@RequestParam Long networkId, @RequestParam Long tariffPackageId) {
 
-        return ResponseEntity.ok(tariffUpdateService.getTariffPackageDetails(tariffPackageId, networkId));
-    }
+//         return ResponseEntity.ok(tariffUpdateService.getTariffPackageDetails(tariffPackageId, networkId));
+//     }
 
 
-     @GetMapping("/tariffpacks")
-    public ResponseEntity<List<TariffPackageDetailsDto>> getTariffPackages(
-            @RequestParam Integer networkId) {
+//      @GetMapping("/tariffpacks")
+//     public ResponseEntity<List<TariffPackageDetailsDto>> getTariffPackages(
+//             @RequestParam Integer networkId) {
 
-        List<TariffPackageDetailsDto> response = tariffPackageService.getTariffPackages(networkId);
-        return ResponseEntity.ok(response);
-    }
- @ResponseBody
-   @PutMapping("/update/{tariffPackageId}")
-   public ResponseEntity<Map<String, Object>> updateTariffPackage(
-           @PathVariable Long tariffPackageId,
-           @RequestParam Long networkId,
-           @RequestBody Map<String, Object> requestBody,
-           HttpSession session) {
+//         List<TariffPackageDetailsDto> response = tariffPackageService.getTariffPackages(networkId);
+//         return ResponseEntity.ok(response);
+//     }
+//  @ResponseBody
+//    @PutMapping("/update/{tariffPackageId}")
+//    public ResponseEntity<Map<String, Object>> updateTariffPackage(
+//            @PathVariable Long tariffPackageId,
+//            @RequestParam Long networkId,
+//            @RequestBody Map<String, Object> requestBody,
+//            HttpSession session) {
  
-       String username = (String) session.getAttribute("username");
-       Map<String, Object> result = tariffPackageSyncService.syncTariffPackage(
-               tariffPackageId, networkId, requestBody, username != null ? username : "system");
-       return ResponseEntity.ok(result);
-   }
-}
+//        String username = (String) session.getAttribute("username");
+//        Map<String, Object> result = tariffPackageSyncService.syncTariffPackage(
+//                tariffPackageId, networkId, requestBody, username != null ? username : "system");
+//        return ResponseEntity.ok(result);
+//    }
+// }
