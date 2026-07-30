@@ -18,6 +18,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // restore selected pills
     const saved = JSON.parse(sessionStorage.getItem('selectedSvcs_s2') || '[]');
+    const savedCategory = sessionStorage.getItem('svcCategory_s2') || (saved.includes('BILLING') ? 'BILLING' : 'RATING');
+
+    const radio = document.querySelector(`input[name="svcCategory"][value="${savedCategory}"]`);
+    if (radio) radio.checked = true;
+
+    document.getElementById('ratingButtons').style.display = savedCategory === 'BILLING' ? 'none' : 'flex';
+    document.getElementById('billingButtons').style.display = savedCategory === 'BILLING' ? 'flex' : 'none';
 
     saved.forEach(svc => {
         const pill = document.querySelector(`.svc-pill[data-svc="${svc}"]`);
@@ -27,6 +34,41 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (saved.length) refreshSidebar();
 });
+
+// ---------- CATEGORY SWITCH (Rating / Billing) ----------
+function switchCategory(category) {
+
+    const ratingBtns = document.getElementById('ratingButtons');
+    const billingBtns = document.getElementById('billingButtons');
+
+    if (category === 'BILLING') {
+
+        ratingBtns.style.display = 'none';
+        billingBtns.style.display = 'flex';
+
+        ['VOICE', 'SMS', 'DATA'].forEach(s => {
+            const pill = document.querySelector(`.svc-pill[data-svc="${s}"]`);
+            if (pill) pill.classList.remove('active');
+        });
+
+        selectedSvcs = selectedSvcs.filter(s => s === 'BILLING');
+
+    } else {
+
+        billingBtns.style.display = 'none';
+        ratingBtns.style.display = 'flex';
+
+        const billingPill = document.querySelector('.svc-pill[data-svc="BILLING"]');
+        if (billingPill) billingPill.classList.remove('active');
+
+        selectedSvcs = selectedSvcs.filter(s => s !== 'BILLING');
+    }
+
+    sessionStorage.setItem('selectedSvcs_s2', JSON.stringify(selectedSvcs));
+    sessionStorage.setItem('svcCategory_s2', category);
+
+    refreshSidebar();
+}
 
 // ---------- SERVICE SELECTION ----------
 let selectedSvcs = [];
@@ -64,7 +106,7 @@ function refreshSidebar() {
 
     const list = document.getElementById('comp-list');
 
-    const svcMap = { VOICE: '1', SMS: '2', DATA: '3' };
+    const svcMap = { VOICE: '1', SMS: '2', DATA: '3', BILLING: 'B' };
 
     const types = selectedSvcs.map(s => svcMap[s]).sort().join(",");
 

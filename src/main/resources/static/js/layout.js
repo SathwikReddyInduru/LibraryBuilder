@@ -143,6 +143,74 @@ function loadDrafts(targetId = "comp-list") {
     });
 }
 
+// Restores per-item CA configuration onto rebuilt s4 (AATP) state.
+
+function attachCaConfigToS4(s4Items, caAtps) {
+  const caList = caAtps || [];
+
+  const normalItems = s4Items.filter((item) => item.category !== "CA");
+  const legacyCaItems = s4Items.filter((item) => item.category === "CA");
+
+  const caItems = caList.map((match) => {
+    const existing =
+      legacyCaItems.find(
+        (item) => String(item.id) === String(match.servicePackageId),
+      ) || {
+        id: String(match.servicePackageId),
+        name: match.packageName,
+        type: match.type || "",
+        chargeId: match.chargeId || "",
+        category: "CA",
+        validity: match.validity,
+        rentalPeriod: match.rentalPeriod || "",
+        midnightExpiry: match.midnightExpiry,
+        renewal: match.renewal,
+        rental: match.rental,
+        maxCount: match.maxCount,
+        freeCycles: match.freeCycles,
+        priority: match.priority,
+        mrp: match.mrp,
+        serviceCode: "",
+        vipPlan: "",
+      };
+
+    const restoredMappings = (match.serviceMappings || []).map((m, idx) => ({
+      rowId: `restored-${existing.id}-${idx}`,
+      serviceUnitType: m.serviceUnitType || "",
+      serviceId: m.serviceId ?? "",
+      units: m.units ?? "",
+      topupCharge: m.topupCharge ?? "",
+      maxTransferLimit: m.maxTransferLimit ?? "",
+    }));
+
+    existing.caConfig = {
+      defaultLinesAllowed: match.defaultLinesAllowed ?? "",
+      additionalChargePerLine: match.additionalChargePerLine ?? 0,
+      packageRolloverYn: match.packageRolloverYn || "",
+      packageStartDate: match.packageStartDate || "",
+      packageEndDate: match.packageEndDate || "",
+      // At least one mapping is always required, even if older saved data
+      // somehow has none.
+      serviceMappings: restoredMappings.length
+        ? restoredMappings
+        : [
+            {
+              rowId: `restored-${existing.id}-0`,
+              serviceUnitType: "",
+              serviceId: "",
+              units: "",
+              topupCharge: "",
+              maxTransferLimit: "",
+            },
+          ],
+    };
+
+    return existing;
+  });
+
+  return [...normalItems, ...caItems];
+}
+
 function loadDraft(index) {
   const draft = window.ALL_DRAFTS[index];
 
@@ -302,29 +370,6 @@ function applyPrivilege() {
   }
 }
 
-/*async function checkDraftsOnLogin() {
-    const isBuilderPage = window.location.pathname.startsWith('/builder/step');
-    if (!isBuilderPage) return;
-    if (!window.location.pathname.includes('step1')) return;
-
-    const state = JSON.parse(sessionStorage.getItem('state') || '{}');
-    const pkgType = sessionStorage.getItem('pkgType');
-    if (pkgType || state?.s2?.length) return;
-
-    try {
-        const res = await fetch('/draft/list');
-        const drafts = await res.json();
-
-        if (!drafts.length) return;
-
-        // OPEN DRAFT PANEL
-        openDrafts();
-
-    } catch (err) {
-        console.error('Draft check failed', err);
-    }
-}*/
-
 // ── Apply privilege on load ──
 window.addEventListener("DOMContentLoaded", () => {
   applyPrivilege();
@@ -413,12 +458,15 @@ function setModuleUI(module) {
 
   // ── Active node highlight ──
   const cloneNode = document.getElementById("mn-clone");
+  const atpRulesNode = document.getElementById("mn-atprules");
   if (builderNode) builderNode.classList.toggle("active", module === "builder");
   if (approverNode)
     approverNode.classList.toggle("active", module === "approver");
   if (cloneNode) cloneNode.classList.toggle("active", module === "clone");
+  if (atpRulesNode)
+    atpRulesNode.classList.toggle("active", module === "atprules");
 
-  if (module === "clone") {
+  if (module === "clone" || module === "atprules") {
     if (stepRail) stepRail.classList.add("collapsed");
     if (sidebar) sidebar.classList.add("collapsed");
     if (footerActions) footerActions.style.display = "none";
@@ -729,6 +777,70 @@ function checkStepAccess(targetStep) {
       if (input) input.focus();
       return false;
     }
+
+    // VIP Plan is mandatory for every non-CA AATP (CA-category items don't
+    // render this field at all; Service Code is optional).
+    const missingVipPlan = state.s4.find(
+      (item) => item.category !== "CA" && !item.vipPlan,
+    );
+
+    if (missingVipPlan) {
+      alert(
+        `Please select VIP Plan for "${missingVipPlan.name}" before proceeding.`,
+      );
+      const input = document.getElementById(
+        `vip-plan-s4-${missingVipPlan.id}`,
+      );
+      if (input) input.focus();
+      return false;
+    }
+
+    // CA-category AATPs: package-level fields (all mandatory except
+    // Additional Charge Per Line) + every mapping row (mandatory except
+    // Topup Charge) must be filled before leaving Step 4. Mirrors the same
+    // check that runs again in saveConfiguration() as a final safety net.
+    const isBlankCa = (v) => v === "" || v === null || v === undefined;
+
+    for (const item of state.s4) {
+      if (item.category !== "CA") continue;
+
+      const ca = item.caConfig || {};
+
+      if (
+        isBlankCa(ca.defaultLinesAllowed) ||
+        isBlankCa(ca.packageRolloverYn) ||
+        isBlankCa(ca.packageStartDate) ||
+        isBlankCa(ca.packageEndDate)
+      ) {
+        alert(
+          `Please fill all mandatory CA Configuration fields for "${item.name}" before proceeding.`,
+        );
+        return false;
+      }
+
+      const caMappings = ca.serviceMappings || [];
+
+      if (!caMappings.length) {
+        alert(
+          `At least one service mapping is required for "${item.name}" before proceeding.`,
+        );
+        return false;
+      }
+
+      const badCaMapping = caMappings.find(
+        (m) =>
+          isBlankCa(m.serviceUnitType) ||
+          isBlankCa(m.units) ||
+          isBlankCa(m.maxTransferLimit),
+      );
+
+      if (badCaMapping) {
+        alert(
+          `Please fill CA Service, Units, and Max Transfer Limit for every mapping in "${item.name}" before proceeding.`,
+        );
+        return false;
+      }
+    }
   }
 
   return true;
@@ -856,6 +968,67 @@ async function saveConfiguration() {
     return;
   }
 
+  // VIP Plan is mandatory for every non-CA AATP (CA-category items don't
+  // render this field at all; Service Code is optional).
+  const missingVipPlanS4 = (state.s4 || []).find(
+    (item) => item.category !== "CA" && !item.vipPlan,
+  );
+
+  if (missingVipPlanS4) {
+    alert(`VIP Plan is required for "${missingVipPlanS4.name}".`);
+    const input = document.getElementById(
+      `vip-plan-s4-${missingVipPlanS4.id}`,
+    );
+    if (input) input.focus();
+    return;
+  }
+
+  // CA-category AATPs: package-level fields (all mandatory except
+  // Additional Charge Per Line) plus every service mapping row (mandatory
+  // except Topup Charge). At least one mapping row is always required.
+  function isBlank(v) {
+    return v === "" || v === null || v === undefined;
+  }
+
+  for (const item of state.s4 || []) {
+    if (item.category !== "CA") continue;
+
+    const ca = item.caConfig || {};
+
+    if (
+      isBlank(ca.defaultLinesAllowed) ||
+      isBlank(ca.packageRolloverYn) ||
+      isBlank(ca.packageStartDate) ||
+      isBlank(ca.packageEndDate)
+    ) {
+      alert(
+        `Please fill all mandatory CA Configuration fields for "${item.name}".`,
+      );
+      return;
+    }
+
+    const mappings = ca.serviceMappings || [];
+
+    if (!mappings.length) {
+      alert(`At least one service mapping is required for "${item.name}".`);
+      return;
+    }
+
+    const badMapping = mappings.find(
+      (m) =>
+        isBlank(m.serviceUnitType) ||
+        isBlank(m.units) ||
+        isBlank(m.maxTransferLimit),
+    );
+
+    if (badMapping) {
+      alert(
+        `Please fill CA Service, Units, and Max Transfer Limit for every mapping in "${item.name}".`,
+      );
+      return;
+    }
+  }
+
   const chargeId = configName + "_PR";
 
   function formatDateToMMDDYYYY(dateStr) {
@@ -933,7 +1106,9 @@ async function saveConfiguration() {
           : 0,
     })),
 
-    allowedAtps: (state.s4 || []).map((item) => ({
+    allowedAtps: (state.s4 || [])
+      .filter((item) => item.category !== "CA")
+      .map((item) => ({
       servicePackageId: Number(item.id),
 
       chargeId: chargeId,
@@ -962,7 +1137,71 @@ async function saveConfiguration() {
           : 0,
 
       mrp: item.mrp || 0,
+
+      category: item.category || "NORMAL",
+
+      serviceCode: item.serviceCode || "",
+
+      vipPlan: item.vipPlan || "",
     })),
+
+    // CA-category AATPs additionally carry their own package config plus a
+    // set of service/unit-type -> units/charge mappings (built via the
+    // Add Units To Services row list in step4).
+    caAtps: (state.s4 || [])
+      .filter((item) => item.category === "CA")
+      .map((item) => {
+        const ca = item.caConfig || {};
+
+        return {
+          servicePackageId: Number(item.id),
+
+          chargeId: chargeId,
+
+          packageName: item.name,
+
+          type: item.type || "",
+
+          validity: item.validity,
+
+          rentalPeriod: item.validity === "O" ? item.rentalPeriod || 1 : "",
+
+          midnightExpiry: item.midnightExpiry,
+
+          renewal: item.renewal,
+
+          rental: item.rental || 0,
+
+          maxCount: item.maxCount || 0,
+
+          freeCycles: item.freeCycles || 0,
+
+          priority:
+            item.priority !== "" && Number(item.priority) > 0
+              ? Number(item.priority)
+              : 0,
+
+          mrp: item.mrp || 0,
+
+          defaultLinesAllowed: ca.defaultLinesAllowed || 0,
+
+          additionalChargePerLine: ca.additionalChargePerLine || 0,
+
+          packageRolloverYn: ca.packageRolloverYn || "",
+
+          packageStartDate: ca.packageStartDate || "",
+
+          packageEndDate: ca.packageEndDate || "",
+
+          serviceMappings: (ca.serviceMappings || []).map((m) => ({
+            serviceUnitType: m.serviceUnitType || "",
+            serviceId: m.serviceId || "",
+            units: m.units || 0,
+            topupCharge: m.topupCharge || 0,
+            maxTransferLimit: m.maxTransferLimit || 0,
+          })),
+        };
+      }),
   };
 
   console.log("REQUEST", payload);
@@ -1242,12 +1481,27 @@ function loadHierarchy(tpName) {
         '<p style="color:#94a3b8; font-size:13px; padding:8px 0;">No DATP components</p>';
 
       // AATP Components
-      const aatp = data.allowedAtps || [];
+      const caAtpsPreview = data.caAtps || [];
+      // CA-category AATPs live only in caAtps now (see saveConfiguration()),
+      // so merge them back in here as their own AATP entries for display.
+      const aatp = [
+        ...(data.allowedAtps || []),
+        ...caAtpsPreview.map((c) => ({ ...c, category: "CA" })),
+      ];
       document.getElementById("h-aatp-header").textContent =
         `➕ AATP - ${aatp.length} COMPONENTS`;
       const aatpHtml = aatp
-        .map(
-          (item) => `
+        .map((item) => {
+          const ca =
+            item.category === "CA"
+              ? caAtpsPreview.find(
+                  (c) =>
+                    String(c.servicePackageId) ===
+                    String(item.servicePackageId),
+                )
+              : null;
+
+          return `
                 <div class="component-box">
                     <div class="comp-name">${item.packageName}</div>
                     <div class="comp-details">
@@ -1260,10 +1514,29 @@ function loadHierarchy(tpName) {
                         <span class="pill"><strong>Free Cycles:</strong> ${item.freeCycles || "0"}</span>
 						<span class="pill"><strong>Priority:</strong> ${item.priority ?? 0}</span>
 						<span class="pill"><strong>MRP:</strong> ${item.mrp ?? "0"}</span>
+						${item.serviceCode ? `<span class="pill"><strong>Service Code:</strong> ${item.serviceCode}</span>` : ""}
+						${item.category !== "CA" ? `<span class="pill"><strong>VIP Plan:</strong> ${item.vipPlan === "Y" ? "Yes" : item.vipPlan === "N" ? "No" : "—"}</span>` : ""}
+						${
+              ca
+                ? `
+						<span class="pill"><strong>Default Lines:</strong> ${ca.defaultLinesAllowed ?? "0"}</span>
+						<span class="pill"><strong>Charge/Line:</strong> ${ca.additionalChargePerLine ?? "0"}</span>
+						<span class="pill"><strong>Rollover:</strong> ${ca.packageRolloverYn || "—"}</span>
+						${ca.packageStartDate ? `<span class="pill"><strong>CA Start:</strong> ${ca.packageStartDate}</span>` : ""}
+						${ca.packageEndDate ? `<span class="pill"><strong>CA End:</strong> ${ca.packageEndDate}</span>` : ""}
+						${(ca.serviceMappings || [])
+              .map(
+                (m) =>
+                  `<span class="pill"><strong>${m.serviceUnitType || "Mapping"}:</strong> ${m.units ?? 0} units, topup ${m.topupCharge ?? 0}, max xfer ${m.maxTransferLimit ?? 0}%</span>`,
+              )
+              .join("")}
+						`
+                : ""
+            }
                     </div>
                 </div>
-            `,
-        )
+            `;
+        })
         .join("");
 
       document.getElementById("h-aatp").innerHTML =
@@ -1463,7 +1736,6 @@ function loadSaved() {
         container.innerHTML = `
  
                 <div class="drafts-empty">
- 
                     <span class="material-icons">
                         inventory_2
                     </span>
@@ -1471,7 +1743,6 @@ function loadSaved() {
                     <p class="drafts-empty-title">
                         No saved configs
                     </p>
- 
                 </div>
             `;
 
@@ -1483,7 +1754,6 @@ function loadSaved() {
       container.innerHTML = configs
         .map(
           (c, i) => `
- 
                     <div class="draft-item saved">
                         <div class="draft-info"
                             onclick="loadSavedPackage(${i})">
@@ -1514,10 +1784,6 @@ function loadSavedPackage(index) {
 
   const d = config.data;
 
-  /*
-       convert saved format → builder state
-    */
-
   const state = {
     s2: [
       {
@@ -1540,20 +1806,26 @@ function loadSavedPackage(index) {
       priority: a.priority,
     })),
 
-    s4: (d.allowedAtps || d.additionalAtps || []).map((a) => ({
-      id: a.servicePackageId,
-      name: a.packageName,
-      type: a.type || "",
-      validity: a.validity,
-      rentalPeriod: a.rentalPeriod || "",
-      midnightExpiry: a.midnightExpiry,
-      renewal: a.renewal,
-      rental: a.rental,
-      maxCount: a.maxCount,
-      freeCycles: a.freeCycles,
-      priority: a.priority,
-      mrp: a.mrp,
-    })),
+    s4: attachCaConfigToS4(
+      (d.allowedAtps || d.additionalAtps || []).map((a) => ({
+        id: a.servicePackageId,
+        name: a.packageName,
+        type: a.type || "",
+        validity: a.validity,
+        rentalPeriod: a.rentalPeriod || "",
+        midnightExpiry: a.midnightExpiry,
+        renewal: a.renewal,
+        rental: a.rental,
+        maxCount: a.maxCount,
+        freeCycles: a.freeCycles,
+        priority: a.priority,
+        mrp: a.mrp,
+        category: a.category || "NORMAL",
+        serviceCode: a.serviceCode || "",
+        vipPlan: a.vipPlan || "",
+      })),
+      d.caAtps,
+    ),
 
     price: d.charge,
 
@@ -1801,11 +2073,7 @@ function clearApprovedSearch() {
   filterApproved("");
 }
 
-// Clicking an approved TP card now opens the same details modal used in the
-// clone page's "Select" button (cloneTreeModal), instead of jumping straight
-// into the builder. The "approved" context is passed through so the modal's
-// Modify/Clone actions know this plan is an already-approved TP (see
-// _cloneTreeAction) rather than a plan being cloned from the clone page.
+// Clicking an approved TP card now opens the same details modal used in the clone
 function openApprovedTpDetails(index) {
   const plan = window.ALL_APPROVED[index];
   if (!plan) return;
@@ -1918,20 +2186,26 @@ function loadRejectedPackage(index) {
       priority: a.priority,
     })),
 
-    s4: (d.allowedAtps || d.additionalAtps || []).map((a) => ({
-      id: a.servicePackageId,
-      name: a.packageName,
-      type: a.type || "",
-      validity: a.validity,
-      rentalPeriod: a.rentalPeriod || "",
-      midnightExpiry: a.midnightExpiry,
-      renewal: a.renewal,
-      rental: a.rental,
-      maxCount: a.maxCount,
-      freeCycles: a.freeCycles,
-      priority: a.priority,
-      mrp: a.mrp,
-    })),
+    s4: attachCaConfigToS4(
+      (d.allowedAtps || d.additionalAtps || []).map((a) => ({
+        id: a.servicePackageId,
+        name: a.packageName,
+        type: a.type || "",
+        validity: a.validity,
+        rentalPeriod: a.rentalPeriod || "",
+        midnightExpiry: a.midnightExpiry,
+        renewal: a.renewal,
+        rental: a.rental,
+        maxCount: a.maxCount,
+        freeCycles: a.freeCycles,
+        priority: a.priority,
+        mrp: a.mrp,
+        category: a.category || "NORMAL",
+        serviceCode: a.serviceCode || "",
+        vipPlan: a.vipPlan || "",
+      })),
+      d.caAtps,
+    ),
 
     price: d.charge,
 
@@ -2232,6 +2506,15 @@ function openClone() {
   const sidebar = document.getElementById("sidebar");
 
   if (!page) return;
+
+  // Force-close ATP Rules page if it's the one currently showing —
+  // otherwise it stays stacked on top (same z-index, later in DOM)
+  // and the clone page opens invisibly underneath it.
+  const atpPage = document.getElementById("atpRulesPage");
+  if (atpPage) {
+    atpPage.classList.remove("visible");
+    atpPage.style.display = "none";
+  }
 
   // 1. Hide the normal workspace content (like admin mode does)
   if (workBody) workBody.style.display = "none";
@@ -2942,7 +3225,14 @@ function _renderCloneTree(container, tpDesc, response) {
 
   const tpName = d.tariffPlanName || d.tariffPackageDesc || "—";
   const datpRows = d.defaultAtps || [];
-  const aatpRows = d.allowedAtps || [];
+  const caAtpRows = d.caAtps || [];
+  // CA-category AATPs live only in caAtps now (see saveConfiguration()), so
+  // merge them back in here as their own AATP rows for display. They don't
+  // carry a `category` field in caAtps itself, so tag it on here.
+  const aatpRows = [
+    ...(d.allowedAtps || []),
+    ...caAtpRows.map((c) => ({ ...c, category: "CA" })),
+  ];
 
   function attrPill(label, value) {
     if (value === null || value === undefined || value === "") return "";
@@ -2954,6 +3244,12 @@ function _renderCloneTree(container, tpDesc, response) {
 
   function componentRow(r, index, type) {
     const name = r.packageName || r.chargeDesc || r.chargeId || type;
+    const ca =
+      type === "AATP" && r.category === "CA"
+        ? caAtpRows.find(
+            (c) => String(c.servicePackageId) === String(r.servicePackageId),
+          )
+        : null;
     const attrs = [
       attrPill(
         "Validity",
@@ -2980,6 +3276,23 @@ function _renderCloneTree(container, tpDesc, response) {
       attrPill("Max Count", r.maxCount ?? "0"),
       attrPill("Free Cycles", r.freeCycles ?? "0"),
       attrPill("MRP", r.mrp ?? "0"),
+      attrPill("Service Code", r.serviceCode || ""),
+      r.category !== "CA"
+        ? attrPill("VIP Plan", r.vipPlan === "Y" ? "Yes" : r.vipPlan === "N" ? "No" : "—")
+        : "",
+      ca ? attrPill("Default Lines", ca.defaultLinesAllowed ?? "0") : "",
+      ca ? attrPill("Charge/Line", ca.additionalChargePerLine ?? "0") : "",
+      ca ? attrPill("Rollover", ca.packageRolloverYn || "—") : "",
+      ca ? attrPill("CA Start", ca.packageStartDate || "") : "",
+      ca ? attrPill("CA End", ca.packageEndDate || "") : "",
+      ...(ca
+        ? (ca.serviceMappings || []).map((m) =>
+            attrPill(
+              m.serviceUnitType || "Mapping",
+              `${m.units ?? 0} units, topup ${m.topupCharge ?? 0}, max xfer ${m.maxTransferLimit ?? 0}%`,
+            ),
+          )
+        : []),
     ].join("");
     const colorClass = type === "DATP" ? "pd-row--datp" : "pd-row--aatp";
     const badge = type === "DATP" ? "pd-badge--datp" : "pd-badge--aatp";
@@ -3144,21 +3457,27 @@ async function _cloneTreeAction(action) {
         freeCycles: a.freeCycles,
         priority: a.priority,
       })),
-      s4: (d.allowedAtps || []).map((a) => ({
-        id: a.servicePackageId,
-        name: a.packageName,
-        type: a.type || "",
-        ...(isApproved ? { chargeId: a.chargeId || "" } : {}),
-        validity: a.validity,
-        rentalPeriod: a.rentalPeriod || "",
-        midnightExpiry: a.midnightExpiry,
-        renewal: a.renewal,
-        rental: a.rental,
-        maxCount: a.maxCount,
-        freeCycles: a.freeCycles,
-        priority: a.priority,
-        mrp: a.mrp,
-      })),
+      s4: attachCaConfigToS4(
+        (d.allowedAtps || []).map((a) => ({
+          id: a.servicePackageId,
+          name: a.packageName,
+          type: a.type || "",
+          ...(isApproved ? { chargeId: a.chargeId || "" } : {}),
+          validity: a.validity,
+          rentalPeriod: a.rentalPeriod || "",
+          midnightExpiry: a.midnightExpiry,
+          renewal: a.renewal,
+          rental: a.rental,
+          maxCount: a.maxCount,
+          freeCycles: a.freeCycles,
+          priority: a.priority,
+          mrp: a.mrp,
+          category: a.category || "NORMAL",
+          serviceCode: a.serviceCode || "",
+          vipPlan: a.vipPlan || "",
+        })),
+        d.caAtps,
+      ),
       price: d.charge || "",
       publicityCode: d.publicityId || "",
       startDate: (function () {

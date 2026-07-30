@@ -409,6 +409,21 @@ public class TariffApprovalService {
 			List<Long> allowedAtpIds = new ArrayList<>();
 			List<Long> newAtpIds = new ArrayList<>();
 
+			java.util.Set<Long> caAtpIds = new java.util.HashSet<>();
+
+	
+			List<Map<String, Object>> caAtps = (List<Map<String, Object>>) data.get("caAtps");
+			boolean hasCaAtps = caAtps != null && !caAtps.isEmpty();
+			Map<Long, Map<String, Object>> caAtpsBySourceAtpId = new HashMap<>();
+			if (caAtps != null) {
+				for (Map<String, Object> caAtp : caAtps) {
+					Long srcId = Long.valueOf(caAtp.get("servicePackageId").toString());
+					caAtpsBySourceAtpId.put(srcId, caAtp);
+				}
+			}
+
+			List<Map<String, Object>> allowedAtpSource = new ArrayList<>();
+
 			if (hasAnyAtps) {
 
 				if (hasDefaultAtps) {
@@ -420,13 +435,16 @@ public class TariffApprovalService {
 						atp.put("chargeId", chargeId);
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
-						CloneAtpResult atpResult =bundleService.cloneAtpData( oldAtpId, networkId, atpSuffix, newBucketZoneId, startDate, endDate);
+						CloneAtpResult atpResult =bundleService.cloneAtpData( oldAtpId, networkId, atpSuffix, newBucketZoneId, startDate, endDate, caAtpsBySourceAtpId.get(oldAtpId));
 
 						defaultAtpIds.add(atpResult.getNewAtpId());
 						newAtpIds.add(atpResult.getNewAtpId());
+						if (atpResult.isCaAtp()) {
+							caAtpIds.add(atpResult.getNewAtpId());
+						}
 
-						logger.info("Default ATP cloned oldAtpId={} newAtpId={} atpSuffix={} chargeId={}",
-								oldAtpId, atpResult.getNewAtpId(), atpSuffix, chargeId);
+						logger.info("Default ATP cloned oldAtpId={} newAtpId={} atpSuffix={} chargeId={} caAtp={}",
+								oldAtpId, atpResult.getNewAtpId(), atpSuffix, chargeId, atpResult.isCaAtp());
 					}
 				}
 
@@ -439,13 +457,17 @@ public class TariffApprovalService {
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
 						CloneAtpResult atpResult = bundleService.cloneAtpData(
-								oldAtpId, networkId, atpSuffix, newBucketZoneId,startDate,endDate);
+								oldAtpId, networkId, atpSuffix, newBucketZoneId,startDate,endDate, caAtpsBySourceAtpId.get(oldAtpId));
 
 						allowedAtpIds.add(atpResult.getNewAtpId());
+						allowedAtpSource.add(atp);
 						newAtpIds.add(atpResult.getNewAtpId());
+						if (atpResult.isCaAtp()) {
+							caAtpIds.add(atpResult.getNewAtpId());
+						}
 
-						logger.info("Allowed ATP cloned oldAtpId={} newAtpId={} atpSuffix={} chargeId={}",
-								oldAtpId, atpResult.getNewAtpId(), atpSuffix, chargeId);
+						logger.info("Allowed ATP cloned oldAtpId={} newAtpId={} atpSuffix={} chargeId={} caAtp={}",
+								oldAtpId, atpResult.getNewAtpId(), atpSuffix, chargeId, atpResult.isCaAtp());
 					}
 				}
 
@@ -453,7 +475,31 @@ public class TariffApprovalService {
 				logger.info("No ATPs present. Skipping bundle and bucket clone.");
 			}
 
-			logger.info("Final defaultAtpIds={} allowedAtpIds={}", defaultAtpIds, allowedAtpIds);
+		
+			if (hasCaAtps) {
+				for (Map<String, Object> caAtp : caAtps) {
+					String atpSuffix = "ATP" + atpSuffixCounter++;
+
+					String chargeId = tpName + "_" + atpSuffix;
+					caAtp.put("chargeId", chargeId);
+					Long oldAtpId = Long.valueOf(caAtp.get("servicePackageId").toString());
+
+					CloneAtpResult atpResult = bundleService.cloneAtpData(
+							oldAtpId, networkId, atpSuffix, newBucketZoneId, startDate, endDate, caAtp);
+
+					allowedAtpIds.add(atpResult.getNewAtpId());
+					allowedAtpSource.add(caAtp);
+					newAtpIds.add(atpResult.getNewAtpId());
+					if (atpResult.isCaAtp()) {
+						caAtpIds.add(atpResult.getNewAtpId());
+					}
+
+					logger.info("CA ATP cloned oldAtpId={} newAtpId={} atpSuffix={} chargeId={} caAtp={}",
+							oldAtpId, atpResult.getNewAtpId(), atpSuffix, chargeId, atpResult.isCaAtp());
+				}
+			}
+
+			logger.info("Final defaultAtpIds={} allowedAtpIds={} caAtpIds={}", defaultAtpIds, allowedAtpIds, caAtpIds);
 
 			// ── STEP 6: Periodic charge — one insert per ATP ─────────────────
 			if (hasDefaultAtps) {
@@ -466,8 +512,13 @@ public class TariffApprovalService {
 					insertPeriodicChargeForAtp(atp, data, networkId, username);
 				}
 			}
+			if (hasCaAtps) {
+				for (Map<String, Object> caAtp : caAtps) {
+					insertPeriodicChargeForAtp(caAtp, data, networkId, username);
+				}
+			}
 
-			if (!hasAnyAtps) {
+			if (!hasAnyAtps && !hasCaAtps) {
 				logger.info("No ATPs. Skipping periodic charge insert.");
 			}
 
@@ -541,7 +592,7 @@ public class TariffApprovalService {
 				throw new TariffInsertException("STEP 9", "CS_RAT_TARIFF_SERVICE_PACK_MAP", ex);
 			}
 
-			// ── STEP 10: Map tariff to ATPs (use per-ATP chargeId) ───────────
+			
 			int datpIdx = 0;
 			for (Long atpId : defaultAtpIds) {
 				Object priorityObj = defaultAtps.get(defaultAtpIds.indexOf(atpId)).get("priority");
@@ -571,10 +622,10 @@ public class TariffApprovalService {
 
 			int aatpIdx = 0;
 			for (Long atpId : allowedAtpIds) {
-				Object priorityObj = addAtps.get(allowedAtpIds.indexOf(atpId)).get("priority");
+				Object priorityObj = allowedAtpSource.get(aatpIdx).get("priority");
 				String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
 				Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
-				String atpChargeId = addAtps.get(aatpIdx).get("chargeId").toString();
+				String atpChargeId = allowedAtpSource.get(aatpIdx).get("chargeId").toString();
 				try {
 					jdbcTemplate.update("""
 							insert into CS_RAT_TARIFF_SERVICE_PACK_MAP
@@ -604,8 +655,8 @@ public class TariffApprovalService {
 				for (int i = 0; i < allowedAtpIds.size(); i++) {
 					Map<String, Object> rcEntry = new HashMap<>();
 					rcEntry.put("atpId", allowedAtpIds.get(i));
-					rcEntry.put("mrp", addAtps.get(i).get("mrp"));
-					rcEntry.put("type", String.valueOf(addAtps.get(i).get("type")));
+					rcEntry.put("mrp", allowedAtpSource.get(i).get("mrp"));
+					rcEntry.put("type", String.valueOf(allowedAtpSource.get(i).get("type")));
 					rcAtpPayload.add(rcEntry);
 				}
 

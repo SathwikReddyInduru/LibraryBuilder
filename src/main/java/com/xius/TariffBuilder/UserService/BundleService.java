@@ -20,15 +20,22 @@ public class BundleService {
 
 	private static final Logger logger = LoggerFactory.getLogger(BundleService.class);
 
+	// ATP_CATEGORY value that routes ATP cloning through the CA Package clone
+	// flow instead of the Bundle/Bucket clone flow.
+	private static final String ATP_CATEGORY_CA = "CA";
+
 	@Qualifier("oracleJdbcTemplate")
 	private final JdbcTemplate jdbcTemplate;
 	private final ServiceCloneService serviceCloneService;
 	private final ServiceplanZone servicePlanZone;
+	private final CaPackageService caPackageService;
 
-	BundleService(JdbcTemplate jdbcTemplate, ServiceCloneService serviceCloneService, ServiceplanZone servicePlanZone) {
+	BundleService(JdbcTemplate jdbcTemplate, ServiceCloneService serviceCloneService, ServiceplanZone servicePlanZone,
+			CaPackageService caPackageService) {
 		this.jdbcTemplate = jdbcTemplate;
 		this.serviceCloneService = serviceCloneService;
 		this.servicePlanZone = servicePlanZone;
+		this.caPackageService = caPackageService;
 	}
 
 	public static class CloneAtpResult {
@@ -38,13 +45,24 @@ public class BundleService {
 		private String newBucketId;
 		private Long newBucketZoneId;
 		private List<Long> newPlanIds;
+		// True when this ATP was cloned through the CA Package flow. CA ATPs stop
+		// at Service Plan creation — no Bundle/Bucket was created for them, and
+		// they must not be mapped to the Tariff Package in this flow.
+		private boolean caAtp;
+
 		public CloneAtpResult(Long newAtpId, String oldBucketId, String newBucketId, Long newBucketZoneId,
 				List<Long> newPlanIds) {
+			this(newAtpId, oldBucketId, newBucketId, newBucketZoneId, newPlanIds, false);
+		}
+
+		public CloneAtpResult(Long newAtpId, String oldBucketId, String newBucketId, Long newBucketZoneId,
+				List<Long> newPlanIds, boolean caAtp) {
 			this.newAtpId = newAtpId;
 			this.oldBucketId = oldBucketId;
 			this.newBucketId = newBucketId;
 			this.newBucketZoneId = newBucketZoneId;
 			this.newPlanIds = newPlanIds;
+			this.caAtp = caAtp;
 		}
 
 		public Long getNewAtpId() {
@@ -65,6 +83,10 @@ public class BundleService {
 
 		public List<Long> getNewPlanIds() {
 			return newPlanIds;
+		}
+
+		public boolean isCaAtp() {
+			return caAtp;
 		}
 	}
 
@@ -136,9 +158,25 @@ public class BundleService {
 
 	
 	 //Clone ATP, bundle, and bucket. Bucket will use newBucketZoneId.
-
+	 //
+	 //If the source ATP's ATP_CATEGORY is 'CA', this instead stops at Service
+	 //Plan creation — no Bundle or Bucket is created. Equivalent to calling
+	 //the 7-arg overload below with caAtpRequest = null, which means: no
+	 //matching "caAtps" entry, so no CA Package is created for this call.
 	@Transactional
 	public CloneAtpResult cloneAtpData(Long atpId, Long networkId, String tpName, Long newBucketZoneId,Date startDate,Date endDate) {
+		return cloneAtpData(atpId, networkId, tpName, newBucketZoneId, startDate, endDate, null);
+	}
+
+	 //Same as the 6-arg overload, but for a CA ATP: a CA Package is only
+	 //created — via CaPackageService.createCaPackage, using the request's
+	 //fields — when caAtpRequest (the request body's matching "caAtps"
+	 //entry) is non-null. When caAtpRequest is null, no CA Package is created
+	 //or mapped at all; the ATP still gets created up to Service Plan. There
+	 //is no fallback to cloning an old ATP's CA Package here — that's a
+	 //separate, unused-by-this-path method (CaPackageService.cloneCaPackage).
+	@Transactional
+	public CloneAtpResult cloneAtpData(Long atpId, Long networkId, String tpName, Long newBucketZoneId,Date startDate,Date endDate, Map<String, Object> caAtpRequest) {
 
 		logger.info("ATP clone started atpId={} networkId={} tpName={} newBucketZoneId={}", atpId, networkId, tpName,
 				newBucketZoneId);
@@ -150,6 +188,8 @@ public class BundleService {
 		Map<String, Object> oldAtp = jdbcTemplate.queryForMap(
 			""" 
 			select * from CS_RAT_SERVICE_PACKAGE where SERVICE_PACKAGE_ID = ?	""", atpId);
+
+		boolean isCaAtp = caAtpRequest != null;
 
 		try {
 			jdbcTemplate.update("""
@@ -221,6 +261,37 @@ public class BundleService {
 		List<Long> newPlanIds = serviceCloneService.cloneServicePlans(networkId, atpId, newAtpId, tpName);
 
 		logger.info("ATP service plans cloned oldAtpId={} newAtpId={} newPlanIds={}", atpId, newAtpId, newPlanIds);
+
+		if (isCaAtp) {
+
+			Long newCaPackageId = null;
+
+			if (caAtpRequest != null) {
+				logger.info(
+						"CA ATP detected (ATP_CATEGORY=CA). Creating a new CA Package from request instead of Bundle/Bucket. oldAtpId={} newAtpId={}",
+						atpId, newAtpId);
+				newCaPackageId = caPackageService.createCaPackage(newAtpId, networkId, tpName, caAtpRequest);
+			} else {
+				// No matching "caAtps" entry in the request for this ATP — per spec,
+				// a CA Package is only created/mapped when the request explicitly
+				// supplies one. No fallback clone-from-old-ATP here: the ATP still
+				// gets created up to Service Plan, it just ends up with no CA
+				// Package (and no CS_ADD_SVCPACK_CA_PKG_MAP row) until a later
+				// request supplies one.
+				logger.warn(
+						"CA ATP oldAtpId={} newAtpId={} has ATP_CATEGORY=CA but no matching \"caAtps\" entry in the request. "
+								+ "No CA Package will be created or mapped for this ATP.",
+						atpId, newAtpId);
+			}
+
+			copyServiceAtpMap(atpId, newAtpId, networkId);
+
+			logger.info(
+					"CA ATP clone completed up to Service Plan creation. Bundle/Bucket skipped. oldAtpId={} newAtpId={} newCaPackageId={}",
+					atpId, newAtpId, newCaPackageId);
+
+			return new CloneAtpResult(newAtpId, null, null, null, newPlanIds, true);
+		}
 
 		List<Long> bundleIds = jdbcTemplate.queryForList("""
 				select BUNDLE_OR_DISCOUNT_ID

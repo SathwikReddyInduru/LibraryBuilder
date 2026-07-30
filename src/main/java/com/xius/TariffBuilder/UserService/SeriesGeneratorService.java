@@ -8,7 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import com.xius.TariffBuilder.Entity.SaveConfigDao;
+
 import com.xius.TariffBuilder.util.JsonStorage;
 
 @Service
@@ -16,7 +16,7 @@ public class SeriesGeneratorService {
 
     private static final Logger logger = LoggerFactory.getLogger(TariffApprovalService.class);
     private final JdbcTemplate jdbcTemplate;
-    SeriesGeneratorService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager, SaveConfigDao saveConfigDao, JsonStorage jsonStorage) {
+    SeriesGeneratorService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager,  JsonStorage jsonStorage) {
         this.jdbcTemplate = jdbcTemplate;
     }
     

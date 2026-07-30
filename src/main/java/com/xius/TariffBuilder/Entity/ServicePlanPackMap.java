@@ -1,30 +1,70 @@
 package com.xius.TariffBuilder.Entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.Data;
 
-@Entity
-@Data
-// @Table(name = "CS_SERVICE_PLAN_PACK_MAP")
+
 public class ServicePlanPackMap {
 
-	@Id
-	@Column(name = "SERVICE_PACKAGE_ID")
 	private String servicePackageId;
 
-	@Column(name = "SERVICE_PACKAGE_NAME")
+
+	public String getServicePackageId() {
+		return servicePackageId;
+	}
+
+	public void setServicePackageId(String servicePackageId) {
+		this.servicePackageId = servicePackageId;
+	}
+
+	public String getServicePackageName() {
+		return servicePackageName;
+	}
+
+	public void setServicePackageName(String servicePackageName) {
+		this.servicePackageName = servicePackageName;
+	}
+
+	public Integer getNetworkId() {
+		return networkId;
+	}
+
+	public void setNetworkId(Integer networkId) {
+		this.networkId = networkId;
+	}
+
+	public String getTariffPlanType() {
+		return tariffPlanType;
+	}
+
+	public void setTariffPlanType(String tariffPlanType) {
+		this.tariffPlanType = tariffPlanType;
+	}
+
+	public String getServiceTypes() {
+		return serviceTypes;
+	}
+
+	public void setServiceTypes(String serviceTypes) {
+		this.serviceTypes = serviceTypes;
+	}
+
+	public String getAtpCategory() {
+		return atpCategory;
+	}
+
+	public void setAtpCategory(String atpCategory) {
+		this.atpCategory = atpCategory;
+	}
+
 	private String servicePackageName;
 
-	@Column(name = "NETWORK_ID")
+
 	private Integer networkId;
 
-	@Column(name = "TARIFF_PLAN_TYPE")
+
 	private String tariffPlanType;
 
-	// Change to String if DB is VARCHAR
-	@Column(name = "SERVICE_TYPES")
+
 	private String serviceTypes;
+
+	private String atpCategory;
 }

@@ -30,6 +30,12 @@ public class TariffPackageSyncService {
     private static final Logger logger = LoggerFactory.getLogger(TariffPackageSyncService.class);
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
+    // ATP_CATEGORY value (CS_RAT_SERVICE_PACKAGE) that routes an ATP through
+    // the CA Package clone flow instead of Bundle/Bucket — same constant
+    // BundleService uses for the clone/approve side, kept in sync here so the
+    // update/sync flow branches the same way.
+    private static final String ATP_CATEGORY_CA = "CA";
+
     @Qualifier("oracleJdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
 
@@ -39,6 +45,7 @@ public class TariffPackageSyncService {
     private final ServiceplanZone servicePlanZone;
     private final RcAtpRechargeService rcAtpRechargeService;
     private final SeriesGeneratorService seriesGeneratorService;
+    private final CaPackageService caPackageService;
 
     TariffPackageSyncService(JdbcTemplate jdbcTemplate,
             PlatformTransactionManager transactionManager,
@@ -46,7 +53,8 @@ public class TariffPackageSyncService {
             BundleService bundleService,
             ServiceplanZone servicePlanZone,
             RcAtpRechargeService rcAtpRechargeService,
-            SeriesGeneratorService seriesGeneratorService) {
+            SeriesGeneratorService seriesGeneratorService,
+            CaPackageService caPackageService) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactionManager = transactionManager;
         this.serviceCloneService = serviceCloneService;
@@ -54,6 +62,7 @@ public class TariffPackageSyncService {
         this.servicePlanZone = servicePlanZone;
         this.rcAtpRechargeService = rcAtpRechargeService;
         this.seriesGeneratorService = seriesGeneratorService;
+        this.caPackageService = caPackageService;
     }
 
     // =====================================================================
@@ -162,8 +171,7 @@ Date endDate = Date.valueOf(
                         PACKAGE_TYPE         = ?,
                         IS_CORPORATE_YN      = ?,
                         TARIFF_PACK_CATEGORY = ?,
-                        END_DATE             = ?,
-                        START_DATE           =?,
+                        END_DATE             = ?
                     WHERE TARIFF_PACKAGE_ID = ?
                       AND NETWORK_ID = ?
                     """,
@@ -173,7 +181,6 @@ Date endDate = Date.valueOf(
                     convertYN(data.get("isCorporateYn")),
                     data.get("tariffPackCategory"),
                     Date.valueOf(LocalDate.parse(data.get("endDate").toString(), formatter)),
-                    Date.valueOf(LocalDate.parse(data.get("startDate").toString(), formatter)),
                     tariffPackageId,
                     networkId);
         } catch (Exception ex) {
@@ -377,6 +384,19 @@ Date endDate = Date.valueOf(
                             tariffPackageId);
                 }
                 updateAtpPeriodicCharge(incomingChargeId, networkId, atp, data);
+
+                if (caPackageService.hasCaPackage(id)) {
+                    Map<String, Object> caAtpRequest = findCaAtpRequest(data, id);
+                    if (caAtpRequest != null) {
+                        caPackageService.updateCaPackage(id, networkId, caAtpRequest);
+                        logger.info("CA Package fields updated servicePackageId={}", id);
+                    } else {
+                        logger.info(
+                                "servicePackageId={} has a CA Package but no matching caAtps entry in this request — fields left unchanged",
+                                id);
+                    }
+                }
+
                 logger.info("DATP updated in place servicePackageId={} chargeId={}", id, incomingChargeId);
             } else {
             
@@ -424,6 +444,18 @@ Date endDate = Date.valueOf(
                 }
                 updateAtpPeriodicCharge(incomingChargeId, networkId, atp, data);
 
+                if (caPackageService.hasCaPackage(id)) {
+                    Map<String, Object> caAtpRequest = findCaAtpRequest(data, id);
+                    if (caAtpRequest != null) {
+                        caPackageService.updateCaPackage(id, networkId, caAtpRequest);
+                        logger.info("CA Package fields updated servicePackageId={}", id);
+                    } else {
+                        logger.info(
+                                "servicePackageId={} has a CA Package but no matching caAtps entry in this request — fields left unchanged",
+                                id);
+                    }
+                }
+
                 // Keep the RC's MRP (LOW_VALUE/HIGH_VALUE) in sync with the UI edit.
                 Long existingRcIdForAtp = rcAtpRechargeService.findRcIdByAtpId(id, networkId);
                 if (existingRcIdForAtp != null) {
@@ -470,21 +502,44 @@ Date endDate = Date.valueOf(
     private Long addNewAtp(Long tariffPackageId, Long networkId, String username, Long sourceAtpId,
             String tariffPlanType, Map<String, Object> atp, Map<String, Object> data,Date startDate,Date endDate) {
 
-        String oldBucketId = bundleService.getOldBucketId(sourceAtpId, networkId);
-        Long oldBucketZoneId = bundleService.getBucketZoneId(oldBucketId);
-        ServiceplanZone.ZoneTable bucketZoneTable = servicePlanZone.resolveZoneTableByBalanceCategory(
-                bundleService.getBucketBalanceCategory(oldBucketId));
-        Long newBucketZoneId = servicePlanZone.generateNewZoneId(bucketZoneTable);
         String suffix = "ATP" + seriesGeneratorService.resolveNextAtpSuffixNumber();
 
-        servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, suffix, bucketZoneTable);
+        // ── ATP_CATEGORY check (CS_RAT_SERVICE_PACKAGE) ──────────────────────
+        // A CA source ATP has no row in CS_ATP_ACCUMU_BON_DISC_MAP, so
+        // getOldBucketId() returns null; resolving a bucket zone table off a
+        // null balance category isn't meaningful and must be skipped entirely
+        // for CA. bundleService.cloneAtpData already branches on ATP_CATEGORY
+        // internally (clones the CA Package + stops at Service Plan creation),
+        // so newBucketZoneId is simply not needed on the CA path.
+        boolean isCaAtp = isCaAtp(sourceAtpId, networkId);
 
-        CloneAtpResult atpResult = bundleService.cloneAtpData(sourceAtpId, networkId, suffix, newBucketZoneId,startDate,endDate);
+        Long newBucketZoneId = null;
+
+        if (!isCaAtp) {
+            String oldBucketId = bundleService.getOldBucketId(sourceAtpId, networkId);
+            Long oldBucketZoneId = bundleService.getBucketZoneId(oldBucketId);
+            ServiceplanZone.ZoneTable bucketZoneTable = servicePlanZone.resolveZoneTableByBalanceCategory(
+                    bundleService.getBucketBalanceCategory(oldBucketId));
+            newBucketZoneId = servicePlanZone.generateNewZoneId(bucketZoneTable);
+
+            servicePlanZone.cloneZoneIfExists(oldBucketZoneId, newBucketZoneId, networkId, suffix, bucketZoneTable);
+        } else {
+            logger.info("CA ATP detected (ATP_CATEGORY=CA) sourceAtpId={} — skipping bucket zone resolution.",
+                    sourceAtpId);
+        }
+
+        Map<String, Object> caAtpRequest = isCaAtp ? findCaAtpRequest(data, sourceAtpId) : null;
+
+        CloneAtpResult atpResult = bundleService.cloneAtpData(sourceAtpId, networkId, suffix, newBucketZoneId,startDate,endDate, caAtpRequest);
         Long newAtpId = atpResult.getNewAtpId();
 
         String chargeId = data.get("tariffPackageDesc") + "_" + suffix;
         atp.put("chargeId", chargeId);
         insertAtpPeriodicCharge(chargeId, networkId, atp, data, username);
+
+        // CA ATPs map into CS_RAT_TARIFF_SERVICE_PACK_MAP exactly like any
+        // other ATP — the CA Package clone above only replaces what
+        // Bundle/Bucket would have done for a non-CA ATP.
         Object priorityObj = atp.get("priority");
     String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
     Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
@@ -521,6 +576,45 @@ Date endDate = Date.valueOf(
                 sourceAtpId, newAtpId);
 
         return newAtpId;
+    }
+
+    /** Reads ATP_CATEGORY off CS_RAT_SERVICE_PACKAGE for the given ATP. */
+    private boolean isCaAtp(Long servicePackageId, Long networkId) {
+
+        String atpCategory = jdbcTemplate.query("""
+                SELECT ATP_CATEGORY
+                FROM CS_RAT_SERVICE_PACKAGE
+                WHERE SERVICE_PACKAGE_ID = ?
+                  AND NETWORK_ID = ?
+                """, rs -> rs.next() ? rs.getString("ATP_CATEGORY") : null, servicePackageId, networkId);
+
+        return ATP_CATEGORY_CA.equals(atpCategory);
+    }
+
+    /**
+     * Finds the request body's "caAtps" entry whose servicePackageId matches
+     * the given source ATP id — the fresh CA Package creation fields for
+     * that ATP (see CaPackageService.createCaPackage). Returns null if
+     * "caAtps" is absent or has no matching entry, in which case the caller
+     * falls back to cloning whatever CA Package the source ATP already had.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> findCaAtpRequest(Map<String, Object> data, Long sourceAtpId) {
+
+        List<Map<String, Object>> caAtps = (List<Map<String, Object>>) data.get("caAtps");
+
+        if (caAtps == null) {
+            return null;
+        }
+
+        for (Map<String, Object> caAtp : caAtps) {
+            Object servicePackageId = caAtp.get("servicePackageId");
+            if (servicePackageId != null && sourceAtpId.equals(Long.valueOf(servicePackageId.toString()))) {
+                return caAtp;
+            }
+        }
+
+        return null;
     }
 
     private void insertAtpPeriodicCharge(String chargeId, Long networkId, Map<String, Object> atp,
@@ -617,6 +711,13 @@ Date endDate = Date.valueOf(
     /** Deletes ATP + Bundle + Bucket hierarchy plus its periodic charge. */
     private void deleteAtpHierarchy(Long atpId, Long networkId, String chargeId) {
 
+        // Resolved before CS_RAT_SERVICE_PACKAGE is deleted below — ATP_CATEGORY
+        // wouldn't be readable afterwards. A CA ATP has no Bundle/Bucket rows
+        // (the loop below simply runs zero times for it), but it does have a
+        // cloned CA Package that this same method previously had no idea
+        // existed, leaving it permanently orphaned in the DB.
+        boolean isCaAtp = caPackageService.hasCaPackage(atpId);
+
         try {
             List<Long> bundleIds = jdbcTemplate.queryForList("""
                     SELECT BUNDLE_OR_DISCOUNT_ID FROM CS_ATP_ACCUMU_BON_DISC_MAP
@@ -649,6 +750,10 @@ Date endDate = Date.valueOf(
                         chargeId, networkId);
             }
 
+            if (isCaAtp) {
+                caPackageService.deleteCaPackage(atpId, networkId);
+            }
+
             jdbcTemplate.update("DELETE FROM CS_RAT_SERVICE_PACKAGE WHERE SERVICE_PACKAGE_ID = ? AND NETWORK_ID = ?",
                     atpId, networkId);
         } catch (Exception ex) {
@@ -657,7 +762,7 @@ Date endDate = Date.valueOf(
             throw new TariffInsertException("DELETE_ATP_HIERARCHY", "CS_RAT_SERVICE_PACKAGE", ex);
         }
 
-        logger.info("ATP hierarchy deleted atpId={} networkId={}", atpId, networkId);
+        logger.info("ATP hierarchy deleted atpId={} networkId={} wasCaAtp={}", atpId, networkId, isCaAtp);
     }
 
     /** Deletes a TP's service package + plan + plan-package mapping. */

@@ -278,7 +278,7 @@ function renderCard(item) {
             </div>
 			<div class="card-field">
 			    <label>PRIORITY <span class="required">*</span></label>
-			        <input type="number"
+			        <input type="number" min="1"
                         id="priority-s3-${item.id}"
 			            value="${item.priority ?? ''}"
 			            oninput="updateField('${item.id}', 'priority', this.value)"

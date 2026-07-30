@@ -1,3 +1,42 @@
+// Builds the caAtps entry for one CA-category AATP item, mirroring the shape
+// used in the main save-config payload (see layout.js saveConfiguration()).
+function buildCaAtpEntry(item) {
+  const ca = item.caConfig || {};
+
+  return {
+    servicePackageId: Number(item.id),
+    packageName: item.name,
+    chargeId: item.chargeId || "",
+    validity: item.validity,
+    rentalPeriod: item.validity === "O" ? item.rentalPeriod || 1 : "",
+    midnightExpiry: item.midnightExpiry,
+    renewal: item.renewal,
+    rental: item.rental || 0,
+    maxCount: item.maxCount || 0,
+    freeCycles: item.freeCycles || 0,
+    priority:
+      item.priority !== "" &&
+      item.priority !== null &&
+      item.priority !== undefined &&
+      Number(item.priority) > 0
+        ? Number(item.priority)
+        : 0,
+    mrp: item.mrp || 0,
+    defaultLinesAllowed: ca.defaultLinesAllowed || 0,
+    additionalChargePerLine: ca.additionalChargePerLine || 0,
+    packageRolloverYn: ca.packageRolloverYn || "",
+    packageStartDate: ca.packageStartDate || "",
+    packageEndDate: ca.packageEndDate || "",
+    serviceMappings: (ca.serviceMappings || []).map((m) => ({
+      serviceUnitType: m.serviceUnitType || "",
+      serviceId: m.serviceId || "",
+      units: m.units || 0,
+      topupCharge: m.topupCharge || 0,
+      maxTransferLimit: m.maxTransferLimit || 0,
+    })),
+  };
+}
+
 // Returns today's date as a yyyy-mm-dd string (local time, no timezone drift)
 function getTodayStr() {
   const today = new Date();
@@ -211,6 +250,9 @@ async function clonePackageFromBuilder() {
     maxCount: item.maxCount || 0,
     freeCycles: item.freeCycles || 0,
     mrp: item.mrp || 0,
+    category: item.category,
+    serviceCode: item.serviceCode,
+    vipPlan: item.vipPlan,
   });
 
   const dataPayload = {
@@ -230,6 +272,9 @@ async function clonePackageFromBuilder() {
     selectedSvcs_s4: sessionStorage.getItem("selectedSvcs_s4") || "[]",
     defaultAtps: (state.s3 || []).map(atpMapper),
     allowedAtps: (state.s4 || []).map(atpMapper),
+    caAtps: (state.s4 || [])
+      .filter((item) => item.category === "CA")
+      .map((item) => buildCaAtpEntry(item)),
   };
 
   // Detect if user changed tpName or publicityId
@@ -398,6 +443,9 @@ async function updatePackage() {
         ? Number(item.priority)
         : 0,
     mrp: item.mrp || 0,
+    category: item.category,
+    serviceCode: item.serviceCode,
+    vipPlan: item.vipPlan,
   });
 
   const payload = {
@@ -428,6 +476,9 @@ async function updatePackage() {
       selectedSvcs_s4: sessionStorage.getItem("selectedSvcs_s4") || "[]",
       defaultAtps: (state.s3 || []).map(atpMapper),
       allowedAtps: (state.s4 || []).map(atpMapper),
+      caAtps: (state.s4 || [])
+        .filter((item) => item.category === "CA")
+        .map((item) => buildCaAtpEntry(item)),
     },
   };
 

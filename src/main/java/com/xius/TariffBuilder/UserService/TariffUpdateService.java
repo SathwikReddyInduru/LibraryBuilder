@@ -20,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.xius.TariffBuilder.Dto.ServiceMapping;
 import com.xius.TariffBuilder.Dto.TariffPackageDetails;
 
 @Service
@@ -163,6 +164,7 @@ public class TariffUpdateService {
 
         List<Map<String, Object>> defaultAtps = new ArrayList<>();
         List<Map<String, Object>> allowedAtps = new ArrayList<>();
+        List<Map<String, Object>> caAtps = new ArrayList<>();
 
         Set<Long> seenDefaultAtpIds = new LinkedHashSet<>();
         Set<Long> seenAllowedAtpIds = new LinkedHashSet<>();
@@ -250,7 +252,15 @@ public class TariffUpdateService {
                 case "RCATP" -> {
                     if (row.getServicePackageId() != null
                             && seenAllowedAtpIds.add(row.getServicePackageId())) {
-                        allowedAtps.add(buildAtpMap(row));
+                        Map<String, Object> atpMap = buildAtpMap(row);
+
+                        Map<String, Object> caAtpMap = buildCaAtpMap(row.getServicePackageId(), networkId, atpMap);
+                        if (caAtpMap != null) {
+                            // CA ATP — goes to caAtps only, not allowedAtps.
+                            caAtps.add(caAtpMap);
+                        } else {
+                            allowedAtps.add(atpMap);
+                        }
                     }
                 }
             }
@@ -261,6 +271,7 @@ public class TariffUpdateService {
         data.put("selectedSvcs_s4", new ArrayList<>(selectedSvcs_s4));
         data.put("defaultAtps", defaultAtps);
         data.put("allowedAtps", allowedAtps);
+        data.put("caAtps", caAtps);
 
         response.put("data", data);
 
@@ -294,12 +305,97 @@ public class TariffUpdateService {
         return atp;
     }
 
-    private String convertYN(Object value) {
-        if (value == null)
-            return "N";
-        String v = value.toString();
-        if (v.equalsIgnoreCase("Y") || v.equalsIgnoreCase("YES") || v.equalsIgnoreCase("TRUE"))
-            return "Y";
-        return "N";
+    private Map<String, Object> buildCaAtpMap(Long servicePackageId, Long networkId,
+            Map<String, Object> atpFields) {
+
+        List<Map<String, Object>> caPkgRows = jdbcTemplate.queryForList("""
+                SELECT
+                    cp.CA_PACKAGE_ID                AS caPackageId,
+                    cp.CA_PACKAGE_NAME               AS caPackageName,
+                    cp.CA_PACKAGE_DEFAULT_LINES      AS defaultLinesAllowed,
+                    cp.CA_PACKAGE_ADDNL_LINE_CHARGE  AS additionalChargePerLine,
+                    cp.CA_PACKAGE_ROLLOVER_YN        AS packageRolloverYn,
+                    cp.CA_PACKAGE_SHELF_DATE         AS packageEndDate,
+                    cp.CA_PACKAGE_START_DATE         AS packageStartDate
+                FROM CS_ADD_SVCPACK_CA_PKG_MAP m
+                JOIN CA_MT_PACKAGE cp
+                    ON cp.CA_PACKAGE_ID = m.CA_PACKAGE_ID
+                WHERE m.SERVICE_PACKAGE_ID = ?
+                  AND m.NETWORK_ID = ?
+                """, servicePackageId, networkId);
+
+        if (caPkgRows.isEmpty()) {
+            // Not a CA ATP — no CS_ADD_SVCPACK_CA_PKG_MAP row for it.
+            return null;
+        }
+
+        Map<String, Object> caPkg = caPkgRows.get(0);
+        Long caPackageId = ((Number) caPkg.get("caPackageId")).longValue();
+
+        Map<String, Object> caAtp = new LinkedHashMap<>(atpFields);
+
+        caAtp.put("caPackageName", caPkg.get("caPackageName"));
+        caAtp.put("defaultLinesAllowed",
+                caPkg.get("defaultLinesAllowed") != null ? caPkg.get("defaultLinesAllowed") : 0);
+        caAtp.put("additionalChargePerLine",
+                caPkg.get("additionalChargePerLine") != null ? caPkg.get("additionalChargePerLine") : 0);
+        caAtp.put("packageRolloverYn",
+                caPkg.get("packageRolloverYn") != null ? caPkg.get("packageRolloverYn") : "N");
+
+        Object shelfDate = caPkg.get("packageEndDate");
+        caAtp.put("packageEndDate", shelfDate != null ? shelfDate.toString().substring(0, 10) : "");
+
+        Object startDate = caPkg.get("packageStartDate");
+        caAtp.put("packageStartDate", startDate != null ? startDate.toString().substring(0, 10) : "");
+
+     List<ServiceMapping> serviceMappings = jdbcTemplate.query(
+    """
+    SELECT
+        CA_SERVICE_ID AS serviceId,
+        CA_PACKAGE_UNIT_TYPE AS serviceUnitType,
+        CA_PACKAGE_UNIT_VALUE AS units,
+        CA_PACKAGE_UNIT_TOPUP_CHARGE AS topupCharge,
+        CA_SERV_UNIT_MAX_TRANS_PECEN AS maxTransferLimit
+    FROM CA_PACKAGE_SERVICE_UNITS
+    WHERE CA_PACKAGE_ID = ?
+    """,
+    (rs, rowNum) -> {
+        ServiceMapping dto = new ServiceMapping();
+        dto.setServiceId(rs.getLong("serviceId"));
+        dto.setServiceUnitType(rs.getString("serviceUnitType"));
+        dto.setUnits(rs.getInt("units"));
+        dto.setTopupCharge(rs.getInt("topupCharge"));
+        dto.setMaxTransferLimit(rs.getInt("maxTransferLimit"));
+        return dto;
+    },
+    caPackageId
+);
+
+caAtp.put("serviceMappings", serviceMappings);
+
+        List<Object> deviceGroupIds = jdbcTemplate.queryForList("""
+                SELECT DEVICE_GROUP_ID
+                FROM CA_PKG_DEVICE_GROUPS_MAP
+                WHERE CA_PACKAGE_ID = ?
+                """, Object.class, caPackageId);
+        caAtp.put("deviceGroupIds", deviceGroupIds);
+
+        List<Object> dataZoneGroupIds = jdbcTemplate.queryForList("""
+                SELECT DATA_ZONE_GROUP_ID
+                FROM CA_PKG_DATA_ZONE_GROUPS_MAP
+                WHERE CA_PACKAGE_ID = ?
+                """, Object.class, caPackageId);
+        caAtp.put("dataZoneGroupIds", dataZoneGroupIds);
+
+        return caAtp;
     }
+
+    // private String convertYN(Object value) {
+    //     if (value == null)
+    //         return "N";
+    //     String v = value.toString();
+    //     if (v.equalsIgnoreCase("Y") || v.equalsIgnoreCase("YES") || v.equalsIgnoreCase("TRUE"))
+    //         return "Y";
+    //     return "N";
+    // }
 }

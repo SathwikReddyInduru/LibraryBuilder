@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:fragment="layout(titleFrag, stageFrag, activeStep)">
-
+ 
 <head>
     <title th:replace="${titleFrag}">Tariff Builder</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
@@ -9,9 +9,9 @@
     <link rel="icon" type="image/jpeg" href="/images/favicon.jpeg">
     <link rel="stylesheet" th:href="@{/css/builder.css}">
 </head>
-
+ 
 <body>
-
+ 
     <nav class="navbar">
         <img th:src="@{/images/logo.png}" alt="Xius Logo" style="height:50px; vertical-align:middle;">
         <div class="navbar-right">
@@ -31,7 +31,7 @@
         </div>
     </nav>
     <div class="app-container">
-
+ 
         <!-- ═══════════════════════════════════════════════════════════
              MAIN RAIL — app-level module switcher
              Nodes: TARIFF BUILDER | TARIFF APPROVER
@@ -44,50 +44,55 @@
                 <span class="main-node-icon material-icons">build_circle</span>
                 <span class="main-node-label">BUILDER</span>
             </a>
-
-
+ 
+ 
             <!-- Approver node — hidden until privilege allows -->
             <a href="/builder/admin" class="main-node" id="mn-approver" title="Tariff Approver"
                 onclick="return activateModule('approver', this)">
                 <span class="main-node-icon material-icons">task_alt</span>
                 <span class="main-node-label">APPROVER</span>
             </a>
-
-
+ 
+ 
             <a href="#" class="main-node" id="mn-clone" title="Clone TPs" onclick="openClone(); return false;">
                 <span class="main-node-icon material-icons">copy_all</span>
                 <span class="main-node-label">CLONE TP's</span>
             </a>
-
+ 
+            <a href="#" class="main-node" id="mn-atprules" title="ATP Rules" onclick="openAtpRules(); return false;">
+                <span class="main-node-icon material-icons">rule</span>
+                <span class="main-node-label">ATP RULES</span>
+            </a>
+ 
             <div style="margin-top:auto;"></div>
-
+ 
             <!-- Approved TPs node -->
             <a href="#" class="main-node" id="mn-approved" title="Approved TPs"
                 th:classappend="${activeStep != 0} ? ' hidden'" onclick="openApproved(); return false;">
                 <span class="main-node-icon material-icons">check_circle</span>
                 <span class="main-node-label">APPROVED</span>
             </a>
-
+ 
             <!-- Rejected TPs node -->
             <a href="#" class="main-node" id="mn-rejected" title="Rejected TPs"
                 th:classappend="${activeStep != 0} ? ' hidden'" onclick="openRejected(); return false;">
                 <span class="main-node-icon material-icons">cancel</span>
                 <span class="main-node-label">REJECTED</span>
             </a>
-
+ 
             <a href="#" class="main-node" id="mn-saved" title="Drafts" th:classappend="${activeStep == 0} ? ' hidden'"
                 onclick="openSaved(); return false;">
                 <span class="main-node-icon material-icons">folder</span>
                 <span class="main-node-label">CREATED TP's</span>
             </a>
-
+ 
             <a href="#" class="main-node" id="mn-drafts" title="Drafts" th:classappend="${activeStep == 0} ? ' hidden'"
                 onclick="openDrafts(); return false;">
                 <span class="main-node-icon material-icons">drafts</span>
                 <span class="main-node-label">DRAFTS</span>
             </a>
         </nav>
-
+ 
         <!-- ═══════════════════════════════════════════════════════════
              STEP RAIL — visible only when Builder module is active
         ════════════════════════════════════════════════════════════ -->
@@ -113,15 +118,17 @@
                 <b>5</b><span>PRICING</span>
             </a>
         </nav>
-
+ 
         <main class="workspace" th:classappend="${activeStep == 0} ? ' admin-mode'">
             <!-- FLOATING PILL HEADER -->
             <header class="header-pill-bar">
                 <div class="logo">
                     <span th:text="${username != null ? username : 'user'}">user</span>
                 </div>
-                <div class="header-pill-controls" th:classappend="${activeStep == 0} ? ' hidden'">
-                    <input type="text" placeholder="Name..." class="config-name" id="configName">
+                <div class="pillSeperator">
+                    <div class="header-pill-controls" th:classappend="${activeStep == 0} ? ' hidden'">
+                        <input type="text" placeholder="Enter  Name..." class="config-name" id="configName">
+                    </div>
                     <div class="header-icon-btn" th:classappend="${activeStep == 0} ? ' hidden'">
                         <span class="material-icons reset-btn" id="resetBtn" onclick="resetBuilder()" title="Reset builder">
                             restart_alt
@@ -137,19 +144,19 @@
                     </div>
                 </div>
             </header>
-
+ 
             <!-- TWO-PANE BODY: left card + right card -->
             <div class="workspace-body">
                 <!-- LEFT PANE — stage content -->
                 <div class="pane pane-left" id="leftPane">
                     <th:block th:replace="${stageFrag}"></th:block>
-
+ 
                     <!-- FOOTER ACTIONS -->
                     <div class="config-panel" id="footerActions" th:classappend="${activeStep != 5} ? ' hidden'">
                         <button class="btn-hierarchy" onclick="viewTree()">Hierarchy</button>
                     </div>
                 </div>
-
+ 
                 <!-- RIGHT PANE — library sidebar -->
                 <aside class="pane pane-right sidebar" th:classappend="${activeStep == 0} ? ' hidden'" id="sidebar">
                     <div class="sidebar-tabs">
@@ -158,16 +165,16 @@
                     <div class="sidebar-content" id="comp-list"></div>
                 </aside>
             </div>
-
+ 
             <!-- ═══════════════════════════════════════════════════════════
             CLONE TPS PAGE — injected inside .workspace (as sibling to .workspace-body)
             Add this block INSIDE the <main class="workspace"> element,
             RIGHT BEFORE the closing </main> tag in layout.html.
             ════════════════════════════════════════════════════════════ -->
-
+ 
             <!-- Clone TPs inline page (hidden by default) -->
             <div id="clonePage">
-
+ 
                 <!-- Header pill bar — with search bar -->
                 <div class="clone-page-header">
                     <div class="clone-page-header-left">
@@ -185,18 +192,139 @@
                         <span class="clone-filter-badge" id="cloneFilterBadge" style="display:none">0</span>
                     </button>
                 </div>
-
+ 
                 <!-- Scrollable cards body -->
                 <div class="clone-page-body">
                     <div class="clone-plan-grid" id="clonePlanGrid">
                         <!-- Cards injected by _renderTpCards() -->
                     </div>
                 </div>
-
+ 
+            </div>
+ 
+            <!-- ═══════════════════════════════════════════════════════════
+            ATP RULES PAGE — injected inside .workspace, sibling of clonePage.
+            Two sub-views toggled by JS: #arListView (browse) and
+            #arFormView (create). Follows the same inline-page pattern as
+            Clone TPs above.
+            ════════════════════════════════════════════════════════════ -->
+            <div id="atpRulesPage">
+ 
+                <!-- ── LIST VIEW ────────────────────────────────────── -->
+                <div id="arListView">
+                    <div class="clone-page-header">
+                        <div class="clone-page-header-left">
+                            <span class="material-icons">rule</span>
+                            <span class="clone-page-header-title">ATP Rules</span>
+                            <span class="clone-page-header-badge" id="arRuleCount">0 rules</span>
+                        </div>
+                        <div class="clone-search-wrap">
+                            <span class="material-icons clone-search-icon">search</span>
+                            <input type="text" id="arSearchInput" class="clone-search-input"
+                                placeholder="Search rules by name or ATP…" oninput="_arApplySearch(this.value)" />
+                        </div>
+                        <button class="ar-new-btn" onclick="_arShowForm()">
+                            <span class="material-icons">add</span>
+                            New Rule
+                        </button>
+                    </div>
+ 
+                    <div class="clone-page-body">
+                        <div class="ar-rule-list" id="arRuleList">
+                            <!-- Rule rows injected by _arRenderList() -->
+                        </div>
+                        <div class="ar-empty-state" id="arEmptyState" style="display:none;">
+                            <span class="material-icons">rule_folder</span>
+                            <p>No ATP rules yet</p>
+                            <span>Create your first prerequisite rule for an Additional Tariff Plan.</span>
+                            <button class="ar-new-btn" onclick="_arShowForm()">
+                                <span class="material-icons">add</span>
+                                New Rule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+ 
+                <!-- ── CREATE FORM VIEW ─────────────────────────────── -->
+                <div id="arFormView" style="display:none;">
+                    <div class="clone-page-header">
+                        <div class="clone-page-header-left">
+                            <button class="ar-back-btn" onclick="_arShowList()">
+                                <span class="material-icons">arrow_back</span>
+                            </button>
+                            <span class="clone-page-header-title">New ATP Rule</span>
+                        </div>
+                    </div>
+ 
+                    <div class="clone-page-body">
+                        <div class="ar-form" id="arForm">
+ 
+                            <!-- Basics -->
+                            <div class="ar-card">
+                                <div class="ar-card-title">Basics</div>
+                                <div class="ar-field-row">
+                                    <div class="ar-field">
+                                        <label>Additional Tariff Plan Name <span class="ar-req">*</span></label>
+                                        <input type="text" id="arRuleName" class="ar-input"
+                                            placeholder="e.g. AdditionalIVS" />
+                                    </div>
+                                    <div class="ar-field ar-field-narrow">
+                                        <label>Extend Account Validity</label>
+                                        <div class="ar-segmented" id="arExtendValidity" data-value="no">
+                                            <button type="button" data-val="no" class="active">No</button>
+                                            <button type="button" data-val="yes">Yes</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+ 
+                            <!-- Prerequisite conditions -->
+                            <div class="ar-card">
+                                <div class="ar-card-title-row">
+                                    <div>
+                                        <div class="ar-card-title">Prerequisite Conditions</div>
+                                        <div class="ar-card-sub">This rule applies only when every condition below is
+                                            met.</div>
+                                    </div>
+                                    <button type="button" class="ar-add-row-btn" onclick="_arAddConditionRow()">
+                                        <span class="material-icons">add</span> Add Condition
+                                    </button>
+                                </div>
+                                <div class="ar-condition-list" id="arConditionList">
+                                    <!-- rows injected by _arAddConditionRow() -->
+                                </div>
+                                <div class="ar-condition-empty" id="arConditionEmpty">
+                                    No conditions added — this rule will always apply.
+                                </div>
+                            </div>
+ 
+                            <!-- ATPs to add / remove -->
+                            <div class="ar-field-row">
+                                <div class="ar-card ar-card-half">
+                                    <div class="ar-card-title">ATPs to Add</div>
+                                    <div class="ar-card-sub">Granted automatically when this rule fires.</div>
+                                    <div class="ar-tagselect" id="arAddSelect" data-target="add"></div>
+                                </div>
+                                <div class="ar-card ar-card-half">
+                                    <div class="ar-card-title">ATPs to Remove</div>
+                                    <div class="ar-card-sub">Revoked automatically when this rule fires.</div>
+                                    <div class="ar-tagselect" id="arRemoveSelect" data-target="remove"></div>
+                                </div>
+                            </div>
+ 
+                            <div class="ar-form-footer">
+                                <button type="button" class="ar-cancel-btn" onclick="_arShowList()">Cancel</button>
+                                <button type="button" class="ar-submit-btn" id="arSubmitBtn"
+                                    onclick="_arSubmit()">Submit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+ 
             </div>
         </main>
     </div>
-
+ 
     <!-- HIERARCHY MODAL -->
     <div id="treeModal" onclick="closeTree()">
         <div class="tree-card" onclick="event.stopPropagation()">
@@ -215,22 +343,23 @@
             <button class="tree-close-btn" onclick="closeTree()">Close Preview</button>
         </div>
     </div>
-
+ 
     <!-- <footer class="footer">
         <p>© 2026 XIUS</p>
     </footer> -->
-
+ 
     <script th:inline="javascript">
         const PRIVILEGE_IDS = /*[[${privilegeIds}]]*/[];
         const PRIVILEGES = /*[[${privileges}]]*/[];
         const USERNAME = /*[[${username}]]*/ 'User';
         const SESSION_ID = /*[[${sessionId}]]*/ '';
         const NETWORK_ID = /*[[${networkId}]]*/ null;
-
+ 
         console.log(PRIVILEGE_IDS);
     </script>
     <script th:src="@{/js/layout.js}"></script>
-
+    <script th:src="@{/js/atp-rules.js}"></script>
+ 
     <!-- DRAFT OVERLAY -->
     <div id="draftOverlay" class="draft-overlay">
         <div class="draft-panel" id="draftPanel">
@@ -252,7 +381,7 @@
             </div>
         </div>
     </div>
-
+ 
     <div id="savedOverlay" class="draft-overlay">
         <div class="draft-panel">
             <div class="draft-header">
@@ -271,16 +400,16 @@
             <div class="draft-content" id="savedOverlayList" style="height: calc(100% - 115px);"></div>
         </div>
     </div>
-
+ 
     <!-- ── Clone Tree Modal ───────────────────────────────────── -->
     <div id="cloneTreeModal" class="tp-modal-overlay" onclick="_cloneTreeOverlayClick(event)">
         <div class="tp-modal ctm-modal">
-
+ 
             <button class="tp-modal-close" onclick="closeCloneTree()">✕</button>
-
+ 
             <!-- Data panel injected by _renderCloneTree() -->
             <div id="cloneTreeBody" class="ctm-body"></div>
-
+ 
             <!-- Action buttons -->
             <div class="ctm-actions">
                 <button class="ctm-btn ctm-btn--cancel" onclick="_cloneTreeAction('cancel')">Cancel</button>
@@ -293,22 +422,22 @@
                         style="font-size:16px;vertical-align:middle;margin-right:4px;">file_copy</span>Clone
                 </button>
             </div>
-
+ 
         </div>
     </div>
-
+ 
     <!-- ── Filter Modal ───────────────────────────────────────── -->
     <div id="tpFilterModal" class="tp-modal-overlay" onclick="_filterOverlayClick(event)">
         <div class="tp-modal tp-filter-modal">
-
+ 
             <button class="tp-modal-close"
                 onclick="document.getElementById('tpFilterModal').classList.remove('active')">✕</button>
-
+ 
             <div class="ctm-header">
                 <span class="material-icons ctm-header-icon">tune</span>
                 <span class="ctm-header-title">Plan Filters</span>
             </div>
-
+ 
             <!-- category -->
             <div class="tpf-section-label">category</div>
             <div class="tpf-chip-row" id="tpf-category">
@@ -317,7 +446,7 @@
                 <button class="tpf-chip" data-val="SMS" onclick="_tpfChip(this,'category')">SMS</button>
                 <button class="tpf-chip" data-val="DATA" onclick="_tpfChip(this,'category')">Data</button>
             </div>
-
+ 
             <!-- validity -->
             <div class="tpf-section-label" style="margin-top:22px">validity</div>
             <div class="tpf-chip-row" id="tpf-validity">
@@ -326,14 +455,14 @@
                 <button class="tpf-chip" data-val="84" onclick="_tpfChip(this,'validity')">84 Days</button>
                 <button class="tpf-chip" data-val="365" onclick="_tpfChip(this,'validity')">365 Days</button>
             </div>
-
+ 
             <!-- price sort -->
             <div class="tpf-section-label" style="margin-top:22px">price</div>
             <div class="tpf-chip-row" id="tpf-price">
                 <button class="tpf-chip" data-val="asc" onclick="_tpfChip(this,'price')">low to high</button>
                 <button class="tpf-chip" data-val="desc" onclick="_tpfChip(this,'price')">high to low</button>
             </div>
-
+ 
             <!-- footer -->
             <div class="tpf-footer">
                 <button class="tpf-clear-btn" onclick="_tpfClearAll()">clear all</button>
@@ -341,17 +470,17 @@
             </div>
         </div>
     </div>
-
+ 
     <div id="tpDetailsModal" class="tp-modal-overlay">
         <div class="tp-modal">
             <button class="tp-modal-close" onclick="closeTpDetails()">
                 ✕
             </button>
-
+ 
             <div id="tpModalContent"></div>
         </div>
     </div>
-
+ 
     <!-- APPROVED TPs OVERLAY -->
     <div id="approvedOverlay" class="draft-overlay">
         <div class="draft-panel">
@@ -372,7 +501,7 @@
             <div class="draft-content" id="approvedOverlayList" style="height: calc(100% - 115px);"></div>
         </div>
     </div>
-
+ 
     <!-- REJECTED TPs OVERLAY -->
     <div id="rejectedOverlay" class="draft-overlay">
         <div class="draft-panel">
@@ -392,7 +521,7 @@
             <div class="draft-content" id="rejectedOverlayList" style="height: calc(100% - 115px);"></div>
         </div>
     </div>
-
+ 
 </body>
-
+ 
 </html>

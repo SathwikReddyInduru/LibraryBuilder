@@ -118,6 +118,28 @@ public List<ServicePlanPackMap> getTpPlans(
         return service.getDAtpPlans(networkId, types);
     }
 
+
+    // @GetMapping("/builder/step3/cafilter")
+    // public String getCaAtps(@RequestParam String types, HttpSession session) {
+    //     Long networkId = (Long) session.getAttribute("networkId");
+    //     logger.info("Fetching DATP plans networkId={} types={}", networkId, types);
+    //      return service.getCaAtps(networkId, types);
+    // }
+
+     @GetMapping("/builder/step4/cafilter")
+public List<ServicePlanPackMap> getCaAtps(
+        @RequestParam(required = false) Long networkId,
+        @RequestParam String types,
+        HttpSession session) {
+
+    if (networkId == null) {
+        networkId = (Long) session.getAttribute("networkId");
+    }
+
+     logger.info("Fetching TP plans networkId={} types={}", networkId, types);
+    return service.getCaAtps(networkId, types);
+}
+    
     @GetMapping("/builder/step4/filter")
     public List<ServicePlanPackMap> getAAtpPlans(@RequestParam String types, HttpSession session) {
 
@@ -162,20 +184,20 @@ public List<ServicePlanPackMap> getTpPlans(
      * POST /clone/validate
      * Validates tpName and publicityId before a modify-mode clone.
      */
-    @PostMapping("/clone/validate")
-    public ResponseEntity<Map<String, Object>> validateClone(
-            @RequestBody Map<String, Object> requestBody) {
+    // @PostMapping("/clone/validate")
+    // public ResponseEntity<Map<String, Object>> validateClone(
+    //         @RequestBody Map<String, Object> requestBody) {
 
-        Long networkId = Long.valueOf(requestBody.get("networkId").toString());
-        String tpName = requestBody.get("tpName").toString();
-        String publicityId = requestBody.get("publicityId").toString();
+    //     Long networkId = Long.valueOf(requestBody.get("networkId").toString());
+    //     String tpName = requestBody.get("tpName").toString();
+    //     String publicityId = requestBody.get("publicityId").toString();
 
-        logger.info("Clone validate request networkId={} tpName={} publicityId={}", networkId, tpName, publicityId);
+    //     logger.info("Clone validate request networkId={} tpName={} publicityId={}", networkId, tpName, publicityId);
 
-        Map<String, Object> result = tariffApprovalService.validateClone(networkId, tpName, publicityId);
+    //     Map<String, Object> result = tariffApprovalService.validateClone(networkId, tpName, publicityId);
 
-        return ResponseEntity.ok(result);
-    }
+    //     return ResponseEntity.ok(result);
+    // }
 
     /*
      * POST /clone

@@ -18,99 +18,96 @@ public class ServicePlanService {
 	@Qualifier("oracleJdbcTemplate")
 	private final JdbcTemplate jdbcTemplate;
 
-
 	ServicePlanService(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
 	}
-public List<ServicePlanPackMap> getPlans(Long networkId, String types) {
 
+	public List<ServicePlanPackMap> getPlans(Long networkId, String types) {
 
 		logger.info("Fetching TP plans networkId={} types={}", networkId, types);
-    if ("B".equalsIgnoreCase(types)) {
-        return getBillingPlans(networkId);
-    }
+		if ("B".equalsIgnoreCase(types)) {
+			return getBillingPlans(networkId);
+		}
 
-    String sql = """
-			SELECT *
-				FROM (
-				    SELECT
-				        x.service_package_id AS SERVICE_PACKAGE_ID,
-				        x.service_package_desc AS SERVICE_PACKAGE_NAME,
-				        x.network_id AS NETWORK_ID,
-				        'TP' AS TARIFF_PLAN_TYPE,
-				        LISTAGG(x.type_of_service, ',')
-				            WITHIN GROUP (ORDER BY x.type_of_service) AS SERVICE_TYPES
-				    FROM (
-				        SELECT DISTINCT
-				            spkg.service_package_id,
-				            spkg.service_package_desc,
-				            spkg.network_id,
-				            spl.type_of_service
-				        FROM cs_rat_service_package spkg
-				        JOIN cs_rat_service_plan_package spp
-				            ON spkg.service_package_id = spp.service_package_id
-				           AND spkg.network_id = spp.network_id
-				        JOIN cs_rat_service_plans spl
-				            ON spp.service_plan_id = spl.service_plan_id
-				           AND spp.network_id = spl.network_id
-				        WHERE spkg.network_id = ?
-				          AND spkg.add_pack_yn = 'N'
-				          AND spl.type_of_service IN (1,2,3)
-				          AND NOT REGEXP_LIKE(
-				                spkg.service_package_desc,
-				                '_(TP|CL|ATP)[0-9]+$'
-				          )
-				    ) x
-				    GROUP BY
-				        x.service_package_id,
-				        x.service_package_desc,
-				        x.network_id
-				)
-				WHERE SERVICE_TYPES = ?
-								            """;
-    return map(sql, networkId, types);
-}
-
-	
+		String sql = """
+				SELECT *
+					FROM (
+					    SELECT
+					        x.service_package_id AS SERVICE_PACKAGE_ID,
+					        x.service_package_desc AS SERVICE_PACKAGE_NAME,
+					        x.network_id AS NETWORK_ID,
+					        'TP' AS TARIFF_PLAN_TYPE,
+					        LISTAGG(x.type_of_service, ',')
+					            WITHIN GROUP (ORDER BY x.type_of_service) AS SERVICE_TYPES
+					    FROM (
+					        SELECT DISTINCT
+					            spkg.service_package_id,
+					            spkg.service_package_desc,
+					            spkg.network_id,
+					            spl.type_of_service
+					        FROM cs_rat_service_package spkg
+					        JOIN cs_rat_service_plan_package spp
+					            ON spkg.service_package_id = spp.service_package_id
+					           AND spkg.network_id = spp.network_id
+					        JOIN cs_rat_service_plans spl
+					            ON spp.service_plan_id = spl.service_plan_id
+					           AND spp.network_id = spl.network_id
+					        WHERE spkg.network_id = ?
+					          AND spkg.add_pack_yn = 'N'
+					          AND spl.type_of_service IN (1,2,3)
+					          AND NOT REGEXP_LIKE(
+					                spkg.service_package_desc,
+					                '_(TP|CL|ATP)[0-9]+$'
+					          )
+					    ) x
+					    GROUP BY
+					        x.service_package_id,
+					        x.service_package_desc,
+					        x.network_id
+					)
+					WHERE SERVICE_TYPES = ?
+									            """;
+		return map(sql, networkId, types);
+	}
 
 	public List<ServicePlanPackMap> getBillingPlans(Long networkId) {
 
-    String sql = """
-        SELECT DISTINCT
-            spkg.service_package_id AS SERVICE_PACKAGE_ID,
-            spkg.service_package_desc AS SERVICE_PACKAGE_NAME,
-            spkg.network_id AS NETWORK_ID,
-            'TP' AS TARIFF_PLAN_TYPE,
-            'B' AS SERVICE_TYPES
-        FROM cs_rat_service_package spkg
-        JOIN cs_rat_service_plan_package spp
-            ON spkg.service_package_id = spp.service_package_id
-           AND spkg.network_id = spp.network_id
-        JOIN cs_rat_service_plans spl
-            ON spp.service_plan_id = spl.service_plan_id
-           AND spp.network_id = spl.network_id
-        WHERE spkg.network_id = ?
-          AND spkg.add_pack_yn = 'N'
-          AND spl.service_plan_type = 'B'
-          AND NOT REGEXP_LIKE(
-                spkg.service_package_desc,
-                '_(TP|CL|ATP)[0-9]+$'
-          )
-        """;
+		String sql = """
+				SELECT DISTINCT
+				    spkg.service_package_id AS SERVICE_PACKAGE_ID,
+				    spkg.service_package_desc AS SERVICE_PACKAGE_NAME,
+				    spkg.network_id AS NETWORK_ID,
+				    'TP' AS TARIFF_PLAN_TYPE,
+				    'B' AS SERVICE_TYPES
+				FROM cs_rat_service_package spkg
+				JOIN cs_rat_service_plan_package spp
+				    ON spkg.service_package_id = spp.service_package_id
+				   AND spkg.network_id = spp.network_id
+				JOIN cs_rat_service_plans spl
+				    ON spp.service_plan_id = spl.service_plan_id
+				   AND spp.network_id = spl.network_id
+				WHERE spkg.network_id = ?
+				  AND spkg.add_pack_yn = 'N'
+				  AND spl.service_plan_type = 'B'
+				  AND NOT REGEXP_LIKE(
+				        spkg.service_package_desc,
+				        '_(TP|CL|ATP)[0-9]+$'
+				  )
+				""";
 
-    return jdbcTemplate.query(sql, (rs, rowNum) -> {
+		return jdbcTemplate.query(sql, (rs, rowNum) -> {
 
-        ServicePlanPackMap s = new ServicePlanPackMap();
-        s.setServicePackageId(rs.getString("SERVICE_PACKAGE_ID"));
-        s.setServicePackageName(rs.getString("SERVICE_PACKAGE_NAME"));
-        s.setNetworkId(rs.getInt("NETWORK_ID"));
-        s.setTariffPlanType(rs.getString("TARIFF_PLAN_TYPE"));
-        s.setServiceTypes(rs.getString("SERVICE_TYPES"));
+			ServicePlanPackMap s = new ServicePlanPackMap();
+			s.setServicePackageId(rs.getString("SERVICE_PACKAGE_ID"));
+			s.setServicePackageName(rs.getString("SERVICE_PACKAGE_NAME"));
+			s.setNetworkId(rs.getInt("NETWORK_ID"));
+			s.setTariffPlanType(rs.getString("TARIFF_PLAN_TYPE"));
+			s.setServiceTypes(rs.getString("SERVICE_TYPES"));
 
-        return s;
+			return s;
 
-    }, networkId);
-}
+		}, networkId);
+	}
 
 	public List<ServicePlanPackMap> getDAtpPlans(Long networkId, String types) {
 
@@ -216,6 +213,50 @@ public List<ServicePlanPackMap> getPlans(Long networkId, String types) {
 				)
 				WHERE SERVICE_TYPES = ?
 				""";
+
+		return map(sql, networkId, types);
+	}
+
+	public List<ServicePlanPackMap> getCaAtps(Long networkId, String types) {
+
+		logger.info("Fetching CAATP plans networkId={} types={}", networkId, types);
+
+		String sql = """
+								SELECT *
+  FROM (SELECT   x.service_package_id AS service_package_id,
+                 x.service_package_desc AS service_package_name,
+                 x.network_id AS network_id, 'ATP' AS tariff_plan_type,
+                 LISTAGG(x.service_type, ',')
+                  WITHIN GROUP (ORDER BY x.sort_order) AS SERVICE_TYPES
+        FROM     (SELECT DISTINCT c.service_package_id,
+                                  c.service_package_desc, c.network_id,
+                           CASE LOWER(ca_package_unit_type)
+                                WHEN 'sec' THEN '1'
+                                WHEN 'msg' THEN '2'
+                                WHEN 'kb' THEN '3'
+                                WHEN 'service' THEN '4'
+                                WHEN 'iptv' THEN '5'
+                                END AS service_type,
+                            CASE LOWER(ca_package_unit_type)
+                                 WHEN 'sec' THEN 1
+                                WHEN 'msg' THEN 2
+                                WHEN 'kb' THEN 3
+                                WHEN 'service' THEN 4
+                                WHEN 'iptv' THEN 5
+                    END AS sort_order
+                             FROM ca_package_service_units a,
+                                  cs_add_svcpack_ca_pkg_map b,
+                                  cs_rat_service_package c
+                            WHERE a.ca_package_id = b.ca_package_id
+                              AND b.service_package_id = c.service_package_id
+                              AND c.network_id = ?
+                              AND c.atp_category = 'CA'
+                              AND NOT REGEXP_LIKE (c.service_package_desc,
+                                                   '_(TP|CL|ATP)[0-9]+$'
+                                                  )) x
+        GROUP BY x.service_package_id, x.service_package_desc, x.network_id)
+WHERE service_types = ?
+								""";
 
 		return map(sql, networkId, types);
 	}
