@@ -46,9 +46,14 @@ public class TariffApprovalService {
 
 	private final RcAtpRechargeService rcAtpRechargeService;
 
-	private final SeriesGeneratorService seriesGeneratorService;	
+	private final SeriesGeneratorService seriesGeneratorService;
 
-	TariffApprovalService(JdbcTemplate jdbcTemplate, JsonStorage jsonStorage, ServiceCloneService serviceCloneService, BundleService bundleService, SaveConfigDao saveConfigDao, ServiceplanZone servicePlanZone, PlatformTransactionManager transactionManager, RcAtpRechargeService rcAtpRechargeService, SeriesGeneratorService seriesGeneratorService) {
+	private final HlrCodeMappingService hlrCodeMappingService;
+
+	TariffApprovalService(JdbcTemplate jdbcTemplate, JsonStorage jsonStorage, ServiceCloneService serviceCloneService,
+			BundleService bundleService, SaveConfigDao saveConfigDao, ServiceplanZone servicePlanZone,
+			PlatformTransactionManager transactionManager, RcAtpRechargeService rcAtpRechargeService,
+			SeriesGeneratorService seriesGeneratorService, HlrCodeMappingService hlrCodeMappingService) {
 		this.jdbcTemplate = jdbcTemplate;
 		this.jsonStorage = jsonStorage;
 		this.serviceCloneService = serviceCloneService;
@@ -58,6 +63,7 @@ public class TariffApprovalService {
 		this.transactionManager = transactionManager;
 		this.rcAtpRechargeService = rcAtpRechargeService;
 		this.seriesGeneratorService = seriesGeneratorService;
+		this.hlrCodeMappingService = hlrCodeMappingService;
 	}
 
 	// =====================================================
@@ -193,7 +199,6 @@ public class TariffApprovalService {
 		clonedData.put("publicityId", clonedPublicityId);
 		clonedData.put("tariffPackageDesc", clonedTpName);
 
-
 		DefaultTransactionDefinition def = new DefaultTransactionDefinition();
 		def.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
 		TransactionStatus status = transactionManager.getTransaction(def);
@@ -281,8 +286,6 @@ public class TariffApprovalService {
 		return max + 1;
 	}
 
-	
-
 	// =====================================================
 	// REJECT TARIFF
 	// =====================================================
@@ -314,14 +317,11 @@ public class TariffApprovalService {
 	private Map<String, Object> executeTariffCreation(Map<String, Object> data, String tpName, Long networkId,
 			String username) {
 
-
-
 		int tpSuffixNumber = seriesGeneratorService.resolveNextTpSuffixNumber();
 		String tpSuffix = "TP" + tpSuffixNumber;
 		Date startDate = Date.valueOf(LocalDate.parse(data.get("startDate").toString(), formatter));
 
 		Date endDate = Date.valueOf(LocalDate.parse(data.get("endDate").toString(), formatter));
-
 
 		int atpSuffixCounter = seriesGeneratorService.resolveNextAtpSuffixNumber();
 
@@ -337,8 +337,8 @@ public class TariffApprovalService {
 			}
 			ServiceCloneService.PlanZoneInfo oldPlanZoneInfo = serviceCloneService.getPlanZoneInfo(oldPlanId);
 			Long oldPlanZoneId = serviceCloneService.resolveOldPlanZoneId(oldPlanId, oldPlanZoneInfo);
-			ServiceplanZone.ZoneTable planZoneTable =
-					servicePlanZone.resolveZoneTableByTypeOfService(oldPlanZoneInfo.getTypeOfService());
+			ServiceplanZone.ZoneTable planZoneTable = servicePlanZone
+					.resolveZoneTableByTypeOfService(oldPlanZoneInfo.getTypeOfService());
 
 			// ── STEP 2 ──────────────────────────────────────────────────────
 			List<Map<String, Object>> defaultAtps = (List<Map<String, Object>>) data.get("defaultAtps");
@@ -396,7 +396,8 @@ public class TariffApprovalService {
 			}
 
 			// ── STEP 4 ──────────────────────────────────────────────────────
-			CloneServiceResult serviceResult = serviceCloneService.cloneService(networkId,oldServicePackageId,tpSuffix,newPlanZoneId,startDate,endDate);
+			CloneServiceResult serviceResult = serviceCloneService.cloneService(networkId, oldServicePackageId,
+					tpSuffix, newPlanZoneId, startDate, endDate);
 
 			Long newServicePackageId = serviceResult.getNewPackageId();
 			Long newServicePlanId = serviceResult.getNewPlanId();
@@ -411,7 +412,6 @@ public class TariffApprovalService {
 
 			java.util.Set<Long> caAtpIds = new java.util.HashSet<>();
 
-	
 			List<Map<String, Object>> caAtps = (List<Map<String, Object>>) data.get("caAtps");
 			boolean hasCaAtps = caAtps != null && !caAtps.isEmpty();
 			Map<Long, Map<String, Object>> caAtpsBySourceAtpId = new HashMap<>();
@@ -435,10 +435,12 @@ public class TariffApprovalService {
 						atp.put("chargeId", chargeId);
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
-						CloneAtpResult atpResult =bundleService.cloneAtpData( oldAtpId, networkId, atpSuffix, newBucketZoneId, startDate, endDate, caAtpsBySourceAtpId.get(oldAtpId));
+						CloneAtpResult atpResult = bundleService.cloneAtpData(oldAtpId, networkId, atpSuffix,
+								newBucketZoneId, startDate, endDate, caAtpsBySourceAtpId.get(oldAtpId));
 
 						defaultAtpIds.add(atpResult.getNewAtpId());
 						newAtpIds.add(atpResult.getNewAtpId());
+
 						if (atpResult.isCaAtp()) {
 							caAtpIds.add(atpResult.getNewAtpId());
 						}
@@ -457,11 +459,21 @@ public class TariffApprovalService {
 						Long oldAtpId = Long.valueOf(atp.get("servicePackageId").toString());
 
 						CloneAtpResult atpResult = bundleService.cloneAtpData(
-								oldAtpId, networkId, atpSuffix, newBucketZoneId,startDate,endDate, caAtpsBySourceAtpId.get(oldAtpId));
+								oldAtpId, networkId, atpSuffix, newBucketZoneId, startDate, endDate,
+								caAtpsBySourceAtpId.get(oldAtpId));
 
 						allowedAtpIds.add(atpResult.getNewAtpId());
 						allowedAtpSource.add(atp);
 						newAtpIds.add(atpResult.getNewAtpId());
+
+						Object serviceCode = atp.get("serviceCode");
+
+						if (serviceCode != null && !serviceCode.toString().trim().isEmpty()) {
+							hlrCodeMappingService.insertHlrCodeMapping(
+									networkId,
+									atpResult.getNewAtpId(),
+									Long.valueOf(serviceCode.toString().trim()));
+						}
 						if (atpResult.isCaAtp()) {
 							caAtpIds.add(atpResult.getNewAtpId());
 						}
@@ -475,7 +487,6 @@ public class TariffApprovalService {
 				logger.info("No ATPs present. Skipping bundle and bucket clone.");
 			}
 
-		
 			if (hasCaAtps) {
 				for (Map<String, Object> caAtp : caAtps) {
 					String atpSuffix = "ATP" + atpSuffixCounter++;
@@ -549,9 +560,8 @@ public class TariffApprovalService {
 						""", tariffId, data.get("tariffPackageDesc"), networkId,
 						Date.valueOf(LocalDate.parse(data.get("endDate").toString(), formatter)),
 						data.get("publicityId"), data.get("packageType"), convertYN(data.get("isCorporateYn")),
-						data.get("tariffPackCategory"), newChargeId, Date.valueOf(LocalDate.parse(data.get("startDate").toString(), formatter)));
-
-
+						data.get("tariffPackCategory"), newChargeId,
+						Date.valueOf(LocalDate.parse(data.get("startDate").toString(), formatter)));
 
 			} catch (Exception ex) {
 
@@ -592,7 +602,6 @@ public class TariffApprovalService {
 				throw new TariffInsertException("STEP 9", "CS_RAT_TARIFF_SERVICE_PACK_MAP", ex);
 			}
 
-			
 			int datpIdx = 0;
 			for (Long atpId : defaultAtpIds) {
 				Object priorityObj = defaultAtps.get(defaultAtpIds.indexOf(atpId)).get("priority");
@@ -613,7 +622,7 @@ public class TariffApprovalService {
 								EFFECTIVE_START_OFFSET
 							)
 							values (?,?,?,?,?,?,?,?)
-							""", tariffId, atpId, networkId, "DATP", atpChargeId, priorityValue, 30,0);
+							""", tariffId, atpId, networkId, "DATP", atpChargeId, priorityValue, 30, 0);
 				} catch (Exception ex) {
 					throw new TariffInsertException("STEP 10", "CS_RAT_TARIFF_SERVICE_PACK_MAP(DATP)", ex);
 				}
@@ -640,17 +649,15 @@ public class TariffApprovalService {
 								EFFECTIVE_START_OFFSET
 							)
 							values (?,?,?,?,?,?,?,?)
-							""", tariffId, atpId, networkId, "RCATP", atpChargeId, priorityValue, 30,0);
+							""", tariffId, atpId, networkId, "RCATP", atpChargeId, priorityValue, 30, 0);
 				} catch (Exception ex) {
 					throw new TariffInsertException("STEP 10", "CS_RAT_TARIFF_SERVICE_PACK_MAP(RCATP)", ex);
 				}
 				aatpIdx++;
 			}
-            
-			
+
 			if (!allowedAtpIds.isEmpty()) {
 
-				
 				List<Map<String, Object>> rcAtpPayload = new ArrayList<>();
 				for (int i = 0; i < allowedAtpIds.size(); i++) {
 					Map<String, Object> rcEntry = new HashMap<>();
@@ -668,7 +675,7 @@ public class TariffApprovalService {
 						tariffId,
 						tpName,
 						networkId,
-						rcAtpPayload,startDate,endDate);
+						rcAtpPayload, startDate, endDate);
 			}
 
 			Map<String, Object> response = new HashMap<>();

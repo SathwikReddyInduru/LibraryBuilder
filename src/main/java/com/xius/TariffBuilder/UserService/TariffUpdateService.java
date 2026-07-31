@@ -253,6 +253,7 @@ public class TariffUpdateService {
                     if (row.getServicePackageId() != null
                             && seenAllowedAtpIds.add(row.getServicePackageId())) {
                         Map<String, Object> atpMap = buildAtpMap(row);
+                        atpMap.put("serviceCode", getServiceCode(row.getServicePackageId(), networkId));
 
                         Map<String, Object> caAtpMap = buildCaAtpMap(row.getServicePackageId(), networkId, atpMap);
                         if (caAtpMap != null) {
@@ -305,6 +306,27 @@ public class TariffUpdateService {
         return atp;
     }
 
+  
+    private String getServiceCode(Long atpId, Long networkId) {
+
+        List<String> codes = jdbcTemplate.queryForList("""
+                SELECT HLR_CODE
+                FROM CS_HLRCODE_ATP_MAP
+                WHERE ATP_ID = ?
+                  AND NETWORK_ID = ?
+                """, String.class, atpId, networkId);
+
+        if (codes.isEmpty()) {
+            return null;
+        }
+        if (codes.size() > 1) {
+            logger.warn("Multiple HLR_CODE rows found for atpId={} networkId={} — using the first one",
+                    atpId, networkId);
+        }
+        return codes.get(0);
+    }
+
+   
     private Map<String, Object> buildCaAtpMap(Long servicePackageId, Long networkId,
             Map<String, Object> atpFields) {
 
@@ -348,7 +370,7 @@ public class TariffUpdateService {
         Object startDate = caPkg.get("packageStartDate");
         caAtp.put("packageStartDate", startDate != null ? startDate.toString().substring(0, 10) : "");
 
-     List<ServiceMapping> serviceMappings = jdbcTemplate.query(
+        List<ServiceMapping> serviceMappings = jdbcTemplate.query(
     """
     SELECT
         CA_SERVICE_ID AS serviceId,
@@ -370,22 +392,7 @@ public class TariffUpdateService {
     },
     caPackageId
 );
-
-caAtp.put("serviceMappings", serviceMappings);
-
-        List<Object> deviceGroupIds = jdbcTemplate.queryForList("""
-                SELECT DEVICE_GROUP_ID
-                FROM CA_PKG_DEVICE_GROUPS_MAP
-                WHERE CA_PACKAGE_ID = ?
-                """, Object.class, caPackageId);
-        caAtp.put("deviceGroupIds", deviceGroupIds);
-
-        List<Object> dataZoneGroupIds = jdbcTemplate.queryForList("""
-                SELECT DATA_ZONE_GROUP_ID
-                FROM CA_PKG_DATA_ZONE_GROUPS_MAP
-                WHERE CA_PACKAGE_ID = ?
-                """, Object.class, caPackageId);
-        caAtp.put("dataZoneGroupIds", dataZoneGroupIds);
+        caAtp.put("serviceMappings", serviceMappings);
 
         return caAtp;
     }

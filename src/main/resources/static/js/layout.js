@@ -459,14 +459,17 @@ function setModuleUI(module) {
   // ── Active node highlight ──
   const cloneNode = document.getElementById("mn-clone");
   const atpRulesNode = document.getElementById("mn-atprules");
+  const atpRateNode = document.getElementById("mn-atprate");
   if (builderNode) builderNode.classList.toggle("active", module === "builder");
   if (approverNode)
     approverNode.classList.toggle("active", module === "approver");
   if (cloneNode) cloneNode.classList.toggle("active", module === "clone");
   if (atpRulesNode)
     atpRulesNode.classList.toggle("active", module === "atprules");
+  if (atpRateNode)
+    atpRateNode.classList.toggle("active", module === "atprate");
 
-  if (module === "clone" || module === "atprules") {
+  if (module === "clone" || module === "atprules" || module === "atprate") {
     if (stepRail) stepRail.classList.add("collapsed");
     if (sidebar) sidebar.classList.add("collapsed");
     if (footerActions) footerActions.style.display = "none";
@@ -2514,6 +2517,13 @@ function openClone() {
   if (atpPage) {
     atpPage.classList.remove("visible");
     atpPage.style.display = "none";
+  }
+
+  // Same deal for the ATP Rate page.
+  const atpRatePage = document.getElementById("atpRatePage");
+  if (atpRatePage) {
+    atpRatePage.classList.remove("visible");
+    atpRatePage.style.display = "none";
   }
 
   // 1. Hide the normal workspace content (like admin mode does)

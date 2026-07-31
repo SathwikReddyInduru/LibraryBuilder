@@ -10,10 +10,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xius.TariffBuilder.Dto.ServicePackageDetailDto;
+import com.xius.TariffBuilder.Dto.ServicePackageDetailRequest;
 import com.xius.TariffBuilder.Dto.ServicePackageDto;
 import com.xius.TariffBuilder.Dto.ServicePackageDto1;
 import com.xius.TariffBuilder.UserService.ServicePackage1;
@@ -86,5 +90,18 @@ public class ServicePackageController {
 
 	        return ResponseEntity.ok(response);
 	    }
-	}
+	
 
+ @PostMapping("/service-package-detail")
+public ResponseEntity<ServicePackageDetailDto> getServicePackageDetail(
+        @RequestBody ServicePackageDetailRequest request) {
+
+    //logger.info("POST /service-plans/service-package-detail called with networkId={}, servicePackageId={}, monthYear={}",
+           // request.getNetworkId(), request.getServicePackageId(), request.getMonthYear());
+
+    ServicePackageDetailDto response = servicePackageService.getServicePackageDetail(
+            request.getNetworkId(), request.getServicePackageId(), request.getMonthYear());
+
+    return ResponseEntity.ok(response);
+} 
+ }

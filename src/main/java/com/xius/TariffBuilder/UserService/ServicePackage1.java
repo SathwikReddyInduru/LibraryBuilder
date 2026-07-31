@@ -6,10 +6,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
-// import com.xius.TariffBuilder.Dto.ServicePackageDetailDto;
+import com.xius.TariffBuilder.Dto.ServicePackageDetailDto;
 import com.xius.TariffBuilder.Dto.ServicePackageDto;
 import com.xius.TariffBuilder.Dto.ServicePackageDto1;
 
@@ -125,62 +129,60 @@ public class ServicePackage1 {
 	        throw ex;
 	    }
 	}
-	
-//	 public ServicePackageDetailDto getServicePackageDetail(Long networkId, Long servicePackageId, String monthYear) {
-//
-//	        if (networkId == null || networkId <= 0) {
-//	            throw new IllegalArgumentException("Invalid networkId");
-//	        }
-//	        if (servicePackageId == null || servicePackageId <= 0) {
-//	            throw new IllegalArgumentException("Invalid servicePackageId");
-//	        }
-//	        if (monthYear == null || monthYear.isBlank()) {
-//	            throw new IllegalArgumentException("Invalid monthYear");
-//	        }
-//
-//	        String sql = """
-//	                SELECT
-//	                    A.SERVICE_PACKAGE_DESC,
-//	                    B.ACTIVATION_FEE
-//	                FROM CS_RAT_SERVICE_PACKAGE A,
-//	                     CS_RAT_PERIODIC_CHARGE_INFO B,
-//	                     CS_RAT_PERD_CHARGE_INFO_ATP_MONTH C
-//	                WHERE A.SERVICE_PACKAGE_ID = C.ATP_ID
-//	                  AND B.CHARGE_ID = C.CHARGE_ID
-//	                  AND A.NETWORK_ID = B.NETWORK_ID
-//	                  AND A.NETWORK_ID = ?
-//	                  AND A.SERVICE_PACKAGE_ID = ?
-//	                  AND TO_CHAR(C.START_DATE, 'MMYYYY') = ?
-//	                """;
-//
-//	        try {
-//	            logger.info("Fetching service package detail for networkId={}, servicePackageId={}, monthYear={}",
-//	                    networkId, servicePackageId, monthYear);
-//
-//	            ServicePackageDetailDto result = jdbcTemplate.queryForObject(sql,
-//	                    new Object[] { networkId, servicePackageId, monthYear },
-//	                    (rs, rowNum) -> {
-//	                        ServicePackageDetailDto dto = new ServicePackageDetailDto();
-//	                        dto.setServicePackageDesc(rs.getString("SERVICE_PACKAGE_DESC"));
-//	                        dto.setActivationFee(rs.getBigDecimal("ACTIVATION_FEE"));
-//	                        return dto;
-//	                    });
-//
-//	            logger.info("Fetched service package detail for networkId={}, servicePackageId={}", networkId, servicePackageId);
-//
-//	            return result;
-//
-//	        } catch (EmptyResultDataAccessException ex) {
-//	            logger.warn("No data found for networkId={}, servicePackageId={}, monthYear={}",
-//	                    networkId, servicePackageId, monthYear);
-//	            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "NO DATA FOUND");
-//
-//	        } catch (DataAccessException ex) {
-//	            logger.error("Error fetching service package detail for networkId={}, servicePackageId={}",
-//	                    networkId, servicePackageId, ex);
-//	            throw ex;
-//	        }
-//	    }
-}
 
-	
+	 public ServicePackageDetailDto getServicePackageDetail(Long networkId, Long servicePackageId, String monthYear) {
+
+	        if (networkId == null || networkId <= 0) {
+	            throw new IllegalArgumentException("Invalid networkId");
+	        }
+	        if (servicePackageId == null || servicePackageId <= 0) {
+	            throw new IllegalArgumentException("Invalid servicePackageId");
+	        }
+	        if (monthYear == null || monthYear.isBlank()) {
+	            throw new IllegalArgumentException("Invalid monthYear");
+	        }
+
+	        String sql = """
+	                SELECT
+	                    A.SERVICE_PACKAGE_DESC,
+	                    B.ACTIVATION_FEE
+	                FROM CS_RAT_SERVICE_PACKAGE A,
+	                     CS_RAT_PERIODIC_CHARGE_INFO B,
+	                     CS_RAT_PERD_CHARGE_INFO_ATP_MONTH C
+	                WHERE A.SERVICE_PACKAGE_ID = C.ATP_ID
+	                  AND B.CHARGE_ID = C.CHARGE_ID
+	                  AND A.NETWORK_ID = B.NETWORK_ID
+	                  AND A.NETWORK_ID = ?
+	                  AND A.SERVICE_PACKAGE_ID = ?
+	                  AND TO_CHAR(C.START_DATE, 'MMYYYY') = ?
+	                """;
+
+	        try {
+	            logger.info("Fetching service package detail for networkId={}, servicePackageId={}, monthYear={}",
+	                    networkId, servicePackageId, monthYear);
+
+	            ServicePackageDetailDto result = jdbcTemplate.queryForObject(sql,
+	                    new Object[] { networkId, servicePackageId, monthYear },
+	                    (rs, rowNum) -> {
+	                        ServicePackageDetailDto dto = new ServicePackageDetailDto();
+	                        dto.setServicePackageDesc(rs.getString("SERVICE_PACKAGE_DESC"));
+	                        dto.setActivationFee(rs.getBigDecimal("ACTIVATION_FEE"));
+	                        return dto;
+	                    });
+
+	            logger.info("Fetched service package detail for networkId={}, servicePackageId={}", networkId, servicePackageId);
+
+	            return result;
+
+	        } catch (EmptyResultDataAccessException ex) {
+	            logger.warn("No data found for networkId={}, servicePackageId={}, monthYear={}",
+	                    networkId, servicePackageId, monthYear);
+	            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "NO DATA FOUND");
+
+	        } catch (DataAccessException ex) {
+	            logger.error("Error fetching service package detail for networkId={}, servicePackageId={}",
+	                    networkId, servicePackageId, ex);
+	            throw ex;
+	        }
+	    }
+}

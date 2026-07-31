@@ -23,6 +23,7 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 import com.xius.TariffBuilder.UserService.BundleService.CloneAtpResult;
 import com.xius.TariffBuilder.UserService.ServiceCloneService.CloneServiceResult;
 import com.xius.TariffBuilder.exception.TariffInsertException;
+import com.xius.TariffBuilder.UserService.HlrCodeMappingService;
 
 @Service
 public class TariffPackageSyncService {
@@ -46,6 +47,7 @@ public class TariffPackageSyncService {
     private final RcAtpRechargeService rcAtpRechargeService;
     private final SeriesGeneratorService seriesGeneratorService;
     private final CaPackageService caPackageService;
+    private final HlrCodeMappingService hlrCodeMappingService;
 
     TariffPackageSyncService(JdbcTemplate jdbcTemplate,
             PlatformTransactionManager transactionManager,
@@ -54,7 +56,7 @@ public class TariffPackageSyncService {
             ServiceplanZone servicePlanZone,
             RcAtpRechargeService rcAtpRechargeService,
             SeriesGeneratorService seriesGeneratorService,
-            CaPackageService caPackageService) {
+            CaPackageService caPackageService,HlrCodeMappingService hlrCodeMappingService) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactionManager = transactionManager;
         this.serviceCloneService = serviceCloneService;
@@ -63,13 +65,15 @@ public class TariffPackageSyncService {
         this.rcAtpRechargeService = rcAtpRechargeService;
         this.seriesGeneratorService = seriesGeneratorService;
         this.caPackageService = caPackageService;
+        this.hlrCodeMappingService = hlrCodeMappingService;
     }
 
     // =====================================================================
     // ENTRY POINT
     // =====================================================================
     @SuppressWarnings("unchecked")
-    public Map<String, Object> syncTariffPackage(Long tariffPackageId, Long networkId,   Map<String, Object> requestBody, String username) {
+    public Map<String, Object> syncTariffPackage(Long tariffPackageId, Long networkId, Map<String, Object> requestBody,
+            String username) {
 
         logger.info("SyncTariffPackage started tariffPackageId={} networkId={}", tariffPackageId, networkId);
 
@@ -84,11 +88,11 @@ public class TariffPackageSyncService {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
         def.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
         TransactionStatus status = transactionManager.getTransaction(def);
-         Date startDate = Date.valueOf(
-        LocalDate.parse(data.get("startDate").toString(), formatter));
+        Date startDate = Date.valueOf(
+                LocalDate.parse(data.get("startDate").toString(), formatter));
 
-Date endDate = Date.valueOf(
-        LocalDate.parse(data.get("endDate").toString(), formatter));
+        Date endDate = Date.valueOf(
+                LocalDate.parse(data.get("endDate").toString(), formatter));
 
         try {
             // ── 1. Direct attribute update on CS_RAT_TARIFF_PACKAGE / TPID_VS_PUBLICITYID
@@ -128,13 +132,15 @@ Date endDate = Date.valueOf(
                 incomingTp.add(tpEntry);
             }
 
-            List<Map<String, Object>> incomingDatp = (List<Map<String, Object>>) data.getOrDefault("defaultAtps",  List.of());
-            List<Map<String, Object>> incomingRcAtp = (List<Map<String, Object>>) data.getOrDefault("allowedAtps",   List.of());
+            List<Map<String, Object>> incomingDatp = (List<Map<String, Object>>) data.getOrDefault("defaultAtps",
+                    List.of());
+            List<Map<String, Object>> incomingRcAtp = (List<Map<String, Object>>) data.getOrDefault("allowedAtps",
+                    List.of());
 
             // ── 4. Sync each plan type ──────────────────────────────────────────
-            syncTp(tariffPackageId, networkId, username, incomingTp, existingTp,startDate,endDate);
-            syncDatp(tariffPackageId, networkId, username, incomingDatp, existingDatp, data,startDate,endDate);
-            syncRcAtp(tariffPackageId, networkId, username, incomingRcAtp, existingRcAtp, data,startDate,endDate);
+            syncTp(tariffPackageId, networkId, username, incomingTp, existingTp, startDate, endDate);
+            syncDatp(tariffPackageId, networkId, username, incomingDatp, existingDatp, data, startDate, endDate);
+            syncRcAtp(tariffPackageId, networkId, username, incomingRcAtp, existingRcAtp, data, startDate, endDate);
 
             transactionManager.commit(status);
             Map<String, Object> result = new LinkedHashMap<>();
@@ -146,11 +152,12 @@ Date endDate = Date.valueOf(
 
         } catch (TariffInsertException tie) {
             transactionManager.rollback(status);
-            logger.error("SyncTariffPackage failed (insert) tariffPackageId={} step={} table={}",   tariffPackageId, tie.getStep(), tie.getFailedTable(), tie);
-             throw tie;
+            logger.error("SyncTariffPackage failed (insert) tariffPackageId={} step={} table={}", tariffPackageId,
+                    tie.getStep(), tie.getFailedTable(), tie);
+            throw tie;
         } catch (Exception ex) {
             transactionManager.rollback(status);
-            logger.error("SyncTariffPackage failed tariffPackageId={} error={}", tariffPackageId, ex.getMessage(),  ex);
+            logger.error("SyncTariffPackage failed tariffPackageId={} error={}", tariffPackageId, ex.getMessage(), ex);
             if (ex instanceof RuntimeException re) {
                 throw re;
             }
@@ -290,16 +297,16 @@ Date endDate = Date.valueOf(
             throw new TariffInsertException("UPDATE_TP", "CS_RAT_TPID_VS_PUBLICITYID", ex);
         }
         rcAtpRechargeService.updateRcNamesByTariffPackage(
-        tariffPackageId,
-        networkId,
-        String.valueOf(data.get("publicityId")));
+                tariffPackageId,
+                networkId,
+                String.valueOf(data.get("publicityId")));
 
         logger.info("Direct attributes updated tariffPackageId={}", tariffPackageId);
     }
 
     // TP SYNC (base plan — normally a single row)
     private void syncTp(Long tariffPackageId, Long networkId, String username,
-            List<Map<String, Object>> incomingTp, Map<Long, String> existingTp,Date startDate,Date endDate) {
+            List<Map<String, Object>> incomingTp, Map<Long, String> existingTp, Date startDate, Date endDate) {
 
         Set<Long> incomingIds = new LinkedHashSet<>();
         for (Map<String, Object> entry : incomingTp) {
@@ -317,7 +324,7 @@ Date endDate = Date.valueOf(
             Long id = Long.valueOf(entry.get("servicePackageId").toString());
             if (!existingTp.containsKey(id)) {
                 logger.info("New TP detected, cloning from catalog sourceId={}", id);
-                addNewTp(tariffPackageId, networkId, id,startDate,endDate);
+                addNewTp(tariffPackageId, networkId, id, startDate, endDate);
             }
         }
 
@@ -333,19 +340,23 @@ Date endDate = Date.valueOf(
         }
     }
 
-    private void addNewTp(Long tariffPackageId, Long networkId, Long sourceServicePackageId,Date startDate,Date endDate) {
+    private void addNewTp(Long tariffPackageId, Long networkId, Long sourceServicePackageId, Date startDate,
+            Date endDate) {
 
         Long oldPlanId = serviceCloneService.getOldPlanId(networkId, sourceServicePackageId);
         ServiceCloneService.PlanZoneInfo oldPlanZoneInfo = serviceCloneService.getPlanZoneInfo(oldPlanId);
         Long oldPlanZoneId = serviceCloneService.resolveOldPlanZoneId(oldPlanId, oldPlanZoneInfo);
-        ServiceplanZone.ZoneTable planZoneTable = servicePlanZone.resolveZoneTableByTypeOfService(oldPlanZoneInfo.getTypeOfService());
+        ServiceplanZone.ZoneTable planZoneTable = servicePlanZone
+                .resolveZoneTableByTypeOfService(oldPlanZoneInfo.getTypeOfService());
         Long newPlanZoneId = servicePlanZone.generateNewZoneId(planZoneTable);
         String suffix = "TP" + seriesGeneratorService.resolveNextTpSuffixNumber();
         servicePlanZone.cloneZoneIfExists(oldPlanZoneId, newPlanZoneId, networkId, suffix, planZoneTable);
-        CloneServiceResult cloneResult = serviceCloneService.cloneService(networkId, sourceServicePackageId, suffix,  newPlanZoneId,startDate,endDate);
+        CloneServiceResult cloneResult = serviceCloneService.cloneService(networkId, sourceServicePackageId, suffix,
+                newPlanZoneId, startDate, endDate);
 
         String existingChargeId = jdbcTemplate.queryForObject("""
-                SELECT CHARGE_ID FROM CS_RAT_TARIFF_PACKAGE WHERE TARIFF_PACKAGE_ID = ? AND NETWORK_ID = ?  """, String.class, tariffPackageId, networkId);
+                SELECT CHARGE_ID FROM CS_RAT_TARIFF_PACKAGE WHERE TARIFF_PACKAGE_ID = ? AND NETWORK_ID = ?  """,
+                String.class, tariffPackageId, networkId);
 
         try {
             jdbcTemplate.update("""
@@ -363,7 +374,8 @@ Date endDate = Date.valueOf(
 
     // DATP SYNC
     private void syncDatp(Long tariffPackageId, Long networkId, String username,
-            List<Map<String, Object>> incomingDatp, Map<Long, String> existingDatp, Map<String, Object> data,Date startDate,Date endDate) {
+            List<Map<String, Object>> incomingDatp, Map<Long, String> existingDatp, Map<String, Object> data,
+            Date startDate, Date endDate) {
 
         Set<Long> incomingIds = new LinkedHashSet<>();
 
@@ -399,8 +411,9 @@ Date endDate = Date.valueOf(
 
                 logger.info("DATP updated in place servicePackageId={} chargeId={}", id, incomingChargeId);
             } else {
-            
-                Long newAtpId = addNewAtp(tariffPackageId, networkId, username, id, "DATP", atp, data,startDate,endDate);
+
+                Long newAtpId = addNewAtp(tariffPackageId, networkId, username, id, "DATP", atp, data, startDate,
+                        endDate);
                 incomingIds.add(newAtpId);
             }
         }
@@ -420,11 +433,10 @@ Date endDate = Date.valueOf(
 
     // RCATP SYNC
     private void syncRcAtp(Long tariffPackageId, Long networkId, String username,
-            List<Map<String, Object>> incomingRcAtp, Map<Long, String> existingRcAtp, Map<String, Object> data,Date startDate,Date endDate) {
+            List<Map<String, Object>> incomingRcAtp, Map<Long, String> existingRcAtp, Map<String, Object> data,
+            Date startDate, Date endDate) {
 
         Set<Long> incomingIds = new LinkedHashSet<>();
-
-       
 
         for (Map<String, Object> atp : incomingRcAtp) {
             if (atp.get("servicePackageId") == null) {
@@ -443,6 +455,14 @@ Date endDate = Date.valueOf(
                             tariffPackageId);
                 }
                 updateAtpPeriodicCharge(incomingChargeId, networkId, atp, data);
+
+                Object serviceCode = atp.get("serviceCode");
+                if (serviceCode != null && !serviceCode.toString().trim().isEmpty()) {
+                    hlrCodeMappingService.updateHlrCodeMapping(
+                            networkId,
+                            id,
+                            Long.valueOf(serviceCode.toString()));
+                }
 
                 if (caPackageService.hasCaPackage(id)) {
                     Map<String, Object> caAtpRequest = findCaAtpRequest(data, id);
@@ -468,12 +488,21 @@ Date endDate = Date.valueOf(
                         mrp);
             } else {
 
-                Long newAtpId = addNewAtp(tariffPackageId, networkId, username, id, "RCATP", atp, data,startDate,endDate);
+                Long newAtpId = addNewAtp(tariffPackageId, networkId, username, id, "RCATP", atp, data, startDate,
+                        endDate);
+                Object serviceCode = atp.get("serviceCode");
+                if (serviceCode != null && !serviceCode.toString().trim().isEmpty()) {
+                    hlrCodeMappingService.insertHlrCodeMapping(
+                            networkId,
+                            newAtpId,
+                            Long.valueOf(serviceCode.toString()));
+                }
                 incomingIds.add(newAtpId);
 
                 // Every RCATP gets its own brand-new RC, with a unique RC_CODE series
                 // and this RCATP's MRP.
-                rcAtpRechargeService.createSingleRc(tariffPackageId, String.valueOf(data.get("tariffPackageDesc")),networkId,newAtpId,mrp,String.valueOf(atp.get("type")),startDate,endDate);
+                rcAtpRechargeService.createSingleRc(tariffPackageId, String.valueOf(data.get("tariffPackageDesc")),
+                        networkId, newAtpId, mrp, String.valueOf(atp.get("type")), startDate, endDate);
 
                 logger.info("New RCATP added and RC created servicePackageId={} mrp={}", newAtpId, mrp);
             }
@@ -483,6 +512,8 @@ Date endDate = Date.valueOf(
         for (Long id : existingRcAtp.keySet()) {
             if (!incomingIds.contains(id)) {
                 removeMapping(tariffPackageId, networkId, id, "RCATP");
+
+                hlrCodeMappingService.deleteHlrCodeMapping(networkId, id);
 
                 Long rcIdForRemovedAtp = rcAtpRechargeService.findRcIdByAtpId(id, networkId);
                 if (rcIdForRemovedAtp != null) {
@@ -498,19 +529,11 @@ Date endDate = Date.valueOf(
         }
     }
 
-
     private Long addNewAtp(Long tariffPackageId, Long networkId, String username, Long sourceAtpId,
-            String tariffPlanType, Map<String, Object> atp, Map<String, Object> data,Date startDate,Date endDate) {
+            String tariffPlanType, Map<String, Object> atp, Map<String, Object> data, Date startDate, Date endDate) {
 
         String suffix = "ATP" + seriesGeneratorService.resolveNextAtpSuffixNumber();
 
-        // ── ATP_CATEGORY check (CS_RAT_SERVICE_PACKAGE) ──────────────────────
-        // A CA source ATP has no row in CS_ATP_ACCUMU_BON_DISC_MAP, so
-        // getOldBucketId() returns null; resolving a bucket zone table off a
-        // null balance category isn't meaningful and must be skipped entirely
-        // for CA. bundleService.cloneAtpData already branches on ATP_CATEGORY
-        // internally (clones the CA Package + stops at Service Plan creation),
-        // so newBucketZoneId is simply not needed on the CA path.
         boolean isCaAtp = isCaAtp(sourceAtpId, networkId);
 
         Long newBucketZoneId = null;
@@ -530,7 +553,8 @@ Date endDate = Date.valueOf(
 
         Map<String, Object> caAtpRequest = isCaAtp ? findCaAtpRequest(data, sourceAtpId) : null;
 
-        CloneAtpResult atpResult = bundleService.cloneAtpData(sourceAtpId, networkId, suffix, newBucketZoneId,startDate,endDate, caAtpRequest);
+        CloneAtpResult atpResult = bundleService.cloneAtpData(sourceAtpId, networkId, suffix, newBucketZoneId,
+                startDate, endDate, caAtpRequest);
         Long newAtpId = atpResult.getNewAtpId();
 
         String chargeId = data.get("tariffPackageDesc") + "_" + suffix;
@@ -541,32 +565,32 @@ Date endDate = Date.valueOf(
         // other ATP — the CA Package clone above only replaces what
         // Bundle/Bucket would have done for a non-CA ATP.
         Object priorityObj = atp.get("priority");
-    String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
-    Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
+        String priorityStr = priorityObj != null ? priorityObj.toString().trim() : "";
+        Integer priorityValue = priorityStr.isEmpty() ? 0 : Integer.valueOf(priorityStr);
 
         try {
             jdbcTemplate.update("""
-        INSERT INTO CS_RAT_TARIFF_SERVICE_PACK_MAP
-        (
-            TARIFF_PACKAGE_ID,
-            SERVICE_PACKAGE_ID,
-            NETWORK_ID,
-            TARIFF_PLAN_TYPE,
-            CHARGE_ID,
-            PRIORITY,
-            SERVICE_DURATION,
-            EFFECTIVE_START_OFFSET
-        )
-        VALUES (?,?,?,?,?,?,?,?)
-        """,
-        tariffPackageId,
-        newAtpId,
-        networkId,
-        tariffPlanType,
-        chargeId,
-        priorityValue,
-        30,
-        0);
+                    INSERT INTO CS_RAT_TARIFF_SERVICE_PACK_MAP
+                    (
+                        TARIFF_PACKAGE_ID,
+                        SERVICE_PACKAGE_ID,
+                        NETWORK_ID,
+                        TARIFF_PLAN_TYPE,
+                        CHARGE_ID,
+                        PRIORITY,
+                        SERVICE_DURATION,
+                        EFFECTIVE_START_OFFSET
+                    )
+                    VALUES (?,?,?,?,?,?,?,?)
+                    """,
+                    tariffPackageId,
+                    newAtpId,
+                    networkId,
+                    tariffPlanType,
+                    chargeId,
+                    priorityValue,
+                    30,
+                    0);
         } catch (Exception ex) {
             throw new TariffInsertException("ADD_" + tariffPlanType,
                     "CS_RAT_TARIFF_SERVICE_PACK_MAP(" + tariffPlanType + ")", ex);
@@ -839,7 +863,10 @@ Date endDate = Date.valueOf(
         return "N";
     }
 
-    /** Parses a Number/String MRP value from the request payload, or null if absent/invalid. */
+    /**
+     * Parses a Number/String MRP value from the request payload, or null if
+     * absent/invalid.
+     */
     private Double toDouble(Object value) {
         if (value == null)
             return null;
