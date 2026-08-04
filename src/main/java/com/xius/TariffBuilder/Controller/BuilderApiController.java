@@ -126,7 +126,7 @@ public List<ServicePlanPackMap> getTpPlans(
     //      return service.getCaAtps(networkId, types);
     // }
 
-     @GetMapping("/builder/step4/cafilter")
+     @GetMapping("/builder/step5/cafilter")
 public List<ServicePlanPackMap> getCaAtps(
         @RequestParam(required = false) Long networkId,
         @RequestParam String types,

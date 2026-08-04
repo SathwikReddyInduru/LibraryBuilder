@@ -1,13 +1,6 @@
 // ---------- STATE ----------
-function getState() {
-    const defaultState = { s2: [], s3: [], s4: [] };
-    const stored = sessionStorage.getItem('state');
-    return stored ? JSON.parse(stored) : defaultState;
-}
-
-function saveState(state) {
-    sessionStorage.setItem('state', JSON.stringify(state));
-}
+// getState()/saveState() now live in payload-builder.js (loaded in
+// layout.html's <head>, before this file) — single shared definition.
 
 // ---------- INIT ----------
 function initStep3() {
@@ -21,7 +14,7 @@ function initStep3() {
 
     // Restore pills into in-memory array fresh each time
     selectedSvcs = [];
-    const saved = JSON.parse(sessionStorage.getItem('selectedSvcs_s3') || '[]');
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.SELECTED_SVCS_S3) || '[]');
 
     saved.forEach(svc => {
         const pill = document.querySelector(`.svc-pill[data-svc="${svc}"]`);
@@ -52,7 +45,7 @@ function toggleSvc(service, el) {
         el.classList.add('active');
     }
 
-    sessionStorage.setItem('selectedSvcs_s3', JSON.stringify(selectedSvcs));
+    sessionStorage.setItem(STORAGE_KEYS.SELECTED_SVCS_S3, JSON.stringify(selectedSvcs));
 
     if (selectedSvcs.length === 0) {
         // clearCenter();
@@ -173,7 +166,7 @@ function addToCenter(id, name, networkId, serviceTypes) {
     // Cross-check: block if already selected in step4 (AATP)
     const s4Items = state.s4 || [];
     if (s4Items.find(i => String(i.id) === String(id))) {
-        alert(`"${name}" is already selected in Allowed ATPs (AATP).`);
+        showToast(`"${name}" is already selected in Allowed ATPs (AATP).`);
         return;
     }
 
@@ -316,7 +309,7 @@ function validatePriority(id, table) {
     const input = document.getElementById(`priority-${table}-${id}`);
 
     if (Number(value) <= 0) {
-        alert("Priority must be greater than 0.");
+        showToast("Priority must be greater than 0.");
         item.priority = "";
         saveState(state);
         if (input) input.value = "";
@@ -334,7 +327,7 @@ function validatePriority(id, table) {
     );
 
     if (takenInS3 || takenInS4) {
-        alert(`Priority ${value} is already assigned to another package.`);
+        showToast(`Priority ${value} is already assigned to another package.`);
         item.priority = "";
         saveState(state);
         if (input) input.value = "";

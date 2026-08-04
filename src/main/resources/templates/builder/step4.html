@@ -33,16 +33,6 @@
         </div>
  
         <div class="svc-panel">
-            <div class="svc-category-toggle">
-                <input type="radio" id="catNormal4" name="svcCategory" value="NORMAL" class="svc-radio-input"
-                    checked onchange="switchCategory('NORMAL')">
-                <label for="catNormal4" class="svc-radio-label">Normal</label>
- 
-                <input type="radio" id="catCA4" name="svcCategory" value="CA" class="svc-radio-input"
-                    onchange="switchCategory('CA')">
-                <label for="catCA4" class="svc-radio-label">CA</label>
-            </div>
- 
             <div class="svc-group-buttons" id="svcButtons4">
                 <button class="svc-pill" data-svc="VOICE" onclick="toggleSvc('VOICE', this)">
                     <span class="material-icons pill-icon">phone</span>
@@ -65,7 +55,7 @@
                 Back
             </button>
  
-            <button class="btn-primary" onclick="goNext()" th:disabled="${activeStep == 5}">
+            <button class="btn-primary" onclick="goNext()" th:disabled="${activeStep == 6}">
                 Continue
                 <span class="material-icons">arrow_forward</span>
             </button>

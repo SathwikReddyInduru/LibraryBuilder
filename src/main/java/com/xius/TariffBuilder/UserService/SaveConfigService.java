@@ -29,13 +29,22 @@ public class SaveConfigService {
 		this.jsonStorage = jsonStorage;
 	}
 
+	@SuppressWarnings("unchecked")
 	public Map<String, Object> prepareConfig(Map<String, Object> request,String username,Long networkId) {
 
 		logger.info("Preparing config for user={} networkId={}", username, networkId);
 		Map<String, Object> response = new HashMap<>();
-		String tpName = (String) request.get("tariffPackageDesc");
-		String publicityId = (String) request.get("publicityId");
-		Number tariffPlanId = (Number) request.get("tariffPlanId");
+
+		// Frontend now sends the package fields nested under "data" (matching
+		// the shape clone/update already use). Unwrap it once here so every
+		// line below — and everything downstream (approve/executeTariffCreation,
+		// the various restore endpoints) — keeps seeing the same flat package
+		// shape it always has.
+		Map<String, Object> data = (Map<String, Object>) request.get("data");
+
+		String tpName = (String) data.get("tariffPackageDesc");
+		String publicityId = (String) data.get("publicityId");
+		Number tariffPlanId = (Number) data.get("tariffPlanId");
 
 		logger.debug("Extracted fields tpName={} publicityId={} tariffPlanId={}",tpName, publicityId, tariffPlanId);
 
@@ -53,7 +62,7 @@ public class SaveConfigService {
 			return response;
 		}
 
-		boolean isUpdate = Boolean.TRUE.equals(request.get("isUpdate"));
+		boolean isUpdate = Boolean.TRUE.equals(data.get("isUpdate"));
 
 		if (!isUpdate && jsonStorage.exists(tpName)) {
 			logger.warn("JSON validation failed: config already exists tpName={}", tpName);
@@ -62,7 +71,7 @@ public class SaveConfigService {
 		}
 
 		logger.info("Storing config tpName={} username={} networkId={}",tpName, username, networkId);
-		jsonStorage.store(tpName, username, networkId, request);
+		jsonStorage.store(tpName, username, networkId, data);
 
 		// SUCCESS RESPONSE
 		logger.info("Config prepared successfully tpName={} username={} networkId={}", tpName, username, networkId);

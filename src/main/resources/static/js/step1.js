@@ -6,7 +6,7 @@ function applyCommercialVisibility(billingType) {
     if (billingType === 'POSTPAID') {
         subTypeSection.style.opacity = '0.3';
         subTypeSection.style.pointerEvents = 'none';
-        sessionStorage.removeItem('pkgSubType');
+        sessionStorage.removeItem(STORAGE_KEYS.PKG_SUB_TYPE);
         document.querySelectorAll('#subTypeSection .type-card').forEach(c =>
             c.classList.remove('selected')
         );
@@ -18,8 +18,8 @@ function applyCommercialVisibility(billingType) {
 
 // Restore selections when page loads
 document.addEventListener('DOMContentLoaded', function () {
-    const savedType = sessionStorage.getItem('pkgType');
-    const savedSubType = sessionStorage.getItem('pkgSubType');
+    const savedType = sessionStorage.getItem(STORAGE_KEYS.PKG_TYPE);
+    const savedSubType = sessionStorage.getItem(STORAGE_KEYS.PKG_SUB_TYPE);
 
     // Restore Billing Type
     if (savedType) {
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // If saved subtype was COMMERCIAL but billing is now PREPAID, clear it
     if (savedSubType && savedType) {
         if (savedSubType === 'COMMERCIAL' && savedType === 'PREPAID') {
-            sessionStorage.removeItem('pkgSubType');
+            sessionStorage.removeItem(STORAGE_KEYS.PKG_SUB_TYPE);
         } else {
             const subCard = document.getElementById('card-' + savedSubType);
             if (subCard) {
@@ -60,13 +60,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Existing functions (slightly improved)
 function selectType(type) {
-    const currentType = sessionStorage.getItem('pkgType');
+    const currentType = sessionStorage.getItem(STORAGE_KEYS.PKG_TYPE);
     const subGroup = document.getElementById('subTypeGroup');
 
     // If same type clicked again → deselect everything
     if (currentType === type) {
-        sessionStorage.removeItem('pkgType');
-        sessionStorage.removeItem('pkgSubType');
+        sessionStorage.removeItem(STORAGE_KEYS.PKG_TYPE);
+        sessionStorage.removeItem(STORAGE_KEYS.PKG_SUB_TYPE);
 
         document.querySelectorAll('#typeSection .type-card').forEach(c =>
             c.classList.remove('selected')
@@ -87,7 +87,7 @@ function selectType(type) {
     }
 
     // Normal selection
-    sessionStorage.setItem('pkgType', type);
+    sessionStorage.setItem(STORAGE_KEYS.PKG_TYPE, type);
 
     document.querySelectorAll('#typeSection .type-card').forEach(c =>
         c.classList.remove('selected')
@@ -103,23 +103,23 @@ function selectType(type) {
     document.querySelectorAll('#subTypeSection .type-card').forEach(c =>
         c.classList.remove('selected')
     );
-    sessionStorage.removeItem('pkgSubType');
+    sessionStorage.removeItem(STORAGE_KEYS.PKG_SUB_TYPE);
 
     // Show/hide Commercial based on billing type
     applyCommercialVisibility(type);
 
     // If switching to PREPAID and COMMERCIAL was previously selected, clear it
-    if (type === 'PREPAID' && sessionStorage.getItem('pkgSubType') === 'COMMERCIAL') {
-        sessionStorage.removeItem('pkgSubType');
+    if (type === 'PREPAID' && sessionStorage.getItem(STORAGE_KEYS.PKG_SUB_TYPE) === 'COMMERCIAL') {
+        sessionStorage.removeItem(STORAGE_KEYS.PKG_SUB_TYPE);
     }
 }
 
 function selectSubType(subType) {
-    const currentSubType = sessionStorage.getItem('pkgSubType');
+    const currentSubType = sessionStorage.getItem(STORAGE_KEYS.PKG_SUB_TYPE);
 
     // If same category clicked again → deselect it
     if (currentSubType === subType) {
-        sessionStorage.removeItem('pkgSubType');
+        sessionStorage.removeItem(STORAGE_KEYS.PKG_SUB_TYPE);
 
         document.querySelectorAll('#subTypeSection .type-card').forEach(c =>
             c.classList.remove('selected')
@@ -129,7 +129,7 @@ function selectSubType(subType) {
     }
 
     // Normal selection
-    sessionStorage.setItem('pkgSubType', subType);
+    sessionStorage.setItem(STORAGE_KEYS.PKG_SUB_TYPE, subType);
 
     document.querySelectorAll('#subTypeSection .type-card').forEach(c =>
         c.classList.remove('selected')
@@ -142,7 +142,7 @@ function selectSubType(subType) {
 // document.addEventListener('DOMContentLoaded', function () {
 
 //     if (NETWORK_ID) {
-//         const currentChargeId = sessionStorage.getItem("periodicChargeID");
+//         const currentChargeId = sessionStorage.getItem(STORAGE_KEYS.PERIODIC_CHARGE_ID);
 //         loadPeriodicCharges(NETWORK_ID, currentChargeId);
 //     } else {
 //         console.error("NETWORK_ID not available");
@@ -157,7 +157,7 @@ function selectSubType(subType) {
 //         return;
 //     }
 
-//     sessionStorage.setItem("periodicChargeID", chargeId);
+//     sessionStorage.setItem(STORAGE_KEYS.PERIODIC_CHARGE_ID, chargeId);
 
 //     console.log("Selected Periodic Charge:", chargeId);
 // }
@@ -193,7 +193,7 @@ function selectSubType(subType) {
 
 //         // Restore previously selected value
 //         const savedCharge =
-//             sessionStorage.getItem("periodicChargeID");
+//             sessionStorage.getItem(STORAGE_KEYS.PERIODIC_CHARGE_ID);
 
 //         if (savedCharge) {
 //             dropdown.value = savedCharge;

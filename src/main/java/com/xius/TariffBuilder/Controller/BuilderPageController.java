@@ -257,6 +257,23 @@ public class BuilderPageController {
         return "builder/step5";
     }
 
+    @GetMapping("/builder/step6")
+    public String step6(HttpSession session, Model model) {
+
+        logger.info("Opening step6");
+
+        if (isNotLoggedIn(session)) {
+
+            logger.warn("Unauthorized step6 access");
+
+            return "redirect:/loginform";
+        }
+
+        setCommonData(session, model);
+
+        return "builder/step6";
+    }
+
     @GetMapping("/logout")
     public String logout(HttpSession session) {
 

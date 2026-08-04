@@ -734,7 +734,7 @@ async function _arDeleteRule(id) {
 
   const networkId = typeof NETWORK_ID !== "undefined" && NETWORK_ID ? NETWORK_ID : "";
   if (!networkId) {
-    alert("Network not found in session. Please reload the page and try again.");
+    showToast("Network not found in session. Please reload the page and try again.");
     return;
   }
 
@@ -760,7 +760,7 @@ async function _arDeleteRule(id) {
     _arShowPlaceholder(); // go back
   } catch (err) {
     console.error("Failed to delete ATP rule:", err);
-    alert("Couldn't delete the rule: " + (err.message || "Please try again."));
+    showToast("Couldn't delete the rule: " + (err.message || "Please try again."));
     actionButtons.forEach((b) => (b.disabled = false));
     if (btn) btn.innerHTML = `<span class="material-icons">delete</span> Delete`;
   }
@@ -992,20 +992,20 @@ async function _arSubmit() {
   // The plan-name picker only matters (and is only shown) when creating —
   // while editing, the plan is fixed and _arEditingRuleId is the source of truth.
   if (!isEdit && !servicePackageId) {
-    alert("Please select the Additional Tariff Plan name.");
+    showToast("Please select the Additional Tariff Plan name.");
     nameSelect.focus();
     return;
   }
 
   const filledConditions = _arConditions.filter((c) => c.atpId);
   if (!filledConditions.length && !_arAdd.length && !_arRemove.length) {
-    alert("Add at least one Prerequisite Condition, ATP to Add, or ATP to Remove before submitting.");
+    showToast("Add at least one Prerequisite Condition, ATP to Add, or ATP to Remove before submitting.");
     return;
   }
 
   const networkId = typeof NETWORK_ID !== "undefined" && NETWORK_ID ? NETWORK_ID : "";
   if (!networkId) {
-    alert("Network not found in session. Please reload the page and try again.");
+    showToast("Network not found in session. Please reload the page and try again.");
     return;
   }
 
@@ -1052,7 +1052,7 @@ async function _arSubmit() {
     await _arSelectRule(Number(planId));
   } catch (err) {
     console.error("Failed to save ATP rule:", err);
-    alert("Couldn't save the rule: " + (err.message || "Please try again."));
+    showToast("Couldn't save the rule: " + (err.message || "Please try again."));
     _arSetFormMode(isEdit, editingRuleName); // restore the correct header/button state
   } finally {
     btn.disabled = false;

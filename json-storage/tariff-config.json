@@ -1,1 +1,84 @@
-{ }
+{
+  "1116" : {
+    "tpName" : "1116",
+    "username" : "FTLUSER",
+    "networkId" : 1,
+    "data" : {
+      "isUpdate" : true,
+      "submittedOn" : "04 Aug 2026",
+      "packageType" : "POSTPAID",
+      "tariffPackCategory" : "",
+      "tariffPackageDesc" : "1116",
+      "periodicChargeID" : "",
+      "charge" : "3000",
+      "startDate" : "08/22/2026",
+      "endDate" : "08/29/2026",
+      "publicityId" : "1116",
+      "isCorporateYn" : true,
+      "tariffPlanId" : 1,
+      "tariffPlanName" : "FT_TRAIFF_PLAN",
+      "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
+      "selectedSvcs_s3" : "[\"VOICE\"]",
+      "selectedSvcs_s4" : "[\"VOICE\"]",
+      "selectedSvcs_s5" : "[\"VOICE\"]",
+      "defaultAtps" : [ {
+        "servicePackageId" : 2,
+        "packageName" : "VC DAILY 10M",
+        "type" : "VOICE",
+        "validity" : "O",
+        "rentalPeriod" : "30",
+        "midnightExpiry" : "No",
+        "renewal" : "Yes",
+        "rental" : "10",
+        "maxCount" : "20",
+        "freeCycles" : "30",
+        "priority" : 1
+      } ],
+      "allowedAtps" : [ {
+        "servicePackageId" : 5,
+        "packageName" : "F1 VC UL",
+        "type" : "VOICE",
+        "validity" : "O",
+        "rentalPeriod" : "28",
+        "midnightExpiry" : "Yes",
+        "renewal" : "Yes",
+        "rental" : "30",
+        "maxCount" : "25",
+        "freeCycles" : "10",
+        "priority" : 2,
+        "mrp" : "199",
+        "category" : "NORMAL",
+        "serviceCode" : "111",
+        "vipPlan" : "N"
+      } ],
+      "caAtps" : [ {
+        "servicePackageId" : 293,
+        "packageName" : "CA_PACKAGE_TEST",
+        "type" : "VOICE",
+        "validity" : "O",
+        "rentalPeriod" : "31",
+        "midnightExpiry" : "Yes",
+        "renewal" : "Yes",
+        "rental" : "22",
+        "maxCount" : "22",
+        "freeCycles" : "22",
+        "priority" : 3,
+        "mrp" : "149",
+        "category" : "CA",
+        "defaultLinesAllowed" : "3",
+        "additionalChargePerLine" : "1",
+        "packageRolloverYn" : "N",
+        "packageStartDate" : "2026-08-22",
+        "packageEndDate" : "2026-08-29",
+        "serviceMappings" : [ {
+          "serviceUnitType" : "VOICE_MO_ILD_CA2CA~Sec",
+          "serviceId" : 10,
+          "units" : "10",
+          "topupCharge" : "0",
+          "maxTransferLimit" : "10"
+        } ]
+      } ],
+      "username" : "FTLUSER"
+    }
+  }
+}

@@ -1,11 +1,3 @@
-function getState() {
-    return JSON.parse(sessionStorage.getItem('builderState') || '{"s2":[]}');
-}
-
-function saveState(state) {
-    sessionStorage.setItem('builderState', JSON.stringify(state));
-}
-
 // ---------- INIT ----------
 window.addEventListener('DOMContentLoaded', () => {
 
@@ -17,8 +9,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // restore selected pills
-    const saved = JSON.parse(sessionStorage.getItem('selectedSvcs_s2') || '[]');
-    const savedCategory = sessionStorage.getItem('svcCategory_s2') || (saved.includes('BILLING') ? 'BILLING' : 'RATING');
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.SELECTED_SVCS_S2) || '[]');
+    const savedCategory = sessionStorage.getItem(STORAGE_KEYS.SVC_CATEGORY_S2) || (saved.includes('BILLING') ? 'BILLING' : 'RATING');
 
     const radio = document.querySelector(`input[name="svcCategory"][value="${savedCategory}"]`);
     if (radio) radio.checked = true;
@@ -64,8 +56,8 @@ function switchCategory(category) {
         selectedSvcs = selectedSvcs.filter(s => s !== 'BILLING');
     }
 
-    sessionStorage.setItem('selectedSvcs_s2', JSON.stringify(selectedSvcs));
-    sessionStorage.setItem('svcCategory_s2', category);
+    sessionStorage.setItem(STORAGE_KEYS.SELECTED_SVCS_S2, JSON.stringify(selectedSvcs));
+    sessionStorage.setItem(STORAGE_KEYS.SVC_CATEGORY_S2, category);
 
     refreshSidebar();
 }
@@ -83,7 +75,7 @@ function toggleSvc(service, el) {
         el.classList.add('active');
     }
 
-    sessionStorage.setItem('selectedSvcs_s2', JSON.stringify(selectedSvcs));
+    sessionStorage.setItem(STORAGE_KEYS.SELECTED_SVCS_S2, JSON.stringify(selectedSvcs));
 
     if (selectedSvcs.length === 0) {
         // clearCenter();

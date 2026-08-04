@@ -8,6 +8,10 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="icon" type="image/jpeg" href="/images/favicon.jpeg">
     <link rel="stylesheet" th:href="@{/css/builder.css}">
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/storage-keys.js}"></script>
+    <script th:src="@{/js/toast.js}"></script>
+    <script th:src="@{/js/payload-builder.js}"></script>
 </head>
 
 <body>
@@ -120,7 +124,11 @@
             </a>
             <a href="/builder/step5" class="step-node" onclick="return checkStepAccess(5)"
                 th:classappend="${activeStep == 5} ? ' active'">
-                <b>5</b><span>PRICING</span>
+                <b>5</b><span>OPTIONAL SVCS</span>
+            </a>
+            <a href="/builder/step6" class="step-node" onclick="return checkStepAccess(6)"
+                th:classappend="${activeStep == 6} ? ' active'">
+                <b>6</b><span>PRICING</span>
             </a>
         </nav>
 
@@ -157,7 +165,7 @@
                     <th:block th:replace="${stageFrag}"></th:block>
 
                     <!-- FOOTER ACTIONS -->
-                    <div class="config-panel" id="footerActions" th:classappend="${activeStep != 5} ? ' hidden'">
+                    <div class="config-panel" id="footerActions" th:classappend="${activeStep != 6} ? ' hidden'">
                         <button class="btn-hierarchy" onclick="viewTree()">Hierarchy</button>
                     </div>
                 </div>
@@ -489,7 +497,15 @@
 
         console.log(PRIVILEGE_IDS);
     </script>
-    <script th:src="@{/js/layout.js}"></script>
+    <script th:src="@{/js/layout-core-init.js}"></script>
+    <script th:src="@{/js/layout-drafts.js}"></script>
+    <script th:src="@{/js/layout-nav-state.js}"></script>
+    <script th:src="@{/js/layout-save-configuration.js}"></script>
+    <script th:src="@{/js/layout-session-hierarchy.js}"></script>
+    <script th:src="@{/js/layout-approvals-lists.js}"></script>
+    <script th:src="@{/js/layout-misc-ui.js}"></script>
+    <script th:src="@{/js/layout-clone.js}"></script>
+    <script th:src="@{/js/layout-tp-details.js}"></script>
     <script th:src="@{/js/atp-rules.js}"></script>
     <script th:src="@{/js/atp-rate.js}"></script>
 

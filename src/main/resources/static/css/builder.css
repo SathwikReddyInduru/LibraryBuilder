@@ -483,15 +483,15 @@ button:disabled {
 
 /* vertical connector line running through all steps */
 /* Each step-node: padding 14px + badge 32px + gap 10px + label 12px + padding 14px ≈ 82px */
-/* 5 steps = 410px. Line from badge-center of step1 to badge-center of step5:              */
-/* height = 4 × 82px = 328px. Top = 50% - (410/2) + (82/2) = 50% - 164px                  */
+/* 6 steps = 492px. Line from badge-center of step1 to badge-center of step6:              */
+/* height = 5 × 82px = 410px. Top = 50% - (492/2) + (82/2) = 50% - 205px                   */
 .step-rail::before {
     content: '';
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    top: calc(50% - 164px);
-    height: 328px;
+    top: calc(50% - 205px);
+    height: 410px;
     width: 2px;
     background: linear-gradient(to bottom, #dbeafe, #bfdbfe, #dbeafe);
     border-radius: 2px;
@@ -5584,4 +5584,147 @@ button:disabled {
 .ar-submit-btn:disabled {
     background: #cbd5e1;
     cursor: not-allowed;
+}
+/* ═══════════════════════════════════════
+   TOAST / SNACKBAR NOTIFICATIONS
+   Replaces native alert() app-wide — see static/js/toast.js
+═══════════════════════════════════════ */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 380px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+    border-left: 4px solid var(--primary);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateX(24px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    overflow: hidden;
+}
+
+.toast-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+}
+
+.toast--visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast--leaving {
+    opacity: 0;
+    transform: translateX(24px);
+}
+
+.toast--error {
+    border-left-color: #dc2626;
+}
+
+.toast--success {
+    border-left-color: var(--success);
+}
+
+.toast--info {
+    border-left-color: var(--primary-light);
+}
+
+.toast-icon {
+    font-size: 20px;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.toast--error .toast-icon {
+    color: #dc2626;
+}
+
+.toast--success .toast-icon {
+    color: var(--success);
+}
+
+.toast--info .toast-icon {
+    color: var(--primary-light);
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: #1e293b;
+    white-space: pre-line;
+}
+
+.toast-close {
+    font-size: 16px;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 50%;
+    padding: 2px;
+}
+
+.toast-close:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+/* Countdown bar along the bottom edge — shrinks from 100% to 0% over the
+   toast's auto-dismiss duration. animation-play-state is toggled between
+   "running"/"paused" from JS on hover, which (unlike a JS-driven width)
+   freezes and resumes the bar at the exact same point it paused. */
+.toast-progress-track {
+    height: 3px;
+    background: rgba(15, 23, 42, 0.08);
+    width: 100%;
+}
+
+.toast-progress-bar {
+    height: 100%;
+    width: 100%;
+    transform-origin: left;
+    background: var(--primary);
+}
+
+.toast--error .toast-progress-bar {
+    background: #dc2626;
+}
+
+.toast--success .toast-progress-bar {
+    background: var(--success);
+}
+
+.toast--info .toast-progress-bar {
+    background: var(--primary-light);
+}
+
+.toast-progress-bar--running {
+    animation-name: toast-shrink;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+
+@keyframes toast-shrink {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
 }

@@ -249,17 +249,17 @@ async function _atrSubmit() {
   const submitBtn = document.getElementById("atrSubmitBtn");
 
   if (!pkgSelect.value) {
-    alert("Please select the Additional Tariff Package.");
+    showToast("Please select the Additional Tariff Package.");
     pkgSelect.focus();
     return;
   }
   if (!monthSelect.value) {
-    alert("Please select the Month.");
+    showToast("Please select the Month.");
     monthSelect.focus();
     return;
   }
   if (!yearSelect.value) {
-    alert("Please select the Year.");
+    showToast("Please select the Year.");
     yearSelect.focus();
     return;
   }
@@ -312,7 +312,7 @@ async function _atrSubmit() {
     _atrShowStep2();
   } catch (err) {
     console.error("Failed to fetch service package detail:", err);
-    alert(
+    showToast(
       err && err.message && err.message !== "Failed to fetch"
         ? err.message
         : "Couldn't fetch the current rate for this package. Please try again.",
@@ -332,12 +332,12 @@ async function _atrSubmitNewRate() {
   const finalSubmitBtn = document.getElementById("atrFinalSubmitBtn");
 
   if (!newRateInput.value || Number(newRateInput.value) < 0) {
-    alert("Please enter a valid New Rate.");
+    showToast("Please enter a valid New Rate.");
     newRateInput.focus();
     return;
   }
   if (!_atrPackageDetail) {
-    alert("Something went wrong — please start over.");
+    showToast("Something went wrong — please start over.");
     _atrShowStep1();
     return;
   }
@@ -371,7 +371,7 @@ async function _atrSubmitNewRate() {
     _atrShowSuccess(body.message);
   } catch (err) {
     console.error("Failed to update ATP rate:", err);
-    alert("Couldn't update the rate. Please try again.");
+    showToast("Couldn't update the rate. Please try again.");
   } finally {
     if (finalSubmitBtn) {
       finalSubmitBtn.disabled = false;

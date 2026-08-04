@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{builder/layout :: layout(~{::title}, ~{::section}, 5)}">
  
 <head>
-    <title>Pricing</title>
+    <title>Optional Services</title>
 </head>
  
 <body>
@@ -10,55 +10,44 @@
         <div class="step-guide modern">
  
             <div class="guide-header">
-                <span class="material-icons">payments</span>
-                <b>Finalize Configuration</b>
+                <span class="material-icons">add_circle</span>
+                <b>Optional Services (CA ATP)</b>
             </div>
  
-           
             <div class="guide-steps">
  
                 <div class="guide-step">
                     <span class="guide-num">1</span>
-                    <span>Enter package price and validity of the package.</span>
+                    <span> Optional Services are Corporate Account (CA) add-ons — pick a service type, choose a plan, then configure its lines, validity window and service~unit mappings.</span>
                 </div>
  
             </div>
  
             <div class="guide-points">
-                <span class="guide-pill">Charge → package price</span>
-                <span class="guide-pill">Start Date → activation</span>
-                <span class="guide-pill">End Date → validity</span>
+               
+                <span class="guide-pill">Corporate Accounts</span>
+                 <span class="guide-pill">Optional add-on</span>
+                <span class="guide-pill">Line &amp; unit mapping</span>
             </div>
  
         </div>
  
-        <div class="form-container">
-            <div class="form-group">
-                <label>PACKAGE CHARGE</label>
-                <input type="number" id="price" oninput="onPriceChange(this.value)" placeholder="0.00">
-            </div>
- 
-            <div class="form-group">
-                <label>PACKAGE START DATE</label>
-                <input type="date" id="startDate" onchange="onStartDateChange(this.value)">
-            </div>
- 
-            <div class="form-group">
-                <label>PACKAGE END DATE</label>
-                <input type="date" id="endDate" onchange="onEndDateChange(this.value)">
-            </div>
- 
-            <div class="form-group">
-                <label>PUBLICITY CODE</label>
-                <input type="text" id="publicityCode" oninput="onPublicityCodeChange(this.value)"
-                    placeholder="Enter code">
-            </div>
- 
-            <div class="checkbox-group">
-                <input type="checkbox" id="isCorporate" onchange="onCorporateChange(this.checked)">
-                <label for="isCorporate">IS CORPORATE PACK</label>
+        <div class="svc-panel">
+            <div class="svc-group-buttons" id="svcButtons5">
+                <button class="svc-pill" data-svc="VOICE" onclick="toggleSvc('VOICE', this)">
+                    <span class="material-icons pill-icon">phone</span>
+                    VOICE</button>
+                <button class="svc-pill" data-svc="SMS" onclick="toggleSvc('SMS', this)">
+                    <span class="material-icons pill-icon">sms</span>
+                    SMS</button>
+                <button class="svc-pill" data-svc="DATA" onclick="toggleSvc('DATA', this)">
+                    <span class="material-icons pill-icon">wifi</span>
+                    DATA</button>
             </div>
         </div>
+ 
+        <!-- Drop zone — rendered by step5.js -->
+        <div id="dropArea" class="service-results"></div>
  
         <div class="step-actions">
             <button class="btn-secondary" onclick="goBack()" th:disabled="${activeStep == 1}">
@@ -66,19 +55,9 @@
                 Back
             </button>
  
-            <button class="btn-primary" id="saveConfigBtn" onclick="saveConfiguration()">
-                SAVE CONFIG
-                <span class="material-icons">check</span>
-            </button>
- 
-            <button class="btn-primary btn-clone-package" id="clonePackageBtn" style="display:none;" onclick="clonePackageFromBuilder()">
-                <span class="material-icons">content_copy</span>
-                CLONE PACKAGE
-            </button>
- 
-            <button class="btn-primary btn-update-package" id="updatePackageBtn" style="display:none;" onclick="updatePackage()">
-                <span class="material-icons">save</span>
-                UPDATE PACKAGE
+            <button class="btn-primary" onclick="goNext()" th:disabled="${activeStep == 6}">
+                Continue
+                <span class="material-icons">arrow_forward</span>
             </button>
         </div>
  
