@@ -481,8 +481,9 @@ function _acRenderView(id, name, detail) {
 // Renders the GET /atp/{id} response as plain label/value text
 // inside .ar-detail-* — deliberately NOT .ar-input/.ar-input-
 // readonly, so nothing in this view looks like a form field. This is
-// purely for looking at an ATP's config; "Modify" (still a 501 stub)
-// is the only path that ever opens the actual create/edit form.
+// purely for looking at an ATP's config; "Modify" (see _acModifyAtp
+// below) is the only path that ever opens the actual create/edit
+// form, which it then fills in from this same GET /atp/{id} data.
 
 // value -> "Yes"/"No" badge for the API's various *Yn / Y|N fields.
 function _acYn(value) {
@@ -700,12 +701,67 @@ function _acRenderAtpDetail(detail) {
     .join("");
 }
 
-function _acModifyAtp() {
-  // The modify/update API isn't implemented yet (see AtpDetailsController)
-  // — be upfront about that instead of opening a form that can't save.
-  if (typeof showToast === "function") {
-    showToast("Modify API not implemented yet.", "info");
+// Opens the create/edit form in Modify mode and fills it in from
+// GET /atp/{atpId} (same detail object the read-only view renders —
+// reused from _acDetailCache when we already fetched it for that
+// view, otherwise fetched fresh here). The save-side API still
+// doesn't exist (see AtpDetailsController), so applyEditModeUI()
+// (called via window._acApplyEditModeUI) keeps Publish disabled —
+// this just gets the fields populated for reference/copy-editing.
+async function _acModifyAtp(id) {
+  const listed = _acAtps.find((a) => String(a.id) === String(id));
+
+  function openForm(detail) {
+    _acSelectedId = null;
+    _acHighlightSelectedRow();
+
+    const panel = document.getElementById("acFormPanel");
+    panel.dataset.mode = "edit";
+    panel.dataset.servicePackageId = id;
+
+    const displayName = detail?.atpName || listed?.name || `ATP #${id}`;
+    const title = panel.querySelector(".ar-form-header h3");
+    const sub = panel.querySelector(".ar-form-header-sub");
+    if (title) title.textContent = `Modify ATP — ${displayName}`;
+    if (sub) {
+      sub.textContent =
+        "Update the tariff, validity and usage rules for this ATP";
+    }
+
+    document.getElementById("acPlaceholder").classList.add("hidden");
+    document.getElementById("acViewPanel").classList.add("hidden");
+    panel.classList.remove("hidden");
+
+    if (typeof window._acPopulateForm === "function") {
+      window._acPopulateForm(detail);
+    }
+    if (typeof window._acApplyEditModeUI === "function") {
+      window._acApplyEditModeUI();
+    }
   }
+
+  if (_acDetailCache[id]) {
+    openForm(_acDetailCache[id]);
+    return;
+  }
+
+  try {
+    const res = await fetch(`/atp/${id}`);
+    if (res.ok) {
+      const detail = await res.json();
+      _acDetailCache[id] = detail;
+      openForm(detail);
+      return;
+    }
+    console.error(`GET /atp/${id} failed with status ${res.status}`);
+  } catch (err) {
+    console.error("Failed to load ATP details:", err);
+  }
+
+  if (typeof showToast === "function") {
+    showToast("Couldn't load this ATP's details — opening a blank form.", "error");
+  }
+  openForm(null);
 }
 
 // ── Page init ──────────────────────────────────────────────────
@@ -745,6 +801,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!isoDate) return null;
     const [y, m, d] = isoDate.split("-");
     return `${m}/${d}/${y}`;
+  }
+
+  // Inverse of toApiDate() — "MM/DD/YYYY" (or "M/D/YYYY") from the
+  // GET /atp/{id} response back to the "YYYY-MM-DD" a <input
+  // type="date"> needs.
+  function fromApiDate(apiDate) {
+    if (!apiDate) return "";
+    const [m, d, y] = apiDate.split("/");
+    if (!m || !d || !y) return "";
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
 
   function toYN(value) {
@@ -1643,11 +1709,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ---------- Modify mode ----------
-     /builder/atpcreate/edit/{id} renders this same form with
-     data-mode="edit" on the .atpc-fullscreen section. Neither the "load
-     existing ATP data" API nor the "save changes" API exist on the backend
-     yet, so in edit mode we keep the form usable for reference but disable
-     the actions that would need those APIs, instead of silently creating a
+     Opened via the "Modify" button on the read-only ATP view
+     (_acModifyAtp in the list-pane script above), which sets
+     data-mode="edit" + data-service-package-id on #acFormPanel
+     (.atpc-fullscreen) and calls window._acPopulateForm(detail) with
+     the GET /atp/{id} response to fill this form in. The "save
+     changes" API still doesn't exist on the backend (see
+     AtpDetailsController), so in edit mode we keep the form
+     populated for reference/copy-editing but disable the actions
+     that would need that API, instead of silently creating a
      duplicate ATP via the create endpoint. */
   function isEditMode() {
     return (
@@ -1669,6 +1739,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (publishLabel) publishLabel.textContent = "Publish (unavailable)";
   }
+  // Exposed so _acModifyAtp() (list-pane script above) can re-apply
+  // this after switching #acFormPanel into edit mode — the
+  // DOMContentLoaded call below only covers the initial page load.
+  window._acApplyEditModeUI = applyEditModeUI;
 
   /* ---------- Reset for reuse ----------
      This page keeps the create form mounted for the whole visit — the
@@ -1713,6 +1787,236 @@ document.addEventListener("DOMContentLoaded", () => {
     markStatus(null, "");
   }
   window._acResetForm = resetAtpCreateForm;
+
+  /* ---------- Populate from GET /atp/{id} (Modify mode) ----------
+     Inverse of buildAtpPayload() above — takes the AtpDetailsResponse
+     fetched by _acModifyAtp() (list-pane script) and fills every form
+     field from it, using the same *_MAP tables buildAtpPayload uses
+     to go the other way, so the two stay in sync. Exposed on window
+     so _acModifyAtp() can call it once the form panel is visible.
+     `detail` may be null (detail fetch failed) — in that case this
+     just resets the form to blank and stops. */
+  function populateAtpCreateForm(detail) {
+    const form = document.getElementById("atpCreateForm");
+    if (!form) return;
+
+    resetAtpCreateForm();
+    if (!detail) return;
+
+    function setField(name, value) {
+      const el = form.elements.namedItem(name);
+      if (!el) return;
+      el.value = value === null || value === undefined ? "" : String(value);
+    }
+
+    /* ---- ATP Details ---- */
+    setField("atpName", detail.atpName);
+    setField("publicityId", detail.publicityId);
+    setField("description", detail.description);
+    setField("categoryOfferCode", detail.categoryOfferCode);
+    setField("vipPlan", detail.vipPlanFlagYn || "N");
+
+    setField(
+      "typeOfService",
+      detail.typeOfService != null ? detail.typeOfService : "",
+    );
+    syncBillingServiceType();
+    if (detail.typeOfService === 2) {
+      setField(
+        "billingServiceType",
+        detail.billingServiceType != null ? detail.billingServiceType : "",
+      );
+    }
+
+    // Rating Type segmented toggle
+    const ratingTypeHidden = document.getElementById("ratingType");
+    if (ratingTypeHidden) {
+      ratingTypeHidden.value = detail.ratingType || "N";
+      document
+        .querySelectorAll('.ar-segmented[data-hidden-input="ratingType"] button')
+        .forEach((b) => {
+          b.classList.toggle("active", b.dataset.value === ratingTypeHidden.value);
+        });
+    }
+
+    /* ---- Validity & Scheduling ---- */
+    setField("validFrom", fromApiDate(detail.validFrom));
+    setField("validTo", fromApiDate(detail.validTo));
+    setField("validityPeriodType", detail.validityPeriodType || "LIMITED");
+    syncValidityPeriodDaysField();
+    if ((detail.validityPeriodType || "").toUpperCase() === "LIMITED") {
+      setField(
+        "validityPeriodDays",
+        detail.validityPeriodDays != null ? detail.validityPeriodDays : "",
+      );
+    }
+    setField(
+      "hoursFrom",
+      detail.applicableFromHrs != null ? detail.applicableFromHrs : "",
+    );
+    setField(
+      "hoursTo",
+      detail.applicableToHrs != null ? detail.applicableToHrs : "",
+    );
+
+    setField("rollOver", detail.rollOverYn || "N");
+    setField("extendValidity", detail.extendValidityYn || "N");
+
+    /* ---- Balance & Usage Configuration / Unit Types & Values /
+       Derived Services — driven off detail.balanceCategories. ---- */
+    (detail.balanceCategories || []).forEach((entry) => {
+      const catUpper = (entry.balanceCategory || "").toUpperCase();
+      const cat = catUpper.toLowerCase();
+      if (!cat) return;
+
+      const pillBox = document.querySelector(
+        `#balanceCategoryGroup input[data-unit-target="${cat}"]`,
+      );
+      if (pillBox) pillBox.checked = true;
+
+      // Bucket Type is one shared field across every category in
+      // this form — take it from whichever entry actually has one.
+      if (entry.bucketType) {
+        const slug = Object.entries(BUCKET_TYPE_MAP).find(
+          ([, code]) => code === entry.bucketType,
+        )?.[0];
+        if (slug) setField("bucketType", slug);
+      }
+
+      const capCat = capitalize(cat);
+      const unlimitedYn = entry.unlimitedUsageYn === "Y" ? "Y" : "N";
+      setField(`unlimitedUsage${capCat}`, unlimitedYn);
+
+      const typeField = document.getElementById(`unitType${capCat}`);
+      const valueField = document.getElementById(`unitValue${capCat}`);
+      const isUnlimited = unlimitedYn === "Y" && UNLIMITED_FIXED_UNITS[cat];
+      if (isUnlimited) {
+        // Mirrors syncUnlimitedUsageFields()'s locked-field branch.
+        if (typeField) {
+          typeField.value = UNLIMITED_FIXED_UNITS[cat].unitType;
+          typeField.disabled = true;
+          typeField.classList.add("is-locked");
+        }
+        if (valueField) {
+          valueField.value = UNLIMITED_FIXED_UNITS[cat].unitValue;
+          valueField.disabled = true;
+          valueField.classList.add("is-locked");
+        }
+      } else {
+        if (typeField) {
+          typeField.value = entry.bucketUnitType || "";
+          typeField.disabled = false;
+          typeField.classList.remove("is-locked");
+        }
+        if (valueField) {
+          valueField.value =
+            entry.bucketUnitValue != null ? entry.bucketUnitValue : "";
+          valueField.disabled = false;
+          valueField.classList.remove("is-locked");
+        }
+      }
+
+      // Usage type checklist — response carries the numeric ids,
+      // checkboxes are keyed by slug, so reverse USAGE_TYPE_ID_MAP.
+      const idToSlug = {};
+      Object.entries(USAGE_TYPE_ID_MAP[cat] || {}).forEach(([slug, id]) => {
+        idToSlug[id] = slug;
+      });
+      (entry.usageType || []).forEach((id) => {
+        const slug = idToSlug[id];
+        if (!slug) return;
+        const cb = form.querySelector(
+          `input[name="usageType${capCat}"][value="${slug}"]`,
+        );
+        if (cb) cb.checked = true;
+      });
+    });
+
+    // Reveal the Unit Types & Values / Derived Services cards and
+    // the Zone Group / Data Zone Group fields for whichever
+    // categories just got checked above.
+    syncBalanceSections();
+
+    // Derived service selections — flattened codes like "1~1" back
+    // to their {category, slug} checkbox.
+    (detail.derivedServiceSelections || []).forEach((code) => {
+      for (const [category, slugs] of Object.entries(DERIVED_SERVICE_ID_MAP)) {
+        const slug = Object.keys(slugs).find((s) => slugs[s] === code);
+        if (!slug) continue;
+        const cb = form.querySelector(
+          `input[name="derived${capitalize(category)}"][value="${slug}"]`,
+        );
+        if (cb) cb.checked = true;
+        break;
+      }
+    });
+
+    /* ---- Roaming & Network Access ---- */
+    const roamingIdToSlug = {};
+    Object.entries(ROAMING_NETWORK_ID_MAP).forEach(([slug, id]) => {
+      roamingIdToSlug[id] = slug;
+    });
+    (detail.roamingNetworks || []).forEach((entry) => {
+      const box = form.querySelector(
+        String(entry).toUpperCase() === "ALL"
+          ? 'input[name="roamingNetworks"][value="all"]'
+          : `input[name="roamingNetworks"][value="${roamingIdToSlug[Number(entry)] || ""}"]`,
+      );
+      if (box) box.checked = true;
+    });
+
+    setField(
+      "allowNationalRoamingData",
+      detail.allowNationalRoamingData === "Y" ? "yes" : "no",
+    );
+    setField(
+      "allowInternationalRoamingData",
+      detail.allowInternationalRoamingData === "Y" ? "yes" : "no",
+    );
+    setField("simRangeFlag", detail.simImsiFlag === "I" ? "imsi" : "sim");
+
+    // SIM / IMSI Range Details — "<I|E>-<start>-<end>" strings back
+    // into repeater rows.
+    const simList = document.getElementById("simRangeList");
+    if (simList) simList.innerHTML = "";
+    const ranges = detail.simRangeDetails || [];
+    if (ranges.length === 0) {
+      addSimRangeRow();
+    } else {
+      ranges.forEach((entry) => {
+        const match = /^([IE])-(\d+)-(\d+)$/.exec(entry);
+        if (!match) return;
+        addSimRangeRow({
+          mode: match[1] === "E" ? "exclude" : "include",
+          start: match[2],
+          end: match[3],
+        });
+      });
+      if (!simList.querySelector(".sim-range-row")) addSimRangeRow();
+    }
+
+    /* ---- Calendar Config & Zone Groups ---- */
+    setField(
+      "calendarConfig",
+      detail.calendarConfig != null ? detail.calendarConfig : "",
+    );
+    (detail.zoneGroup || []).forEach((entry) => {
+      const cb = document.querySelector(
+        `[data-rating-checklist="zoneGroup"] input[value="${entry.id}"]`,
+      );
+      if (cb) cb.checked = true;
+    });
+    (detail.dataZoneGroupId || []).forEach((entry) => {
+      const cb = document.querySelector(
+        `[data-rating-checklist="dataZoneGroup"] input[value="${entry.id}"]`,
+      );
+      if (cb) cb.checked = true;
+    });
+    syncMsDropdownLabels();
+
+    markStatus(null, "");
+  }
+  window._acPopulateForm = populateAtpCreateForm;
 
   /* ---------- Wire up on load ---------- */
 

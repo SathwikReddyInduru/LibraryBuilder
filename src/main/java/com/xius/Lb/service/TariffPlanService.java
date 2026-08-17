@@ -1,9 +1,8 @@
 package com.xius.Lb.service;
 
-import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,30 +41,48 @@ public class TariffPlanService {
 		Long servicePackageId = tariffPlanRepository.getNextServicePackageId();
 
 		logger.info("Generated servicePackageId={}", servicePackageId);
-		
-		String add_packageYn="N";
 
-		tariffPlanRepository.insertServicePackage(servicePackageId,
+		String addPackageYn = "N";
+		String aspType = "U";
 
-				request.getAtpName() + "_TP", null,
+		BigDecimal rentalAmount = BigDecimal.ZERO;
+		BigDecimal activationCharge = BigDecimal.ZERO;
 
-				null,
+		Integer tax1 = 0;
+		Integer tax2 = 0;
+		Integer tax3 = 0;
 
+		Integer rentalPeriod = 0;
+
+		String atpCategory = "OT";
+		String caServicePackageYn = null;
+		String atpCategoryByOffer = null;
+		String description = null;
+		String chargeOnFirstUsageYn = "N";
+		String allowMultipleAtpYn = null;
+
+		String userDefined1 = null;
+		String userDefined2 = null;
+		String userDefined3 = null;
+
+		String publicityId = request.getPublicityId();
+
+		tariffPlanRepository.insertServicePackage(servicePackageId, request.getAtpName() + "_TP" + servicePackageId,
+
+				rentalAmount, activationCharge,
 				request.getNetworkId(),
-
-				null, null, null, null, null,
-
-				add_packageYn,
+				tax1, tax2, tax3,
 				null,
-
+				addPackageYn,
+				null, rentalPeriod,
+				aspType, request.getValidTo(),
 				null,
-
-				request.getValidTo(),
-
-				null,
-
-				null, null, null, null, null, null);
-
+				atpCategory,
+				null, null, null, null,
+				publicityId,
+				null, null,
+				caServicePackageYn, atpCategoryByOffer, description, chargeOnFirstUsageYn, allowMultipleAtpYn,
+				userDefined1, userDefined2, userDefined3);
 		logger.info("Successfully inserted Service Package servicePackageId={} networkId={}", servicePackageId,
 				request.getNetworkId());
 

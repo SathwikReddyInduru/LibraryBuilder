@@ -72,9 +72,9 @@ public class TariffPlanRepository {
 	public void insertServicePackage(Long servicePackageId, String servicePackageDesc, BigDecimal rentalAmount,
 			BigDecimal activationCharge, Long networkId, Integer tax1, Integer tax2, Integer tax3, Long chargeId,
 			String addPackYn, String rentalType, Integer rentalPeriod, String aspType, String endDate,
-			Integer serviceDuration, BigDecimal transferorCharge, BigDecimal transfereeCharge,
-			BigDecimal changeMsisdnCharge, BigDecimal maxAmtPerTrans, Integer maxFnfserviceNumbers,
-			Integer maxSmsserviceNumbers) {
+			Integer serviceDuration,String atpCategory,BigDecimal transferorCharge, BigDecimal transfereeCharge, BigDecimal changeMsisdnCharge,BigDecimal maxAmtPerTrans,
+			String publicityId,Integer maxFnfserviceNumbers, Integer maxSmsserviceNumbers,String caServicePackageYn, String atpCategoryByOffer, String description, String chargeOnFirstUsageYn,
+			String allowMultipleAtpYn, String userDefined1, String userDefined2, String userDefined3) {
 
 		String sql = """
 				INSERT INTO CS_RAT_SERVICE_PACKAGE
@@ -94,12 +94,27 @@ public class TariffPlanRepository {
 				    ASP_TYPE,
 				    END_DATE,
 				    SERVICE_DURATION,
+
+				    ATP_CATEGORY,
+
 				    TRANSFEROR_CHARGE,
 				    TRANSFEREE_CHARGE,
 				    CHANGE_MSISDN_CHARGE,
 				    MAX_AMT_PER_TRANS,
+
+				    PUBLICITY_ID,
+
 				    MAX_FNFSERVICE_NUMBERS,
-				    MAX_SMSSERVICE_NUMBERS
+				    MAX_SMSSERVICE_NUMBERS,
+
+				    CA_SERVICE_PACKAGE_YN,
+				    ATP_CATEGORY_BY_OFFER,
+				    DESCRIPTION,
+				    CHARGE_ON_FIRST_USAGE_YN,
+				    ALLOW_MULTIPLE_ATP_YN,
+				    USER_DEFINED_1,
+				    USER_DEFINED_2,
+				    USER_DEFINED_3
 				)
 				VALUES
 				(
@@ -118,6 +133,21 @@ public class TariffPlanRepository {
 				    ?,
 				    TO_DATE(?, 'MM/DD/YYYY'),
 				    ?,
+
+				    ?,
+
+				    ?,
+				    ?,
+				    ?,
+				    ?,
+
+				    ?,
+
+				    ?,
+				    ?,
+
+				    ?,
+				    ?,
 				    ?,
 				    ?,
 				    ?,
@@ -127,10 +157,11 @@ public class TariffPlanRepository {
 				)
 				""";
 
-		oracleJdbcTemplate.update(sql, servicePackageId, servicePackageDesc, rentalAmount, activationCharge, networkId,
-				tax1, tax2, tax3, chargeId, addPackYn, rentalType, rentalPeriod, aspType, endDate, serviceDuration,
-				transferorCharge, transfereeCharge, changeMsisdnCharge, maxAmtPerTrans, maxFnfserviceNumbers,
-				maxSmsserviceNumbers);
+		oracleJdbcTemplate.update(sql,
+
+				servicePackageId, servicePackageDesc,rentalAmount, activationCharge,networkId,tax1, tax2, tax3,chargeId,addPackYn,rentalType, rentalPeriod,aspType, endDate,serviceDuration,
+                     atpCategory,transferorCharge, transfereeCharge, changeMsisdnCharge, maxAmtPerTrans,publicityId,maxFnfserviceNumbers, maxSmsserviceNumbers,caServicePackageYn, atpCategoryByOffer, description, chargeOnFirstUsageYn, allowMultipleAtpYn,
+                                  userDefined1, userDefined2, userDefined3);
 	}
 
 	/**
