@@ -1,0 +1,674 @@
+/* ═══════════════════════════════════════════════════════════
+   ATP CREATE — standalone page (/builder/atpcreate), own nav
+   node in layout.html, same approver-style two-pane shell as
+   the ATP Rules page (.ar-shell / .ar-left-pane / .ar-right-pane
+   / .ar-form-panel / .ar-view-panel / .ar-checklist-* are all
+   already global in builder.css and reused as-is here).
+   Everything below is ONLY what's specific to this page.
+════════════════════════════════════════════════════════════ */
+
+.atpc-page {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  background: #eef0f5;
+}
+
+/* ── Give cards/fields on this page proper breathing room —
+   the shared .ar-card padding (10px 15px) is too tight for a
+   form this dense, so this page gets a roomier override.
+   Separation between cards comes from spacing + shadow/border
+   only — background stays the plain white .ar-right-pane already
+   uses everywhere else, no extra tint. ── */
+.atpc-page .ar-form {
+  gap: 32px;
+}
+
+.atpc-page .ar-card {
+  padding: 20px 24px 22px;
+  border: 1px solid #d6dce6;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 6px 18px rgba(15, 23, 42, 0.07);
+}
+
+/* Whole-card hide — used by cards that shouldn't render at all
+   (not even with an empty title/subtitle) until a balance
+   category is selected. See syncBalanceSections in Atpcreate.js. */
+.atpc-page .ar-card.is-hidden {
+  display: none;
+}
+
+/* Zone Group / Data Zone Group fields inside "Calendar Config &
+   Zone Groups" — shown/hidden per balance category, same pattern
+   as .unit-row.is-hidden above. */
+.atpc-page .ar-field.is-hidden {
+  display: none;
+}
+
+/* Validity Period Days shares a 3-col row with Applicable From/To
+   (Hr). When it's hidden (Validity Period Type = Unlimited), keep
+   its grid slot reserved as empty space instead of letting the
+   other two fields stretch to fill the row. */
+.atpc-page #validityPeriodDaysField.is-hidden {
+  display: block;
+  visibility: hidden;
+}
+
+.atpc-page .ar-card-title {
+  font-size: 14px;
+}
+
+.atpc-page .ar-card-sub {
+  margin-bottom: 2px;
+}
+
+.atpc-page #atpCreateForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0;
+  margin: 0;
+}
+
+.atpc-page .ar-form-header {
+  margin: 0 24px;
+  background: #fff;
+}
+
+/* ── Consistent input treatment: kill the native number-input
+   spinner (only some fields were showing it depending on hover/
+   focus, which read as inconsistent styling across the form)
+   and make disabled/auto-calculated fields visibly distinct. ── */
+.atpc-page input[type="number"]::-webkit-inner-spin-button,
+.atpc-page input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.atpc-page input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.atpc-page .ar-input {
+  border-color: #dbe1ea;
+}
+
+.atpc-page .ar-input:disabled,
+.atpc-page .ar-input.is-locked {
+  background: #f1f4f8;
+  color: #6b7688;
+  cursor: not-allowed;
+}
+
+.atpc-page .ar-input::placeholder {
+  color: #a3aec2;
+}
+
+/* ── Field rows (ATP Details / Validity / Service Plan) —
+   auto-fit so fields wrap naturally at any viewport width (laptop
+   screens between the old 900px/620px breakpoints were forcing 3
+   cramped columns instead of wrapping) instead of only at two
+   fixed breakpoints. ── */
+.atpc-page .atpc-grid-2,
+.atpc-page .atpc-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px 16px;
+  margin-top: 14px;
+}
+
+.atpc-page .atpc-grid-2 .ar-field,
+.atpc-page .atpc-grid-3 .ar-field {
+  margin-top: 0;
+  width: 100%;
+}
+
+.atpc-page .atpc-grid-2 .ar-field:empty,
+.atpc-page .atpc-grid-3 .ar-field:empty {
+  display: none;
+}
+
+/* ── Balance Category pills — stretch to fill the row's full
+   width (instead of shrinking to fit their text) and sized up a
+   bit so this key selector reads as the primary control it is. ── */
+.atpc-page .ar-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.atpc-page .ar-check-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 0;
+  border: 1.5px solid #d7deea;
+  background: #f9fafc;
+  color: #475569;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+
+.atpc-page .ar-check-pill input {
+  accent-color: #3b5bdb;
+}
+
+.atpc-page .ar-check-pill:has(input:checked) {
+  border-color: #3b5bdb;
+  background: #eef1ff;
+  color: #2f47b0;
+}
+
+/* ── Per-category unit row, toggled by Atpcreate.js —
+   Category/Unit Type/Unit Value sit in one row (wrapping on
+   narrow widths), with the category shown as a labeled badge
+   instead of a floating pill stacked above the fields. ── */
+.atpc-page .unit-row {
+  background: #f9fafc;
+  border: 1px solid #e5e9f2;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.atpc-page .unit-row.is-hidden {
+  display: none;
+}
+
+.atpc-page .unit-row-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.atpc-page .unit-row-fields .ar-field {
+  margin-top: 0;
+}
+
+.atpc-page .unit-row-category {
+  flex: 0 0 110px;
+  min-width: 90px;
+}
+
+.atpc-page .unit-row-fields .ar-field:not(.unit-row-category) {
+  /* Grow to fill the rest of the row, so Unit Type/Unit Value use
+     the full row width instead of leaving blank space on the
+     right — Category stays fixed-width and close beside them
+     since the 16px flex gap is the only space between the two. */
+  flex: 1 1 200px;
+}
+
+.atpc-page .unit-row-tag {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #2f47b0;
+}
+
+/* ── Derived Services / Usage Types group, toggled together by
+   the same data-derived-group selector (Atpcreate.js's
+   syncBalanceSections queries all matches document-wide, so both
+   columns below stay in sync automatically) ── */
+.atpc-page .derived-group {
+  margin-top: 14px;
+}
+
+.atpc-page .derived-group:first-child {
+  margin-top: 0;
+}
+
+.atpc-page .derived-group.is-hidden {
+  display: none;
+}
+
+/* Card-style checklist container (distinct from the plain
+   flex-fill .ar-tagselect used by ATP Rules' Add/Remove columns) */
+.atpc-page .ar-tagselect {
+  border: 1px solid #e5e9f2;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  width: 100%;
+}
+
+.atpc-page .ar-tagselect > label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1e293b;
+  padding: 10px 14px;
+  background: #f9fafc;
+  border-bottom: 1px solid #e5e9f2;
+}
+
+/* The toolbar (search + select-all/deselect) and the checkbox
+   list were sitting flush against the card edges with no
+   internal padding — cramped against the border on every side. */
+.atpc-page .ar-tagselect .ar-checklist-toolbar {
+  padding: 12px 14px 0;
+}
+
+/* Short helper copy under a label, e.g. the Zone Group / Data Zone
+   Group rating-selection rule. */
+.atpc-page .ar-field-hint {
+  margin: 2px 0 6px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: #8792a2;
+}
+
+.atpc-page .ar-tagselect .ar-checklist-body {
+  padding: 0 8px 0 14px;
+}
+
+/* "Rating" / "Restricted" sub-headings inside the Zone Group / Data
+   Zone Group checklists (see renderRatingChecklist in Atpcreate.js) */
+.atpc-page .ar-checklist-group-heading {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  padding: 10px 6px 4px;
+}
+
+.atpc-page .ar-checklist-group-heading:first-child {
+  padding-top: 8px;
+}
+
+/* ── Derived Services + Usage Types side by side, wrapping to a
+   single column once a side would drop below ~320px so it never
+   gets crushed on narrower laptop widths ── */
+.atpc-page .services-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Each category (voice/sms/data/mms/global) is its own row, with
+   the derived-services box and usage-types box side by side as a
+   CSS grid — grid's default row stretch makes both cells the same
+   height (the taller box's height), so a shorter checklist grows
+   to match instead of leaving mismatched heights. */
+.atpc-page .service-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.atpc-page .service-pair.is-hidden,
+.atpc-page .service-pair:has(> .derived-group.is-hidden) {
+  display: none;
+}
+
+.atpc-page .service-pair .derived-group {
+  min-width: 0;
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.atpc-page .service-pair .ar-tagselect {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.atpc-page .service-pair .ar-tagselect .ar-checklist-body {
+  flex: 1;
+}
+
+/* ── Roaming Networks — a handful of short options read better as
+   one row than a tall stacked list; scoped to this checklist only
+   so the longer Derived Services / Usage Types lists elsewhere
+   keep their normal vertical layout. ── */
+.atpc-page .roaming-networks .ar-checklist-body {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  max-height: none;
+  overflow: visible;
+}
+
+.atpc-page .roaming-networks .ar-check-row {
+  flex: 0 0 auto;
+}
+
+/* ── SIM / IMSI range repeater row ──
+   Base .ar-condition-row only styles its <select>s (builder.css) —
+   fine on ATP Rules where every cell is a dropdown, but this row
+   also has two free-text inputs that were falling back to raw
+   browser style. Styling them to match + adding the Include/
+   Exclude dropdown the range applies to. ── */
+.atpc-page .ar-condition-row.sim-range-row {
+  grid-template-columns: 120px 1fr 1fr 32px;
+}
+
+.atpc-page .ar-condition-row input[type="text"] {
+  height: 36px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  color: #1e293b;
+  background: #fff;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.atpc-page .ar-condition-row input[type="text"]:focus {
+  border-color: #3b5bdb;
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
+}
+
+.atpc-page .ar-condition-row input[type="text"]::placeholder {
+  color: #a3aec2;
+}
+
+@media (max-width: 640px) {
+  .atpc-page .ar-condition-row.sim-range-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── "Add Range" sits beside the field label instead of as a
+   long full-width button under the list ── */
+.atpc-page .ar-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.atpc-page .ar-field-header label {
+  margin: 0;
+}
+
+.atpc-page .ar-field-header .ar-add-row-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.atpc-page .ar-condition-remove--disabled {
+  cursor: not-allowed;
+}
+
+/* ── Save/Publish status indicator, sits under the fixed footer ── */
+.atpc-page .footer-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 0 0 12px;
+  flex-shrink: 0;
+}
+
+.atpc-page .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.atpc-page .status-dot.is-saved {
+  background: #f59e0b;
+}
+
+.atpc-page .status-dot.is-published {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+}
+
+/* ── Multi-select dropdown: closed like a normal select, opens to
+   reveal a searchable checkbox checklist (Data Zone Group). The
+   toggle reuses .ar-input for identical sizing/border/focus look;
+   the panel reuses .ar-tagselect/.ar-checklist-* so it matches the
+   Derived Services checklists exactly. ── */
+.atpc-page .ar-msdropdown-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.atpc-page .ar-msdropdown-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1e293b;
+}
+
+.atpc-page .ar-msdropdown-caret {
+  font-size: 18px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.atpc-page .ar-msdropdown.is-open .ar-msdropdown-caret {
+  transform: rotate(180deg);
+}
+
+.atpc-page .ar-msdropdown.is-open .ar-msdropdown-toggle {
+  border-color: #3b5bdb;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
+}
+
+.atpc-page .ar-msdropdown {
+  position: relative;
+}
+
+.atpc-page .ar-msdropdown-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 0;
+  padding: 10px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.atpc-page .ar-msdropdown-panel.is-hidden {
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Read-only ATP detail view (see _acRenderAtpDetail in Atpcreate.js)
+   Deliberately NOT built from .ar-input/.ar-input-readonly — this is
+   a plain label/value display, not a disabled form. Identifiers and
+   codes (names, ranges, calendar/zone-group codes) get a monospace
+   treatment to read as data rather than prose, since that's most of
+   what a tariff config actually is.
+   ══════════════════════════════════════════════════════════════ */
+
+.atpc-page .ar-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 22px;
+  row-gap: 16px;
+  padding: 14px 2px;
+}
+
+.atpc-page .ar-detail-grid + .ar-detail-grid {
+  border-top: 1px solid #eef1f6;
+}
+
+.atpc-page .ar-detail-item {
+  min-width: 0;
+}
+
+.atpc-page .ar-detail-item--full {
+  grid-column: 1 / -1;
+}
+
+.atpc-page .ar-detail-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+
+.atpc-page .ar-detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.atpc-page .ar-detail-value--code {
+  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  letter-spacing: -0.01em;
+}
+
+.atpc-page .ar-detail-value--muted {
+  color: #94a3b8;
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* Colored status pills for Yes/No flags and Include/Exclude/Rating/
+   Restricted tags — distinct from .ar-chip (used for plain list
+   items like roaming networks or usage types) because these carry a
+   meaningful state, not just membership in a list. */
+.atpc-page .ar-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.atpc-page .ar-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.atpc-page .ar-badge--yes {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.atpc-page .ar-badge--no {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.atpc-page .ar-badge--include {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.atpc-page .ar-badge--exclude {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.atpc-page .ar-badge--rating {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.atpc-page .ar-badge--restricted {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+/* Plain chip row for list-type values (roaming networks, usage
+   types, derived services) — no remove icon, no interaction. */
+.atpc-page .ar-detail-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atpc-page .ar-detail-chip {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* SIM / IMSI range rows — a compact code-style list rather than a
+   3-field grid, since "start → end" reads as one unit. */
+.atpc-page .ar-detail-range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  font-size: 13px;
+}
+
+.atpc-page .ar-detail-range-row + .ar-detail-range-row {
+  border-top: 1px solid #eef1f6;
+}
+
+.atpc-page .ar-detail-range-arrow {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+/* Section label used to break up a card into named groups (e.g. one
+   card per balance category) without a nested .ar-card box. */
+.atpc-page .ar-detail-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.atpc-page .ar-detail-subhead + .ar-detail-subhead {
+  margin-top: 4px;
+}

@@ -274,6 +274,34 @@ public class BuilderPageController {
         return "builder/step6";
     }
 
+
+    // ================= ATP CREATE =================
+    //
+    // Standalone page, same pattern as /builder/admin: one path, its own
+    // template (atpcreate.html) with its own JS (Atpcreate.js) and CSS
+    // (Atpcreate.css). The list (left pane) and
+    // create/view panels (right pane) are all client-side panel-switches
+    // within that one page — list comes from GET /builder/added-packages
+    // (AtpRulesController), read-only view from GET /builder/atp-details
+    // (AtpDetailsController, currently a 501 stub).
+    @GetMapping("/builder/atpcreate")
+    public String atpCreatePage(HttpSession session, Model model) {
+
+        logger.info("Opening ATP Create page");
+
+        if (isNotLoggedIn(session)) {
+
+            logger.warn("Unauthorized ATP Create page access");
+
+            return "redirect:/loginform";
+        }
+
+        setCommonData(session, model);
+
+        return "builder/atpcreate";
+    }
+
+
     @GetMapping("/logout")
     public String logout(HttpSession session) {
 

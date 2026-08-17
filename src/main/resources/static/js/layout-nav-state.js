@@ -67,7 +67,11 @@ function restoreActiveModule() {
     setModuleUI("builder");
     return;
   }
-
+  // If already on ATP Create
+  if (path.startsWith("/builder/atpcreate")) {
+    setModuleUI("atpcreate");
+    return;
+  }
   // FIRST LOAD DECISION
   const hasClone = PRIVILEGE_IDS.includes("P26127");
 
@@ -93,6 +97,11 @@ function activateModule(module, el) {
   if (module === "approver" && !hasApprover) return false;
   if (module === "clone" && !hasClone) return false;
 
+  //atp create
+
+  const atpCreateNode = document.getElementById("mn-atpcreate");
+  if (atpCreateNode)
+    atpCreateNode.classList.toggle("active", module === "atpcreate");
   // RESTORE LIBRARY when switching back
   if (module === "builder") {
     const container = document.getElementById("comp-list");
@@ -125,8 +134,7 @@ function setModuleUI(module) {
   if (cloneNode) cloneNode.classList.toggle("active", module === "clone");
   if (atpRulesNode)
     atpRulesNode.classList.toggle("active", module === "atprules");
-  if (atpRateNode)
-    atpRateNode.classList.toggle("active", module === "atprate");
+  if (atpRateNode) atpRateNode.classList.toggle("active", module === "atprate");
 
   if (module === "clone" || module === "atprules" || module === "atprate") {
     if (stepRail) stepRail.classList.add("collapsed");
@@ -380,7 +388,9 @@ function checkStepAccess(targetStep) {
     );
 
     if (missing) {
-      showToast(`Please enter a priority for "${missing.name}" before proceeding.`);
+      showToast(
+        `Please enter a priority for "${missing.name}" before proceeding.`,
+      );
       const input = document.getElementById(`priority-s3-${missing.id}`);
       if (input) input.focus();
       return false;
@@ -401,7 +411,9 @@ function checkStepAccess(targetStep) {
     );
 
     if (missing) {
-      showToast(`Please enter a priority for "${missing.name}" before proceeding.`);
+      showToast(
+        `Please enter a priority for "${missing.name}" before proceeding.`,
+      );
       const input = document.getElementById(`priority-s4-${missing.id}`);
       if (input) input.focus();
       return false;
@@ -432,9 +444,7 @@ function checkStepAccess(targetStep) {
       showToast(
         `Please select VIP Plan for "${missingVipPlan.name}" before proceeding.`,
       );
-      const input = document.getElementById(
-        `vip-plan-s4-${missingVipPlan.id}`,
-      );
+      const input = document.getElementById(`vip-plan-s4-${missingVipPlan.id}`);
       if (input) input.focus();
       return false;
     }
@@ -455,8 +465,12 @@ function checkStepAccess(targetStep) {
     );
 
     if (missingPriority) {
-      showToast(`Please enter a priority for "${missingPriority.name}" before proceeding.`);
-      const input = document.getElementById(`priority-s5-${missingPriority.id}`);
+      showToast(
+        `Please enter a priority for "${missingPriority.name}" before proceeding.`,
+      );
+      const input = document.getElementById(
+        `priority-s5-${missingPriority.id}`,
+      );
       if (input) input.focus();
       return false;
     }

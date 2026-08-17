@@ -1,487 +1,792 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:fragment="layout(titleFrag, stageFrag, activeStep)">
-
-<head>
+<!doctype html>
+<html
+  xmlns:th="http://www.thymeleaf.org"
+  th:fragment="layout(titleFrag, stageFrag, activeStep)"
+>
+  <head>
     <title th:replace="${titleFrag}">Tariff Builder</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
-        rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="icon" type="image/jpeg" href="/images/favicon.jpeg">
-    <link rel="stylesheet" th:href="@{/css/builder.css}">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/jpeg" href="/images/favicon.jpeg" />
+    <link rel="stylesheet" th:href="@{/css/builder.css}" />
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/storage-keys.js}"></script>
     <script th:src="@{/js/toast.js}"></script>
     <script th:src="@{/js/payload-builder.js}"></script>
-</head>
+  </head>
 
-<body>
-
+  <body>
     <nav class="navbar">
-        <img th:src="@{/images/logo.png}" alt="Xius Logo" style="height:50px; vertical-align:middle;">
-        <div class="navbar-right">
-            <div id="navClock" class="nav-clock"></div>
-            <div class="user-menu">
-                <div class="user-icon" onclick="toggleUserMenu()">
-                    <span>👤</span>
-                </div>
-                <div class="user-dropdown" id="userDropdown">
-                    <div class="user-name" th:text="${username != null ? username : 'User'}">User</div>
-                    <div class="logout-option" onclick="logout()">
-                        <span class="material-icons" style="font-size:18px; margin-right:8px;">logout</span>
-                        Logout
-                    </div>
-                </div>
+      <img
+        th:src="@{/images/logo.png}"
+        alt="Xius Logo"
+        style="height: 50px; vertical-align: middle"
+      />
+      <div class="navbar-right">
+        <div id="navClock" class="nav-clock"></div>
+        <div class="user-menu">
+          <div class="user-icon" onclick="toggleUserMenu()">
+            <span>👤</span>
+          </div>
+          <div class="user-dropdown" id="userDropdown">
+            <div
+              class="user-name"
+              th:text="${username != null ? username : 'User'}"
+            >
+              User
             </div>
+            <div class="logout-option" onclick="logout()">
+              <span
+                class="material-icons"
+                style="font-size: 18px; margin-right: 8px"
+                >logout</span
+              >
+              Logout
+            </div>
+          </div>
         </div>
+      </div>
     </nav>
     <div class="app-container">
-
-        <!-- ═══════════════════════════════════════════════════════════
+      <!-- ═══════════════════════════════════════════════════════════
              MAIN RAIL — app-level module switcher
              Nodes: TARIFF BUILDER | TARIFF APPROVER
              Visibility driven by privilege id (set via JS later)
         ════════════════════════════════════════════════════════════ -->
-        <nav class="main-rail" id="mainRail">
-            <!-- Builder node -->
-            <a href="/builder/step1" class="main-node" id="mn-builder" title="Tariff Builder"
-                onclick="return activateModule('builder', this)">
-                <span class="main-node-icon material-icons">build_circle</span>
-                <span class="main-node-label">BUILDER</span>
-            </a>
+      <nav class="main-rail" id="mainRail">
+        <!-- Builder node -->
+        <a
+          href="/builder/step1"
+          class="main-node"
+          id="mn-builder"
+          title="Tariff Builder"
+          onclick="return activateModule('builder', this);"
+        >
+          <span class="main-node-icon material-icons">build_circle</span>
+          <span class="main-node-label">BUILDER</span>
+        </a>
 
+        <!-- Approver node — hidden until privilege allows -->
+        <a
+          href="/builder/admin"
+          class="main-node"
+          id="mn-approver"
+          title="Tariff Approver"
+          onclick="return activateModule('approver', this);"
+        >
+          <span class="main-node-icon material-icons">task_alt</span>
+          <span class="main-node-label">APPROVER</span>
+        </a>
 
-            <!-- Approver node — hidden until privilege allows -->
-            <a href="/builder/admin" class="main-node" id="mn-approver" title="Tariff Approver"
-                onclick="return activateModule('approver', this)">
-                <span class="main-node-icon material-icons">task_alt</span>
-                <span class="main-node-label">APPROVER</span>
-            </a>
+        <a
+          href="#"
+          class="main-node"
+          id="mn-clone"
+          title="Clone TPs"
+          onclick="
+            openClone();
+            return false;
+          "
+        >
+          <span class="main-node-icon material-icons">copy_all</span>
+          <span class="main-node-label">CLONE TP's</span>
+        </a>
 
+        <a
+          href="#"
+          class="main-node"
+          id="mn-atprules"
+          title="ATP Rules"
+          onclick="
+            openAtpRules();
+            return false;
+          "
+        >
+          <span class="main-node-icon material-icons">rule</span>
+          <span class="main-node-label">ATP RULES</span>
+        </a>
 
-            <a href="#" class="main-node" id="mn-clone" title="Clone TPs" onclick="openClone(); return false;">
-                <span class="main-node-icon material-icons">copy_all</span>
-                <span class="main-node-label">CLONE TP's</span>
-            </a>
+        <a
+          href="#"
+          class="main-node"
+          id="mn-atprate"
+          title="Update ATP Rate"
+          onclick="
+            openAtpRate();
+            return false;
+          "
+        >
+          <span class="main-node-icon material-icons">payments</span>
+          <span class="main-node-label">ATP RATE</span>
+        </a>
 
-            <a href="#" class="main-node" id="mn-atprules" title="ATP Rules" onclick="openAtpRules(); return false;">
-                <span class="main-node-icon material-icons">rule</span>
-                <span class="main-node-label">ATP RULES</span>
-            </a>
+        <a
+          th:href="@{/builder/atpcreate}"
+          class="main-node"
+          id="mn-atpcreate"
+          title="Create ATP"
+          onclick="activateModule('atpcreate', this)"
+        >
+          <span class="main-node-icon material-icons">note_add</span>
+          <span class="main-node-label">ATP CREATE</span>
+        </a>
+        <!--atp creation ended -->
+        <div style="margin-top: auto"></div>
 
-            <a href="#" class="main-node" id="mn-atprate" title="Update ATP Rate" onclick="openAtpRate(); return false;">
-                <span class="main-node-icon material-icons">payments</span>
-                <span class="main-node-label">ATP RATE</span>
-            </a>
+        <!-- Approved TPs node -->
+        <a
+          href="#"
+          class="main-node"
+          id="mn-approved"
+          title="Approved TPs"
+          th:classappend="${activeStep != 0} ? ' hidden'"
+          onclick="
+            openApproved();
+            return false;
+          "
+        >
+          <span class="main-node-icon material-icons">check_circle</span>
+          <span class="main-node-label">APPROVED</span>
+        </a>
 
-            <div style="margin-top:auto;"></div>
+        <!-- Rejected TPs node -->
+        <a
+          href="#"
+          class="main-node"
+          id="mn-rejected"
+          title="Rejected TPs"
+          th:classappend="${activeStep != 0} ? ' hidden'"
+          onclick="
+            openRejected();
+            return false;
+          "
+        >
+          <span class="main-node-icon material-icons">cancel</span>
+          <span class="main-node-label">REJECTED</span>
+        </a>
 
-            <!-- Approved TPs node -->
-            <a href="#" class="main-node" id="mn-approved" title="Approved TPs"
-                th:classappend="${activeStep != 0} ? ' hidden'" onclick="openApproved(); return false;">
-                <span class="main-node-icon material-icons">check_circle</span>
-                <span class="main-node-label">APPROVED</span>
-            </a>
+        <a
+          href="#"
+          class="main-node"
+          id="mn-saved"
+          title="Drafts"
+          th:classappend="${activeStep == 0} ? ' hidden'"
+          onclick="
+            openSaved();
+            return false;
+          "
+        >
+          <span class="main-node-icon material-icons">folder</span>
+          <span class="main-node-label">CREATED TP's</span>
+        </a>
 
-            <!-- Rejected TPs node -->
-            <a href="#" class="main-node" id="mn-rejected" title="Rejected TPs"
-                th:classappend="${activeStep != 0} ? ' hidden'" onclick="openRejected(); return false;">
-                <span class="main-node-icon material-icons">cancel</span>
-                <span class="main-node-label">REJECTED</span>
-            </a>
+        <a
+          href="#"
+          class="main-node"
+          id="mn-drafts"
+          title="Drafts"
+          th:classappend="${activeStep == 0} ? ' hidden'"
+          onclick="
+            openDrafts();
+            return false;
+          "
+        >
+          <span class="main-node-icon material-icons">drafts</span>
+          <span class="main-node-label">DRAFTS</span>
+        </a>
+      </nav>
 
-            <a href="#" class="main-node" id="mn-saved" title="Drafts" th:classappend="${activeStep == 0} ? ' hidden'"
-                onclick="openSaved(); return false;">
-                <span class="main-node-icon material-icons">folder</span>
-                <span class="main-node-label">CREATED TP's</span>
-            </a>
-
-            <a href="#" class="main-node" id="mn-drafts" title="Drafts" th:classappend="${activeStep == 0} ? ' hidden'"
-                onclick="openDrafts(); return false;">
-                <span class="main-node-icon material-icons">drafts</span>
-                <span class="main-node-label">DRAFTS</span>
-            </a>
-        </nav>
-
-        <!-- ═══════════════════════════════════════════════════════════
+      <!-- ═══════════════════════════════════════════════════════════
              STEP RAIL — visible only when Builder module is active
         ════════════════════════════════════════════════════════════ -->
-        <nav class="step-rail" id="stepRail">
-            <a href="/builder/step1" class="step-node" onclick="return checkStepAccess(1)"
-                th:classappend="${activeStep == 1} ? ' active'">
-                <b>1</b><span>PKG TYPE</span>
-            </a>
-            <a href="/builder/step2" class="step-node" onclick="return checkStepAccess(2)"
-                th:classappend="${activeStep == 2} ? ' active'">
-                <b>2</b><span>SERVICE</span>
-            </a>
-            <a href="/builder/step3" class="step-node" onclick="return checkStepAccess(3)"
-                th:classappend="${activeStep == 3} ? ' active'">
-                <b>3</b><span>DATP</span>
-            </a>
-            <a href="/builder/step4" class="step-node" onclick="return checkStepAccess(4)"
-                th:classappend="${activeStep == 4} ? ' active'">
-                <b>4</b><span>AATP</span>
-            </a>
-            <a href="/builder/step5" class="step-node" onclick="return checkStepAccess(5)"
-                th:classappend="${activeStep == 5} ? ' active'">
-                <b>5</b><span>OPTIONAL SVCS</span>
-            </a>
-            <a href="/builder/step6" class="step-node" onclick="return checkStepAccess(6)"
-                th:classappend="${activeStep == 6} ? ' active'">
-                <b>6</b><span>PRICING</span>
-            </a>
-        </nav>
+      <nav class="step-rail" id="stepRail">
+        <a
+          href="/builder/step1"
+          class="step-node"
+          onclick="return checkStepAccess(1);"
+          th:classappend="${activeStep == 1} ? ' active'"
+        >
+          <b>1</b><span>PKG TYPE</span>
+        </a>
+        <a
+          href="/builder/step2"
+          class="step-node"
+          onclick="return checkStepAccess(2);"
+          th:classappend="${activeStep == 2} ? ' active'"
+        >
+          <b>2</b><span>SERVICE</span>
+        </a>
+        <a
+          href="/builder/step3"
+          class="step-node"
+          onclick="return checkStepAccess(3);"
+          th:classappend="${activeStep == 3} ? ' active'"
+        >
+          <b>3</b><span>DATP</span>
+        </a>
+        <a
+          href="/builder/step4"
+          class="step-node"
+          onclick="return checkStepAccess(4);"
+          th:classappend="${activeStep == 4} ? ' active'"
+        >
+          <b>4</b><span>AATP</span>
+        </a>
+        <a
+          href="/builder/step5"
+          class="step-node"
+          onclick="return checkStepAccess(5);"
+          th:classappend="${activeStep == 5} ? ' active'"
+        >
+          <b>5</b><span>OPTIONAL SVCS</span>
+        </a>
+        <a
+          href="/builder/step6"
+          class="step-node"
+          onclick="return checkStepAccess(6);"
+          th:classappend="${activeStep == 6} ? ' active'"
+        >
+          <b>6</b><span>PRICING</span>
+        </a>
+      </nav>
 
-        <main class="workspace" th:classappend="${activeStep == 0} ? ' admin-mode'">
-            <!-- FLOATING PILL HEADER -->
-            <header class="header-pill-bar">
-                <div class="logo">
-                    <span th:text="${username != null ? username : 'user'}">user</span>
-                </div>
-                <div class="pillSeperator">
-                    <div class="header-pill-controls" th:classappend="${activeStep == 0} ? ' hidden'">
-                        <input type="text" placeholder="Enter  Name..." class="config-name" id="configName">
-                    </div>
-                    <div class="header-icon-btn" th:classappend="${activeStep == 0} ? ' hidden'">
-                        <span class="material-icons reset-btn" id="resetBtn" onclick="resetBuilder()" title="Reset builder">
-                            restart_alt
-                        </span>
-                        <span class="header-icon-label">Reset</span>
-                    </div>
-                    <div class="header-icon-btn" th:classappend="${activeStep == 0} ? ' hidden'">
-                        <span class="material-icons save-draft-btn" id="saveDraftBtn" onclick="manualSaveDraft()"
-                            title="Save as Draft">
-                            save
-                        </span>
-                        <span class="header-icon-label">Draft</span>
-                    </div>
-                </div>
-            </header>
-
-            <!-- TWO-PANE BODY: left card + right card -->
-            <div class="workspace-body">
-                <!-- LEFT PANE — stage content -->
-                <div class="pane pane-left" id="leftPane">
-                    <th:block th:replace="${stageFrag}"></th:block>
-
-                    <!-- FOOTER ACTIONS -->
-                    <div class="config-panel" id="footerActions" th:classappend="${activeStep != 6} ? ' hidden'">
-                        <button class="btn-hierarchy" onclick="viewTree()">Hierarchy</button>
-                    </div>
-                </div>
-
-                <!-- RIGHT PANE — library sidebar -->
-                <aside class="pane pane-right sidebar" th:classappend="${activeStep == 0} ? ' hidden'" id="sidebar">
-                    <div class="sidebar-tabs">
-                        <div class="tab">LIBRARY</div>
-                    </div>
-                    <div class="sidebar-content" id="comp-list"></div>
-                </aside>
+      <main
+        class="workspace"
+        th:classappend="${activeStep == 0} ? ' admin-mode'"
+      >
+        <!-- FLOATING PILL HEADER -->
+        <header class="header-pill-bar">
+          <div class="logo">
+            <span th:text="${username != null ? username : 'user'}">user</span>
+          </div>
+          <div class="pillSeperator">
+            <div
+              class="header-pill-controls"
+              th:classappend="${activeStep == 0} ? ' hidden'"
+            >
+              <input
+                type="text"
+                placeholder="Enter  Name..."
+                class="config-name"
+                id="configName"
+              />
             </div>
+            <div
+              class="header-icon-btn"
+              th:classappend="${activeStep == 0} ? ' hidden'"
+            >
+              <span
+                class="material-icons reset-btn"
+                id="resetBtn"
+                onclick="resetBuilder()"
+                title="Reset builder"
+              >
+                restart_alt
+              </span>
+              <span class="header-icon-label">Reset</span>
+            </div>
+            <div
+              class="header-icon-btn"
+              th:classappend="${activeStep == 0} ? ' hidden'"
+            >
+              <span
+                class="material-icons save-draft-btn"
+                id="saveDraftBtn"
+                onclick="manualSaveDraft()"
+                title="Save as Draft"
+              >
+                save
+              </span>
+              <span class="header-icon-label">Draft</span>
+            </div>
+          </div>
+        </header>
 
-            <!-- ═══════════════════════════════════════════════════════════
+        <!-- TWO-PANE BODY: left card + right card -->
+        <div class="workspace-body">
+          <!-- LEFT PANE — stage content -->
+          <div class="pane pane-left" id="leftPane">
+            <th:block th:replace="${stageFrag}"></th:block>
+
+            <!-- FOOTER ACTIONS -->
+            <div
+              class="config-panel"
+              id="footerActions"
+              th:classappend="${activeStep != 6} ? ' hidden'"
+            >
+              <button class="btn-hierarchy" onclick="viewTree()">
+                Hierarchy
+              </button>
+            </div>
+          </div>
+
+          <!-- RIGHT PANE — library sidebar -->
+          <aside
+            class="pane pane-right sidebar"
+            th:classappend="${activeStep == 0} ? ' hidden'"
+            id="sidebar"
+          >
+            <div class="sidebar-tabs">
+              <div class="tab">LIBRARY</div>
+            </div>
+            <div class="sidebar-content" id="comp-list"></div>
+          </aside>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
             CLONE TPS PAGE — injected inside .workspace (as sibling to .workspace-body)
             Add this block INSIDE the <main class="workspace"> element,
             RIGHT BEFORE the closing </main> tag in layout.html.
             ════════════════════════════════════════════════════════════ -->
 
-            <!-- Clone TPs inline page (hidden by default) -->
-            <div id="clonePage">
-
-                <!-- Header pill bar — with search bar -->
-                <div class="clone-page-header">
-                    <div class="clone-page-header-left">
-                        <span class="clone-page-header-title">Tariff Packages</span>
-                        <span class="clone-page-header-badge" id="clonePlanCount">0 plans</span>
-                    </div>
-                    <div class="clone-search-wrap">
-                        <span class="material-icons clone-search-icon">search</span>
-                        <input type="text" id="cloneSearchInput" class="clone-search-input"
-                            placeholder="Search by price, name or category…" oninput="_applyTpSearch(this.value)" />
-                    </div>
-                    <button class="clone-filter-btn" id="cloneFilterBtn" onclick="openFilterModal()">
-                        <span class="material-icons">tune</span>
-                        Filter
-                        <span class="clone-filter-badge" id="cloneFilterBadge" style="display:none">0</span>
-                    </button>
-                </div>
-
-                <!-- Scrollable cards body -->
-                <div class="clone-page-body">
-                    <div class="clone-plan-grid" id="clonePlanGrid">
-                        <!-- Cards injected by _renderTpCards() -->
-                    </div>
-                </div>
-
+        <!-- Clone TPs inline page (hidden by default) -->
+        <div id="clonePage">
+          <!-- Header pill bar — with search bar -->
+          <div class="clone-page-header">
+            <div class="clone-page-header-left">
+              <span class="clone-page-header-title">Tariff Packages</span>
+              <span class="clone-page-header-badge" id="clonePlanCount"
+                >0 plans</span
+              >
             </div>
+            <div class="clone-search-wrap">
+              <span class="material-icons clone-search-icon">search</span>
+              <input
+                type="text"
+                id="cloneSearchInput"
+                class="clone-search-input"
+                placeholder="Search by price, name or category…"
+                oninput="_applyTpSearch(this.value)"
+              />
+            </div>
+            <button
+              class="clone-filter-btn"
+              id="cloneFilterBtn"
+              onclick="openFilterModal()"
+            >
+              <span class="material-icons">tune</span>
+              Filter
+              <span
+                class="clone-filter-badge"
+                id="cloneFilterBadge"
+                style="display: none"
+                >0</span
+              >
+            </button>
+          </div>
 
-            <!-- ═══════════════════════════════════════════════════════════
+          <!-- Scrollable cards body -->
+          <div class="clone-page-body">
+            <div class="clone-plan-grid" id="clonePlanGrid">
+              <!-- Cards injected by _renderTpCards() -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
             ATP RULES PAGE — injected inside .workspace, sibling of clonePage.
             Approver-style two-pane layout: left = rule list, right = form /
             detail. No top header-pill (that's hidden entirely by JS while
             this page is open) and no extra title bar spanning both panes.
             ════════════════════════════════════════════════════════════ -->
-            <div id="atpRulesPage">
-                <div class="ar-shell">
-
-                    <!-- ── LEFT PANE — rule list ─────────────────────── -->
-                    <div class="ar-left-pane">
-                        <div class="ar-pane-header">
-                            <div class="ar-pane-header-top">
-                                <h3>ATP Rules</h3>
-                                <span class="ar-count" id="arRuleCount">0 rules</span>
-                            </div>
-                            <div class="ar-search-row">
-                                <span class="material-icons">search</span>
-                                <input type="text" id="arSearchInput" placeholder="Search rules…"
-                                    oninput="_arApplySearch(this.value)" />
-                            </div>
-                            <button class="ar-new-btn" onclick="_arShowForm()">
-                                <span class="material-icons">add</span>
-                                New Rule
-                            </button>
-                        </div>
-
-                        <div class="ar-rule-list" id="arRuleList">
-                            <!-- Rule rows injected by _arRenderList() -->
-                        </div>
-                        <div class="ar-empty-state" id="arEmptyState" style="display:none;">
-                            <span class="material-icons">rule_folder</span>
-                            <p>No ATP rules yet</p>
-                            <span>Create your first prerequisite rule.</span>
-                        </div>
-                    </div>
-
-                    <!-- ── RIGHT PANE — placeholder / view / form ──────── -->
-                    <div class="ar-right-pane">
-
-                        <!-- shown when nothing is selected and not creating -->
-                        <div id="arPlaceholder" class="ar-placeholder">
-                            <div class="ar-placeholder-icon">
-                                <span class="material-icons">fact_check</span>
-                            </div>
-                            <h3>No rule selected</h3>
-                            <p>Pick a rule from the left to view it, or create a new one.</p>
-                            <button class="ar-new-btn" onclick="_arShowForm()">
-                                <span class="material-icons">add</span>
-                                New Rule
-                            </button>
-                        </div>
-
-                        <!-- read-only view of a selected rule -->
-                        <div id="arViewPanel" class="ar-view-panel hidden">
-                            <!-- injected by _arRenderView() -->
-                        </div>
-
-                        <!-- create form -->
-                        <div id="arFormPanel" class="ar-form-panel hidden">
-
-                            <!-- FIXED HEADER -->
-                            <div class="ar-form-header">
-                                <div class="ar-form-header-icon">
-                                    <span class="material-icons">edit_note</span>
-                                </div>
-                                <div>
-                                    <h3>New ATP Rule</h3>
-                                    <p class="ar-form-header-sub">Define the basic details and conditions for this rule</p>
-                                </div>
-                                <span class="ar-form-header-name hidden" id="arFormHeaderName"></span>
-                            </div>
-
-                            <!-- SCROLLABLE MIDDLE -->
-                            <div class="ar-form" id="arForm">
-
-                                <!-- Basics -->
-                                <div class="ar-card">
-                                    <div class="ar-card-title">
-                                        <span class="material-icons ar-card-icon ar-card-icon--basics">sell</span>
-                                        Basics
-                                    </div>
-                                    <div class="ar-field-row">
-                                        <div class="ar-field" id="arRuleNameField">
-                                            <label>Additional Tariff Plan Name <span class="ar-req">*</span></label>
-                                            <select id="arRuleName" class="ar-input">
-                                                <option value="">Select Additional Tariff Plan…</option>
-                                            </select>
-                                        </div>
-                                        <div class="ar-field hidden" id="arRuleNameReadonlyField">
-                                            <label>Additional Tariff Plan Name</label>
-                                            <div class="ar-input ar-input-readonly" id="arRuleNameReadonly"></div>
-                                        </div>
-                                        <div class="ar-field ar-field-narrow">
-                                            <label>Extend Account Validity</label>
-                                            <div class="ar-segmented ar-segmented--three" id="arExtendValidity" data-value="no">
-                                                <button type="button" data-val="no" class="active">No</button>
-                                                <button type="button" data-val="yes">Yes</button>
-                                                <button type="button" data-val="addon" title="Validity Addon">Addon</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Prerequisite conditions -->
-                                <div class="ar-card">
-                                    <div class="ar-card-title-row">
-                                        <div>
-                                            <div class="ar-card-title">
-                                                <span class="material-icons ar-card-icon ar-card-icon--filter">filter_alt</span>
-                                                Prerequisite Conditions
-                                            </div>
-                                            <div class="ar-card-sub">This rule applies only when every condition
-                                                below is met.</div>
-                                        </div>
-                                        <button type="button" class="ar-add-row-btn" onclick="_arAddConditionRow()">
-                                            <span class="material-icons">add</span> Add Condition
-                                        </button>
-                                    </div>
-                                    <div class="ar-condition-list" id="arConditionList">
-                                        <!-- rows injected by _arAddConditionRow() -->
-                                    </div>
-                                    <div class="ar-condition-empty" id="arConditionEmpty">
-                                        No conditions added — this rule will always apply.
-                                    </div>
-                                </div>
-
-                                <!-- ATPs to add / remove -->
-                                <div class="ar-field-row">
-                                    <div class="ar-card ar-card-half">
-                                        <div class="ar-card-title">
-                                            <span class="material-icons ar-card-icon ar-card-icon--add">add_circle</span>
-                                            ATPs to Add
-                                        </div>
-                                        <div class="ar-card-sub">Granted automatically when this rule fires.</div>
-                                        <div class="ar-tagselect" id="arAddSelect" data-target="add"></div>
-                                    </div>
-                                    <div class="ar-card ar-card-half">
-                                        <div class="ar-card-title">
-                                            <span class="material-icons ar-card-icon ar-card-icon--remove">remove_circle</span>
-                                            ATPs to Remove
-                                        </div>
-                                        <div class="ar-card-sub">Revoked automatically when this rule fires.</div>
-                                        <div class="ar-tagselect" id="arRemoveSelect" data-target="remove"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- FIXED FOOTER -->
-                            <div class="ar-form-footer">
-                                <button type="button" class="ar-cancel-btn" onclick="_arCancelForm()">Cancel</button>
-                                <button type="button" class="ar-submit-btn" id="arSubmitBtn"
-                                    onclick="_arSubmit()">Submit</button>
-                            </div>
-                        </div>
-                    </div>
-
+        <div id="atpRulesPage">
+          <div class="ar-shell">
+            <!-- ── LEFT PANE — rule list ─────────────────────── -->
+            <div class="ar-left-pane">
+              <div class="ar-pane-header">
+                <div class="ar-pane-header-top">
+                  <h3>ATP Rules</h3>
+                  <span class="ar-count" id="arRuleCount">0 rules</span>
                 </div>
+                <div class="ar-search-row">
+                  <span class="material-icons">search</span>
+                  <input
+                    type="text"
+                    id="arSearchInput"
+                    placeholder="Search rules…"
+                    oninput="_arApplySearch(this.value)"
+                  />
+                </div>
+                <button class="ar-new-btn" onclick="_arShowForm()">
+                  <span class="material-icons">add</span>
+                  New Rule
+                </button>
+              </div>
+
+              <div class="ar-rule-list" id="arRuleList">
+                <!-- Rule rows injected by _arRenderList() -->
+              </div>
+              <div
+                class="ar-empty-state"
+                id="arEmptyState"
+                style="display: none"
+              >
+                <span class="material-icons">rule_folder</span>
+                <p>No ATP rules yet</p>
+                <span>Create your first prerequisite rule.</span>
+              </div>
             </div>
 
-            <!-- ═══════════════════════════════════════════════════════════
+            <!-- ── RIGHT PANE — placeholder / view / form ──────── -->
+            <div class="ar-right-pane">
+              <!-- shown when nothing is selected and not creating -->
+              <div id="arPlaceholder" class="ar-placeholder">
+                <div class="ar-placeholder-icon">
+                  <span class="material-icons">fact_check</span>
+                </div>
+                <h3>No rule selected</h3>
+                <p>
+                  Pick a rule from the left to view it, or create a new one.
+                </p>
+                <button class="ar-new-btn" onclick="_arShowForm()">
+                  <span class="material-icons">add</span>
+                  New Rule
+                </button>
+              </div>
+
+              <!-- read-only view of a selected rule -->
+              <div id="arViewPanel" class="ar-view-panel hidden">
+                <!-- injected by _arRenderView() -->
+              </div>
+
+              <!-- create form -->
+              <div id="arFormPanel" class="ar-form-panel hidden">
+                <!-- FIXED HEADER -->
+                <div class="ar-form-header">
+                  <div class="ar-form-header-icon">
+                    <span class="material-icons">edit_note</span>
+                  </div>
+                  <div>
+                    <h3>New ATP Rule</h3>
+                    <p class="ar-form-header-sub">
+                      Define the basic details and conditions for this rule
+                    </p>
+                  </div>
+                  <span
+                    class="ar-form-header-name hidden"
+                    id="arFormHeaderName"
+                  ></span>
+                </div>
+
+                <!-- SCROLLABLE MIDDLE -->
+                <div class="ar-form" id="arForm">
+                  <!-- Basics -->
+                  <div class="ar-card">
+                    <div class="ar-card-title">
+                      <span
+                        class="material-icons ar-card-icon ar-card-icon--basics"
+                        >sell</span
+                      >
+                      Basics
+                    </div>
+                    <div class="ar-field-row">
+                      <div class="ar-field" id="arRuleNameField">
+                        <label
+                          >Additional Tariff Plan Name
+                          <span class="ar-req">*</span></label
+                        >
+                        <select id="arRuleName" class="ar-input">
+                          <option value="">
+                            Select Additional Tariff Plan…
+                          </option>
+                        </select>
+                      </div>
+                      <div class="ar-field hidden" id="arRuleNameReadonlyField">
+                        <label>Additional Tariff Plan Name</label>
+                        <div
+                          class="ar-input ar-input-readonly"
+                          id="arRuleNameReadonly"
+                        ></div>
+                      </div>
+                      <div class="ar-field ar-field-narrow">
+                        <label>Extend Account Validity</label>
+                        <div
+                          class="ar-segmented ar-segmented--three"
+                          id="arExtendValidity"
+                          data-value="no"
+                        >
+                          <button type="button" data-val="no" class="active">
+                            No
+                          </button>
+                          <button type="button" data-val="yes">Yes</button>
+                          <button
+                            type="button"
+                            data-val="addon"
+                            title="Validity Addon"
+                          >
+                            Addon
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Prerequisite conditions -->
+                  <div class="ar-card">
+                    <div class="ar-card-title-row">
+                      <div>
+                        <div class="ar-card-title">
+                          <span
+                            class="material-icons ar-card-icon ar-card-icon--filter"
+                            >filter_alt</span
+                          >
+                          Prerequisite Conditions
+                        </div>
+                        <div class="ar-card-sub">
+                          This rule applies only when every condition below is
+                          met.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        class="ar-add-row-btn"
+                        onclick="_arAddConditionRow()"
+                      >
+                        <span class="material-icons">add</span> Add Condition
+                      </button>
+                    </div>
+                    <div class="ar-condition-list" id="arConditionList">
+                      <!-- rows injected by _arAddConditionRow() -->
+                    </div>
+                    <div class="ar-condition-empty" id="arConditionEmpty">
+                      No conditions added — this rule will always apply.
+                    </div>
+                  </div>
+
+                  <!-- ATPs to add / remove -->
+                  <div class="ar-field-row">
+                    <div class="ar-card ar-card-half">
+                      <div class="ar-card-title">
+                        <span
+                          class="material-icons ar-card-icon ar-card-icon--add"
+                          >add_circle</span
+                        >
+                        ATPs to Add
+                      </div>
+                      <div class="ar-card-sub">
+                        Granted automatically when this rule fires.
+                      </div>
+                      <div
+                        class="ar-tagselect"
+                        id="arAddSelect"
+                        data-target="add"
+                      ></div>
+                    </div>
+                    <div class="ar-card ar-card-half">
+                      <div class="ar-card-title">
+                        <span
+                          class="material-icons ar-card-icon ar-card-icon--remove"
+                          >remove_circle</span
+                        >
+                        ATPs to Remove
+                      </div>
+                      <div class="ar-card-sub">
+                        Revoked automatically when this rule fires.
+                      </div>
+                      <div
+                        class="ar-tagselect"
+                        id="arRemoveSelect"
+                        data-target="remove"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- FIXED FOOTER -->
+                <div class="ar-form-footer">
+                  <button
+                    type="button"
+                    class="ar-cancel-btn"
+                    onclick="_arCancelForm()"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    class="ar-submit-btn"
+                    id="arSubmitBtn"
+                    onclick="_arSubmit()"
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
             UPDATE ATP RATE PAGE — injected inside .workspace, sibling of
             clonePage / atpRulesPage. Single centered card, styled to match
             the ATP Rules "New Rule" form. Pick an Additional Tariff
             Package, Month and Year to update that package's rate.
             ════════════════════════════════════════════════════════════ -->
-            <div id="atpRatePage" onclick="closeAtpRatePage()">
-                <div class="atr-shell">
-                    <div class="atr-card-wrap" onclick="event.stopPropagation()">
-
-                        <div class="ar-form-header">
-                            <div class="ar-form-header-icon">
-                                <span class="material-icons">payments</span>
-                            </div>
-                            <div>
-                                <h3>Update ATP Rate</h3>
-                                <p class="ar-form-header-sub" id="atrHeaderSub">Select the Additional Tariff Package, Month and Year to
-                                    update its rate</p>
-                            </div>
-                        </div>
-
-                        <!-- STEP 1 — pick Additional Tariff Package / Month / Year -->
-                        <div class="atr-form" id="atrStep1">
-                            <div class="ar-card">
-                                <div class="ar-field">
-                                    <label>Additional Tariff Package <span class="ar-req">*</span></label>
-                                    <select id="atrPackageSelect" class="ar-input" disabled>
-                                        <option value="">Loading…</option>
-                                    </select>
-                                </div>
-                                <div class="ar-field-row">
-                                    <div class="ar-field">
-                                        <label>Month <span class="ar-req">*</span></label>
-                                        <select id="atrMonthSelect" class="ar-input">
-                                            <option value="">Select</option>
-                                        </select>
-                                    </div>
-                                    <div class="ar-field">
-                                        <label>Year <span class="ar-req">*</span></label>
-                                        <select id="atrYearSelect" class="ar-input">
-                                            <option value="">Select</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- STEP 2 — shown after a successful service-package-detail lookup -->
-                        <div class="atr-form" id="atrStep2" style="display:none">
-                            <div class="ar-card">
-                                <div class="ar-field">
-                                    <label>Additional Tariff Package</label>
-                                    <input type="text" class="ar-input" id="atrDetailPackage" disabled>
-                                </div>
-                                <div class="ar-field">
-                                    <label>Old Rate</label>
-                                    <input type="text" class="ar-input" id="atrDetailOldRate" disabled>
-                                </div>
-                                <div class="ar-field">
-                                    <label>New Rate <span class="ar-req">*</span></label>
-                                    <input type="number" class="ar-input" id="atrNewRateInput" placeholder="Enter new rate" min="0" step="0.01">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- SUCCESS — shown after a successful Bulk rate update, then auto-closes -->
-                        <div class="atr-form atr-success" id="atrSuccess" style="display:none">
-                            <div class="atr-success-icon">
-                                <span class="material-icons">check_circle</span>
-                            </div>
-                            <div class="atr-success-text" id="atrSuccessMessage">Rate updated successfully.</div>
-                        </div>
-
-                        <div class="ar-form-footer" id="atrStep1Footer">
-                            <button type="button" class="ar-cancel-btn" onclick="closeAtpRatePage()">Cancel</button>
-                            <button type="button" class="ar-submit-btn" id="atrSubmitBtn"
-                                onclick="_atrSubmit()">Submit</button>
-                        </div>
-
-                        <div class="ar-form-footer" id="atrStep2Footer" style="display:none">
-                            <button type="button" class="ar-cancel-btn" onclick="_atrGoToStep1()">Back</button>
-                            <button type="button" class="ar-submit-btn" id="atrFinalSubmitBtn"
-                                onclick="_atrSubmitNewRate()">Submit</button>
-                        </div>
-                    </div>
+        <div id="atpRatePage" onclick="closeAtpRatePage()">
+          <div class="atr-shell">
+            <div class="atr-card-wrap" onclick="event.stopPropagation()">
+              <div class="ar-form-header">
+                <div class="ar-form-header-icon">
+                  <span class="material-icons">payments</span>
                 </div>
+                <div>
+                  <h3>Update ATP Rate</h3>
+                  <p class="ar-form-header-sub" id="atrHeaderSub">
+                    Select the Additional Tariff Package, Month and Year to
+                    update its rate
+                  </p>
+                </div>
+              </div>
+
+              <!-- STEP 1 — pick Additional Tariff Package / Month / Year -->
+              <div class="atr-form" id="atrStep1">
+                <div class="ar-card">
+                  <div class="ar-field">
+                    <label
+                      >Additional Tariff Package
+                      <span class="ar-req">*</span></label
+                    >
+                    <select id="atrPackageSelect" class="ar-input" disabled>
+                      <option value="">Loading…</option>
+                    </select>
+                  </div>
+                  <div class="ar-field-row">
+                    <div class="ar-field">
+                      <label>Month <span class="ar-req">*</span></label>
+                      <select id="atrMonthSelect" class="ar-input">
+                        <option value="">Select</option>
+                      </select>
+                    </div>
+                    <div class="ar-field">
+                      <label>Year <span class="ar-req">*</span></label>
+                      <select id="atrYearSelect" class="ar-input">
+                        <option value="">Select</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 2 — shown after a successful service-package-detail lookup -->
+              <div class="atr-form" id="atrStep2" style="display: none">
+                <div class="ar-card">
+                  <div class="ar-field">
+                    <label>Additional Tariff Package</label>
+                    <input
+                      type="text"
+                      class="ar-input"
+                      id="atrDetailPackage"
+                      disabled
+                    />
+                  </div>
+                  <div class="ar-field">
+                    <label>Old Rate</label>
+                    <input
+                      type="text"
+                      class="ar-input"
+                      id="atrDetailOldRate"
+                      disabled
+                    />
+                  </div>
+                  <div class="ar-field">
+                    <label>New Rate <span class="ar-req">*</span></label>
+                    <input
+                      type="number"
+                      class="ar-input"
+                      id="atrNewRateInput"
+                      placeholder="Enter new rate"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUCCESS — shown after a successful Bulk rate update, then auto-closes -->
+              <div
+                class="atr-form atr-success"
+                id="atrSuccess"
+                style="display: none"
+              >
+                <div class="atr-success-icon">
+                  <span class="material-icons">check_circle</span>
+                </div>
+                <div class="atr-success-text" id="atrSuccessMessage">
+                  Rate updated successfully.
+                </div>
+              </div>
+
+              <div class="ar-form-footer" id="atrStep1Footer">
+                <button
+                  type="button"
+                  class="ar-cancel-btn"
+                  onclick="closeAtpRatePage()"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  class="ar-submit-btn"
+                  id="atrSubmitBtn"
+                  onclick="_atrSubmit()"
+                >
+                  Submit
+                </button>
+              </div>
+
+              <div
+                class="ar-form-footer"
+                id="atrStep2Footer"
+                style="display: none"
+              >
+                <button
+                  type="button"
+                  class="ar-cancel-btn"
+                  onclick="_atrGoToStep1()"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  class="ar-submit-btn"
+                  id="atrFinalSubmitBtn"
+                  onclick="_atrSubmitNewRate()"
+                >
+                  Submit
+                </button>
+              </div>
             </div>
-        </main>
+          </div>
+        </div>
+      </main>
     </div>
 
     <!-- HIERARCHY MODAL -->
     <div id="treeModal" onclick="closeTree()">
-        <div class="tree-card" onclick="event.stopPropagation()">
-            <h2>Configuration Summary</h2>
-            <div class="tree-body" id="treeBody">
-                <div class="tree-header">
-                    <h3 id="treeName">Unnamed Package</h3>
-                    <span id="treeMeta">| NORMAL | Retail</span>
-                </div>
-                <div class="tree-row" id="treeMain">📦 Main Service Plan: None</div>
-                <div class="tree-row" id="treeDatp">➕ DATP Components: 0 items</div>
-                <div class="tree-row" id="treeAatp">🛒 AATP Components: 0 items</div>
-                <hr class="tree-divider">
-                <div class="tree-charge" id="treeCharge"><b>Charge: RM 0.00</b> | <b>Ends: Permanent</b></div>
-            </div>
-            <button class="tree-close-btn" onclick="closeTree()">Close Preview</button>
+      <div class="tree-card" onclick="event.stopPropagation()">
+        <h2>Configuration Summary</h2>
+        <div class="tree-body" id="treeBody">
+          <div class="tree-header">
+            <h3 id="treeName">Unnamed Package</h3>
+            <span id="treeMeta">| NORMAL | Retail</span>
+          </div>
+          <div class="tree-row" id="treeMain">📦 Main Service Plan: None</div>
+          <div class="tree-row" id="treeDatp">➕ DATP Components: 0 items</div>
+          <div class="tree-row" id="treeAatp">🛒 AATP Components: 0 items</div>
+          <hr class="tree-divider" />
+          <div class="tree-charge" id="treeCharge">
+            <b>Charge: RM 0.00</b> | <b>Ends: Permanent</b>
+          </div>
         </div>
+        <button class="tree-close-btn" onclick="closeTree()">
+          Close Preview
+        </button>
+      </div>
     </div>
 
     <!-- <footer class="footer">
@@ -489,13 +794,13 @@
     </footer> -->
 
     <script th:inline="javascript">
-        const PRIVILEGE_IDS = /*[[${privilegeIds}]]*/[];
-        const PRIVILEGES = /*[[${privileges}]]*/[];
-        const USERNAME = /*[[${username}]]*/ 'User';
-        const SESSION_ID = /*[[${sessionId}]]*/ '';
-        const NETWORK_ID = /*[[${networkId}]]*/ null;
+      const PRIVILEGE_IDS = /*[[${privilegeIds}]]*/ [];
+      const PRIVILEGES = /*[[${privileges}]]*/ [];
+      const USERNAME = /*[[${username}]]*/ "User";
+      const SESSION_ID = /*[[${sessionId}]]*/ "";
+      const NETWORK_ID = /*[[${networkId}]]*/ null;
 
-        console.log(PRIVILEGE_IDS);
+      console.log(PRIVILEGE_IDS);
     </script>
     <script th:src="@{/js/layout-core-init.js}"></script>
     <script th:src="@{/js/layout-drafts.js}"></script>
@@ -508,169 +813,326 @@
     <script th:src="@{/js/layout-tp-details.js}"></script>
     <script th:src="@{/js/atp-rules.js}"></script>
     <script th:src="@{/js/atp-rate.js}"></script>
+    <!-- <script th:src="@{/js/Atpcreate.js}"></script> -->
 
     <!-- DRAFT OVERLAY -->
     <div id="draftOverlay" class="draft-overlay">
-        <div class="draft-panel" id="draftPanel">
-            <div class="draft-header">
-                <span>Drafts</span>
-                <span class="material-icons close-btn" onclick="closeDrafts()">close</span>
-            </div>
-            <div style="padding: 10px 15px 0;">
-                <div class="library-search-box">
-                    <span class="material-icons library-search-icon">search</span>
-                    <input type="text" id="draftSearchInput" class="library-search-input"
-                           placeholder="Search drafts…" oninput="filterDrafts(this.value)">
-                    <span class="material-icons library-search-clear" id="draftSearchClear"
-                          onclick="clearDraftSearch()" style="opacity:0;">close</span>
-                </div>
-            </div>
-            <div class="draft-content" id="draftOverlayList" style="height: calc(100% - 115px);">
-                <!-- drafts will render here -->
-            </div>
+      <div class="draft-panel" id="draftPanel">
+        <div class="draft-header">
+          <span>Drafts</span>
+          <span class="material-icons close-btn" onclick="closeDrafts()"
+            >close</span
+          >
         </div>
+        <div style="padding: 10px 15px 0">
+          <div class="library-search-box">
+            <span class="material-icons library-search-icon">search</span>
+            <input
+              type="text"
+              id="draftSearchInput"
+              class="library-search-input"
+              placeholder="Search drafts…"
+              oninput="filterDrafts(this.value)"
+            />
+            <span
+              class="material-icons library-search-clear"
+              id="draftSearchClear"
+              onclick="clearDraftSearch()"
+              style="opacity: 0"
+              >close</span
+            >
+          </div>
+        </div>
+        <div
+          class="draft-content"
+          id="draftOverlayList"
+          style="height: calc(100% - 115px)"
+        >
+          <!-- drafts will render here -->
+        </div>
+      </div>
     </div>
 
     <div id="savedOverlay" class="draft-overlay">
-        <div class="draft-panel">
-            <div class="draft-header">
-                <span>Saved Configs</span>
-                <span class="material-icons close-btn" onclick="closeSaved()">close</span>
-            </div>
-            <div style="padding: 10px 15px 0;">
-                <div class="library-search-box">
-                    <span class="material-icons library-search-icon">search</span>
-                    <input type="text" id="savedSearchInput" class="library-search-input"
-                           placeholder="Search saved configs…" oninput="filterSaved(this.value)">
-                    <span class="material-icons library-search-clear" id="savedSearchClear"
-                          onclick="clearSavedSearch()" style="opacity:0;">close</span>
-                </div>
-            </div>
-            <div class="draft-content" id="savedOverlayList" style="height: calc(100% - 115px);"></div>
+      <div class="draft-panel">
+        <div class="draft-header">
+          <span>Saved Configs</span>
+          <span class="material-icons close-btn" onclick="closeSaved()"
+            >close</span
+          >
         </div>
+        <div style="padding: 10px 15px 0">
+          <div class="library-search-box">
+            <span class="material-icons library-search-icon">search</span>
+            <input
+              type="text"
+              id="savedSearchInput"
+              class="library-search-input"
+              placeholder="Search saved configs…"
+              oninput="filterSaved(this.value)"
+            />
+            <span
+              class="material-icons library-search-clear"
+              id="savedSearchClear"
+              onclick="clearSavedSearch()"
+              style="opacity: 0"
+              >close</span
+            >
+          </div>
+        </div>
+        <div
+          class="draft-content"
+          id="savedOverlayList"
+          style="height: calc(100% - 115px)"
+        ></div>
+      </div>
     </div>
 
     <!-- ── Clone Tree Modal ───────────────────────────────────── -->
-    <div id="cloneTreeModal" class="tp-modal-overlay" onclick="_cloneTreeOverlayClick(event)">
-        <div class="tp-modal ctm-modal">
+    <div
+      id="cloneTreeModal"
+      class="tp-modal-overlay"
+      onclick="_cloneTreeOverlayClick(event)"
+    >
+      <div class="tp-modal ctm-modal">
+        <button class="tp-modal-close" onclick="closeCloneTree()">✕</button>
 
-            <button class="tp-modal-close" onclick="closeCloneTree()">✕</button>
+        <!-- Data panel injected by _renderCloneTree() -->
+        <div id="cloneTreeBody" class="ctm-body"></div>
 
-            <!-- Data panel injected by _renderCloneTree() -->
-            <div id="cloneTreeBody" class="ctm-body"></div>
-
-            <!-- Action buttons -->
-            <div class="ctm-actions">
-                <button class="ctm-btn ctm-btn--cancel" onclick="_cloneTreeAction('cancel')">Cancel</button>
-                <button class="ctm-btn ctm-btn--modify" onclick="_cloneTreeAction('modify')">
-                    <span class="material-icons"
-                        style="font-size:16px;vertical-align:middle;margin-right:4px;">edit</span>Modify
-                </button>
-                <button class="ctm-btn ctm-btn--clone" onclick="_cloneTreeAction('clone')">
-                    <span class="material-icons"
-                        style="font-size:16px;vertical-align:middle;margin-right:4px;">file_copy</span>Clone
-                </button>
-            </div>
-
+        <!-- Action buttons -->
+        <div class="ctm-actions">
+          <button
+            class="ctm-btn ctm-btn--cancel"
+            onclick="_cloneTreeAction('cancel')"
+          >
+            Cancel
+          </button>
+          <button
+            class="ctm-btn ctm-btn--modify"
+            onclick="_cloneTreeAction('modify')"
+          >
+            <span
+              class="material-icons"
+              style="font-size: 16px; vertical-align: middle; margin-right: 4px"
+              >edit</span
+            >Modify
+          </button>
+          <button
+            class="ctm-btn ctm-btn--clone"
+            onclick="_cloneTreeAction('clone')"
+          >
+            <span
+              class="material-icons"
+              style="font-size: 16px; vertical-align: middle; margin-right: 4px"
+              >file_copy</span
+            >Clone
+          </button>
         </div>
+      </div>
     </div>
 
     <!-- ── Filter Modal ───────────────────────────────────────── -->
-    <div id="tpFilterModal" class="tp-modal-overlay" onclick="_filterOverlayClick(event)">
-        <div class="tp-modal tp-filter-modal">
+    <div
+      id="tpFilterModal"
+      class="tp-modal-overlay"
+      onclick="_filterOverlayClick(event)"
+    >
+      <div class="tp-modal tp-filter-modal">
+        <button
+          class="tp-modal-close"
+          onclick="
+            document.getElementById('tpFilterModal').classList.remove('active')
+          "
+        >
+          ✕
+        </button>
 
-            <button class="tp-modal-close"
-                onclick="document.getElementById('tpFilterModal').classList.remove('active')">✕</button>
-
-            <div class="ctm-header">
-                <span class="material-icons ctm-header-icon">tune</span>
-                <span class="ctm-header-title">Plan Filters</span>
-            </div>
-
-            <!-- category -->
-            <div class="tpf-section-label">category</div>
-            <div class="tpf-chip-row" id="tpf-category">
-                <button class="tpf-chip" data-val="ALL" onclick="_tpfChip(this,'category')">All</button>
-                <button class="tpf-chip" data-val="VOICE" onclick="_tpfChip(this,'category')">Voice</button>
-                <button class="tpf-chip" data-val="SMS" onclick="_tpfChip(this,'category')">SMS</button>
-                <button class="tpf-chip" data-val="DATA" onclick="_tpfChip(this,'category')">Data</button>
-            </div>
-
-            <!-- validity -->
-            <div class="tpf-section-label" style="margin-top:22px">validity</div>
-            <div class="tpf-chip-row" id="tpf-validity">
-                <button class="tpf-chip" data-val="28" onclick="_tpfChip(this,'validity')">28 Days</button>
-                <button class="tpf-chip" data-val="56" onclick="_tpfChip(this,'validity')">56 Days</button>
-                <button class="tpf-chip" data-val="84" onclick="_tpfChip(this,'validity')">84 Days</button>
-                <button class="tpf-chip" data-val="365" onclick="_tpfChip(this,'validity')">365 Days</button>
-            </div>
-
-            <!-- price sort -->
-            <div class="tpf-section-label" style="margin-top:22px">price</div>
-            <div class="tpf-chip-row" id="tpf-price">
-                <button class="tpf-chip" data-val="asc" onclick="_tpfChip(this,'price')">low to high</button>
-                <button class="tpf-chip" data-val="desc" onclick="_tpfChip(this,'price')">high to low</button>
-            </div>
-
-            <!-- footer -->
-            <div class="tpf-footer">
-                <button class="tpf-clear-btn" onclick="_tpfClearAll()">clear all</button>
-                <button class="tpf-show-btn" id="tpfShowBtn" disabled onclick="_tpfApply()">show results</button>
-            </div>
+        <div class="ctm-header">
+          <span class="material-icons ctm-header-icon">tune</span>
+          <span class="ctm-header-title">Plan Filters</span>
         </div>
+
+        <!-- category -->
+        <div class="tpf-section-label">category</div>
+        <div class="tpf-chip-row" id="tpf-category">
+          <button
+            class="tpf-chip"
+            data-val="ALL"
+            onclick="_tpfChip(this, 'category')"
+          >
+            All
+          </button>
+          <button
+            class="tpf-chip"
+            data-val="VOICE"
+            onclick="_tpfChip(this, 'category')"
+          >
+            Voice
+          </button>
+          <button
+            class="tpf-chip"
+            data-val="SMS"
+            onclick="_tpfChip(this, 'category')"
+          >
+            SMS
+          </button>
+          <button
+            class="tpf-chip"
+            data-val="DATA"
+            onclick="_tpfChip(this, 'category')"
+          >
+            Data
+          </button>
+        </div>
+
+        <!-- validity -->
+        <div class="tpf-section-label" style="margin-top: 22px">validity</div>
+        <div class="tpf-chip-row" id="tpf-validity">
+          <button
+            class="tpf-chip"
+            data-val="28"
+            onclick="_tpfChip(this, 'validity')"
+          >
+            28 Days
+          </button>
+          <button
+            class="tpf-chip"
+            data-val="56"
+            onclick="_tpfChip(this, 'validity')"
+          >
+            56 Days
+          </button>
+          <button
+            class="tpf-chip"
+            data-val="84"
+            onclick="_tpfChip(this, 'validity')"
+          >
+            84 Days
+          </button>
+          <button
+            class="tpf-chip"
+            data-val="365"
+            onclick="_tpfChip(this, 'validity')"
+          >
+            365 Days
+          </button>
+        </div>
+
+        <!-- price sort -->
+        <div class="tpf-section-label" style="margin-top: 22px">price</div>
+        <div class="tpf-chip-row" id="tpf-price">
+          <button
+            class="tpf-chip"
+            data-val="asc"
+            onclick="_tpfChip(this, 'price')"
+          >
+            low to high
+          </button>
+          <button
+            class="tpf-chip"
+            data-val="desc"
+            onclick="_tpfChip(this, 'price')"
+          >
+            high to low
+          </button>
+        </div>
+
+        <!-- footer -->
+        <div class="tpf-footer">
+          <button class="tpf-clear-btn" onclick="_tpfClearAll()">
+            clear all
+          </button>
+          <button
+            class="tpf-show-btn"
+            id="tpfShowBtn"
+            disabled
+            onclick="_tpfApply()"
+          >
+            show results
+          </button>
+        </div>
+      </div>
     </div>
 
     <div id="tpDetailsModal" class="tp-modal-overlay">
-        <div class="tp-modal">
-            <button class="tp-modal-close" onclick="closeTpDetails()">
-                ✕
-            </button>
+      <div class="tp-modal">
+        <button class="tp-modal-close" onclick="closeTpDetails()">✕</button>
 
-            <div id="tpModalContent"></div>
-        </div>
+        <div id="tpModalContent"></div>
+      </div>
     </div>
 
     <!-- APPROVED TPs OVERLAY -->
     <div id="approvedOverlay" class="draft-overlay">
-        <div class="draft-panel">
-            <div class="draft-header">
-                <span>Approved TPs</span>
-                <span class="material-icons close-btn" onclick="closeApproved()">close</span>
-            </div>
-            <div style="padding: 10px 15px 0;">
-                <div class="library-search-box">
-                    <span class="material-icons library-search-icon">search</span>
-                    <input type="text" id="approvedSearchInput" class="library-search-input"
-                           placeholder="Search approved TPs…"
-                           oninput="filterApproved(this.value)">
-                    <span class="material-icons library-search-clear" id="approvedSearchClear"
-                          onclick="clearApprovedSearch()" style="opacity:0;">close</span>
-                </div>
-            </div>
-            <div class="draft-content" id="approvedOverlayList" style="height: calc(100% - 115px);"></div>
+      <div class="draft-panel">
+        <div class="draft-header">
+          <span>Approved TPs</span>
+          <span class="material-icons close-btn" onclick="closeApproved()"
+            >close</span
+          >
         </div>
+        <div style="padding: 10px 15px 0">
+          <div class="library-search-box">
+            <span class="material-icons library-search-icon">search</span>
+            <input
+              type="text"
+              id="approvedSearchInput"
+              class="library-search-input"
+              placeholder="Search approved TPs…"
+              oninput="filterApproved(this.value)"
+            />
+            <span
+              class="material-icons library-search-clear"
+              id="approvedSearchClear"
+              onclick="clearApprovedSearch()"
+              style="opacity: 0"
+              >close</span
+            >
+          </div>
+        </div>
+        <div
+          class="draft-content"
+          id="approvedOverlayList"
+          style="height: calc(100% - 115px)"
+        ></div>
+      </div>
     </div>
 
     <!-- REJECTED TPs OVERLAY -->
     <div id="rejectedOverlay" class="draft-overlay">
-        <div class="draft-panel">
-            <div class="draft-header">
-                <span>Rejected TPs</span>
-                <span class="material-icons close-btn" onclick="closeRejected()">close</span>
-            </div>
-            <div style="padding: 10px 15px 0;">
-                <div class="library-search-box">
-                    <span class="material-icons library-search-icon">search</span>
-                    <input type="text" id="rejectedSearchInput" class="library-search-input"
-                           placeholder="Search rejected TPs…" oninput="filterRejected(this.value)">
-                    <span class="material-icons library-search-clear" id="rejectedSearchClear"
-                          onclick="clearRejectedSearch()" style="opacity:0;">close</span>
-                </div>
-            </div>
-            <div class="draft-content" id="rejectedOverlayList" style="height: calc(100% - 115px);"></div>
+      <div class="draft-panel">
+        <div class="draft-header">
+          <span>Rejected TPs</span>
+          <span class="material-icons close-btn" onclick="closeRejected()"
+            >close</span
+          >
         </div>
+        <div style="padding: 10px 15px 0">
+          <div class="library-search-box">
+            <span class="material-icons library-search-icon">search</span>
+            <input
+              type="text"
+              id="rejectedSearchInput"
+              class="library-search-input"
+              placeholder="Search rejected TPs…"
+              oninput="filterRejected(this.value)"
+            />
+            <span
+              class="material-icons library-search-clear"
+              id="rejectedSearchClear"
+              onclick="clearRejectedSearch()"
+              style="opacity: 0"
+              >close</span
+            >
+          </div>
+        </div>
+        <div
+          class="draft-content"
+          id="rejectedOverlayList"
+          style="height: calc(100% - 115px)"
+        ></div>
+      </div>
     </div>
-
-</body>
-
+  </body>
 </html>

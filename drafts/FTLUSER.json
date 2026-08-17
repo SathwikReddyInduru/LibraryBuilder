@@ -1,4 +1,47 @@
 [ {
+  "name" : "FTLCA1",
+  "packageType" : "POSTPAID",
+  "tariffPackCategory" : null,
+  "periodicChargeID" : "TP_CHARGE_53",
+  "savedOn" : "10 Aug 2026",
+  "savedTime" : "11:50",
+  "username" : "FTLUSER",
+  "selectedSvcs_s2" : "[\"SMS\",\"VOICE\",\"DATA\"]",
+  "selectedSvcs_s3" : "[]",
+  "selectedSvcs_s4" : "[]",
+  "selectedSvcs_s5" : "[]",
+  "state" : {
+    "s2" : [ {
+      "id" : 1,
+      "name" : "FT_TRAIFF_PLAN"
+    } ],
+    "s3" : [ ],
+    "s4" : [ {
+      "id" : 444,
+      "name" : "Digital service entitlements_ATP239",
+      "type" : "",
+      "chargeId" : "FTLCA1_ATP239",
+      "validity" : "D",
+      "rentalPeriod" : 1,
+      "midnightExpiry" : "No",
+      "renewal" : "No",
+      "rental" : 0,
+      "maxCount" : 0,
+      "freeCycles" : "0",
+      "priority" : 8,
+      "mrp" : 50,
+      "category" : "NORMAL",
+      "serviceCode" : "2408",
+      "vipPlan" : "N"
+    } ],
+    "s5" : [ ],
+    "price" : "100.0",
+    "publicityCode" : "FTLCA1",
+    "startDate" : "2026-08-07",
+    "endDate" : "2027-04-15",
+    "isCorporate" : true
+  }
+}, {
   "name" : "454",
   "packageType" : "POSTPAID",
   "tariffPackCategory" : null,

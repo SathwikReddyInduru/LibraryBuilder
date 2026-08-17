@@ -1,0 +1,1813 @@
+<!doctype html>
+<html
+  xmlns:th="http://www.thymeleaf.org"
+  th:replace="~{builder/layout :: layout(~{::title}, ~{::section}, 0)}"
+>
+  <head>
+    <title>ATP Create</title>
+  </head>
+
+  <body>
+    <section
+      style="
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+        border: none;
+      "
+    >
+      <link rel="stylesheet" th:href="@{/css/Atpcreate.css}" />
+      <div class="atpc-page">
+        <div class="ar-shell">
+          <!-- ── LEFT PANE — ATP list ─────────────────────── -->
+          <div class="ar-left-pane">
+            <div class="ar-pane-header">
+              <div class="ar-pane-header-top">
+                <h3>ATP Library</h3>
+                <span class="ar-count" id="acCount">0 ATPs</span>
+              </div>
+              <div class="ar-search-row">
+                <span class="material-icons">search</span>
+                <input
+                  type="text"
+                  id="acSearchInput"
+                  placeholder="Search ATPs by name or ID…"
+                  oninput="_acApplySearch(this.value)"
+                />
+              </div>
+              <button class="ar-new-btn" onclick="_acShowForm()">
+                <span class="material-icons">add</span>
+                New ATP
+              </button>
+            </div>
+
+            <div class="ar-rule-list" id="acList">
+              <!-- Rows injected by _acRenderList() -->
+            </div>
+            <div class="ar-empty-state" id="acEmptyState" style="display: none">
+              <span class="material-icons">inbox</span>
+              <p>No ATPs yet</p>
+              <span>Create your first Additional Tariff Profile.</span>
+            </div>
+          </div>
+
+          <!-- ── RIGHT PANE — placeholder / view / form ──────── -->
+          <div class="ar-right-pane">
+            <!-- shown when nothing is selected and not creating -->
+            <div id="acPlaceholder" class="ar-placeholder">
+              <div class="ar-placeholder-icon">
+                <span class="material-icons">note_add</span>
+              </div>
+              <h3>No ATP selected</h3>
+              <p>Pick an ATP from the left to view it, or create a new one.</p>
+              <button class="ar-new-btn" onclick="_acShowForm()">
+                <span class="material-icons">add</span>
+                New ATP
+              </button>
+            </div>
+
+            <!-- read-only view of a selected ATP -->
+            <div id="acViewPanel" class="ar-view-panel hidden">
+              <!-- injected by _acRenderView() -->
+            </div>
+
+            <!-- create form -->
+            <div
+              id="acFormPanel"
+              class="ar-form-panel hidden atpc-fullscreen"
+              data-mode="create"
+              data-service-package-id=""
+            >
+              <!-- FIXED HEADER -->
+              <div class="ar-form-header">
+                <div class="ar-form-header-icon">
+                  <span class="material-icons">note_add</span>
+                </div>
+                <div>
+                  <h3>New ATP</h3>
+                  <p class="ar-form-header-sub">
+                    Define the tariff, validity and usage rules for this ATP
+                  </p>
+                </div>
+              </div>
+
+              <div
+                class="atpc-modify-notice"
+                id="atpFormModifyNotice"
+                style="
+                  display: none;
+                  gap: 12px;
+                  align-items: flex-start;
+                  background: #fffbeb;
+                  border: 1px solid #fde68a;
+                  border-radius: 16px;
+                  padding: 16px 18px;
+                  margin: 0 30px 0;
+                "
+              >
+                <span
+                  class="material-icons"
+                  style="color: #f59e0b; font-size: 20px; flex-shrink: 0"
+                  >info</span
+                >
+                <div>
+                  <strong
+                    style="
+                      display: block;
+                      font-size: 13px;
+                      color: #92400e;
+                      margin-bottom: 3px;
+                    "
+                  >
+                    Modify isn't wired up yet
+                  </strong>
+                  <p
+                    style="
+                      margin: 0;
+                      font-size: 12.5px;
+                      color: #92400e;
+                      line-height: 1.5;
+                    "
+                  >
+                    The backend APIs to load an existing ATP's data and save
+                    changes to it haven't been implemented yet, so this form
+                    starts blank and "Publish" is disabled in Modify mode.
+                  </p>
+                </div>
+              </div>
+
+              <!-- SCROLLABLE MIDDLE -->
+              <div class="ar-form" id="acForm">
+                <form id="atpCreateForm">
+                  <!-- ===== ATP Details ===== -->
+                  <div class="ar-card">
+                    <div class="ar-card-title">ATP Details</div>
+                    <div class="atpc-grid-3">
+                      <div class="ar-field">
+                        <label>ATP Name <span class="ar-req">*</span></label>
+                        <input
+                          type="text"
+                          id="atpName"
+                          name="atpName"
+                          class="ar-input"
+                          placeholder="e.g. atp_testtt"
+                          required
+                        />
+                      </div>
+                      <div class="ar-field">
+                        <label>Publicity ID</label>
+                        <input
+                          type="text"
+                          name="publicityId"
+                          class="ar-input"
+                          placeholder="e.g. ATP_TEST_PUB015"
+                        />
+                      </div>
+                      <div class="ar-field">
+                        <label>Rating Type</label>
+                        <input
+                          type="hidden"
+                          id="ratingType"
+                          name="ratingType"
+                          value="N"
+                        />
+                        <div
+                          class="ar-segmented ar-segmented--three"
+                          data-hidden-input="ratingType"
+                        >
+                          <button type="button" data-value="S">
+                            Slab Based
+                          </button>
+                          <button type="button" class="active" data-value="N">
+                            Non Slab Based
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="atpc-grid-3">
+                      <div class="ar-field">
+                        <label>Type of Service</label>
+                        <select name="typeOfService" id="typeOfService" class="ar-input">
+                          <option value="">Select</option>
+                          <option value="2">Billing</option>
+                          <option value="1">Rating</option>
+                        </select>
+                      </div>
+                      <div
+                        class="ar-field is-hidden"
+                        id="billingServiceTypeField"
+                      >
+                        <label>Billing Service Type</label>
+                        <select
+                          name="billingServiceType"
+                          id="billingServiceType"
+                          class="ar-input"
+                        >
+                          <option value="">Select</option>
+                          <option value="101">Call Alert</option>
+                          <option value="102">Flash Message</option>
+                          <option value="103">Call Waiting</option>
+                          <option value="104">Call Conference</option>
+                          <option value="108">Barring GPRS in Roaming</option>
+                          <option value="113">Missed Call Alerts</option>
+                          <option value="114">CLIP</option>
+                          <option value="115">CLIR</option>
+                          <option value="116">CRBT</option>
+                          <option value="117">Missed Call Alerts Plus</option>
+                          <option value="118">VOICEMAIL</option>
+                          <option value="119">CALLFILTER</option>
+                          <option value="120">Black Berry</option>
+                          <option value="121">CallerId</option>
+                          <option value="122">IPTV</option>
+                          <option value="123">Call Barring</option>
+                          <option value="124">Selective Call Enabling</option>
+                          <option value="125">Concessional Location</option>
+                          <option value="126">Selective Location Enabling</option>
+                          <option value="127">Semi Local Calls</option>
+                          <option value="128">LowBalAlerts</option>
+                          <option value="129">Contents</option>
+                          <option value="130">Extra Service</option>
+                          <option value="131">Home internet service</option>
+                          <option value="132">TV and video services</option>
+                          <option value="133">Eligibility management</option>
+                          <option value="134">Digital service entitlements</option>
+                          <option value="135">Member-level activation</option>
+                          <option value="136">Cloud storage</option>
+                        </select>
+                      </div>
+                      <div class="ar-field">
+                        <label>Category Offer Code</label>
+                        <select name="categoryOfferCode" class="ar-input">
+                          <option value="">Select</option>
+                          <option value="HLRS">HLRS</option>
+                          <option value="B">Bonus</option>
+                          <option value="TB">Traffic Bundle</option>
+                          <option value="TM">Traffic Module</option>
+                          <option value="P">Promotional</option>
+                        </select>
+                      </div>
+                      <div class="ar-field">
+                        <label>VIP Plan</label>
+                        <select name="vipPlan" class="ar-input">
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="ar-field">
+                      <label>Description</label>
+                      <textarea
+                        name="description"
+                        class="ar-input"
+                        rows="2"
+                        style="height: auto; padding: 10px 12px"
+                        placeholder="Short internal note about what this ATP is for"
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  <!-- ===== Validity & Scheduling ===== -->
+
+                  <div class="ar-card">
+                    <div class="ar-card-title">Validity &amp; Scheduling</div>
+                    <div class="atpc-grid-3">
+                      <div class="ar-field">
+                        <label>Valid From</label>
+                        <input
+                          type="date"
+                          id="validFrom"
+                          name="validFrom"
+                          class="ar-input"
+                        />
+                      </div>
+                      <div class="ar-field">
+                        <label>Valid To</label>
+                        <input
+                          type="date"
+                          id="validTo"
+                          name="validTo"
+                          class="ar-input"
+                        />
+                      </div>
+                      <!-- Effective End Date field removed -->
+                      <div class="ar-field">
+                        <label>Validity Period Type</label>
+                        <select
+                          name="validityPeriodType"
+                          id="validityPeriodType"
+                          class="ar-input"
+                        >
+                          <option value="LIMITED">Limited</option>
+                          <option value="UNLIMITED">Unlimited</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="atpc-grid-3">
+                      <div class="ar-field">
+                        <label>Applicable From (Hr)</label>
+                        <select
+                          name="hoursFrom"
+                          class="ar-input"
+                          id="hoursFromSelect"
+                        ></select>
+                      </div>
+                      <div class="ar-field">
+                        <label>Applicable To (Hr)</label>
+                        <select
+                          name="hoursTo"
+                          class="ar-input"
+                          id="hoursToSelect"
+                        ></select>
+                      </div>
+                      <!-- Only meaningful (and only sent in the payload) when
+                 Validity Period Type is Limited — shown/hidden by
+                 syncValidityPeriodDaysField() in Atpcreate.js. -->
+                      <div
+                        class="ar-field is-hidden"
+                        id="validityPeriodDaysField"
+                      >
+                        <label>Validity Period Days</label>
+                        <input
+                          type="number"
+                          min="0"
+                          id="validityPeriodDays"
+                          name="validityPeriodDays"
+                          class="ar-input"
+                          placeholder="e.g. 30"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- ===== Balance & Usage Configuration ===== -->
+
+                  <div class="ar-card">
+                    <div class="ar-card-title">
+                      Balance &amp; Usage Configuration
+                    </div>
+                    <div class="ar-card-sub">
+                      Choose the balance categories this ATP grants, then set
+                      units for each.
+                    </div>
+
+                    <div class="ar-field">
+                      <label>Balance Category</label>
+                      <div class="ar-pill-row" id="balanceCategoryGroup">
+                        <label class="ar-check-pill"
+                          ><input
+                            type="checkbox"
+                            name="balanceCategory"
+                            value="VOICE"
+                            data-unit-target="voice"
+                          />
+                          Voice</label
+                        >
+                        <label class="ar-check-pill"
+                          ><input
+                            type="checkbox"
+                            name="balanceCategory"
+                            value="SMS"
+                            data-unit-target="sms"
+                          />
+                          SMS</label
+                        >
+                        <label class="ar-check-pill"
+                          ><input
+                            type="checkbox"
+                            name="balanceCategory"
+                            value="DATA"
+                            data-unit-target="data"
+                          />
+                          Data</label
+                        >
+                        <label class="ar-check-pill"
+                          ><input
+                            type="checkbox"
+                            name="balanceCategory"
+                            value="MMS"
+                            data-unit-target="mms"
+                          />
+                          MMS</label
+                        >
+                        <label class="ar-check-pill"
+                          ><input
+                            type="checkbox"
+                            name="balanceCategory"
+                            value="GLOBAL"
+                            data-unit-target="global"
+                          />
+                          Global</label
+                        >
+                      </div>
+                    </div>
+
+                    <div class="atpc-grid-2">
+                      <div class="ar-field">
+                        <label>Bucket Type</label>
+                        <select name="bucketType" class="ar-input">
+                          <option value="">Select</option>
+                          <option value="promotional">Promotional</option>
+                          <option value="bonus">Bonus</option>
+                          <option value="traffic">Traffic</option>
+                        </select>
+                      </div>
+                      <div class="ar-field">
+                        <label>Roll Over</label>
+                        <select name="rollOver" class="ar-input">
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
+                        </select>
+                      </div>
+                      <!-- Unlimited Usage moved into each Unit Type &
+                     Value row below (per-category flag) instead of
+                     one shared field here. Extend Validity sits alone
+                     on the next line as a result. -->
+                      <div class="ar-field">
+                        <label>Extend Validity</label>
+                        <select name="extendValidity" class="ar-input">
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- ===== Unit Types & Values ===== -->
+                  <div class="ar-card is-hidden" id="unitTypesCard">
+                    <div class="ar-card-title">Unit Types &amp; Values</div>
+                    <div class="ar-card-sub">
+                      Set the unit type and value for each selected balance
+                      category.
+                    </div>
+
+                    <!-- Per-category unit type/value rows -->
+                    <div class="unit-row is-hidden" data-unit-row="voice">
+                      <div class="unit-row-fields">
+                        <div class="ar-field unit-row-category">
+                          <label>Category</label>
+                          <div class="unit-row-tag">Voice</div>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unlimited Usage</label>
+                          <select
+                            id="unlimitedUsageVoice"
+                            name="unlimitedUsageVoice"
+                            class="ar-input"
+                          >
+                            <option value="N">No</option>
+                            <option value="Y">Yes</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Type</label>
+                          <select
+                            id="unitTypeVoice"
+                            name="unitTypeVoice"
+                            class="ar-input"
+                          >
+                            <option value="Sec">Seconds</option>
+                            <option value="Amt">Amount</option>
+                            <option value="Calls">Number Of Calls</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Value</label>
+                          <input
+                            type="number"
+                            id="unitValueVoice"
+                            name="unitValueVoice"
+                            class="ar-input"
+                            min="0"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="unit-row is-hidden" data-unit-row="sms">
+                      <div class="unit-row-fields">
+                        <div class="ar-field unit-row-category">
+                          <label>Category</label>
+                          <div class="unit-row-tag">SMS</div>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unlimited Usage</label>
+                          <select
+                            id="unlimitedUsageSms"
+                            name="unlimitedUsageSms"
+                            class="ar-input"
+                          >
+                            <option value="N">No</option>
+                            <option value="Y">Yes</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Type</label>
+                          <select
+                            id="unitTypeSms"
+                            name="unitTypeSms"
+                            class="ar-input"
+                          >
+                            <option value="Msg">Messages</option>
+                            <option value="Amt">Amount</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Value</label>
+                          <input
+                            type="number"
+                            id="unitValueSms"
+                            name="unitValueSms"
+                            class="ar-input"
+                            min="0"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="unit-row is-hidden" data-unit-row="data">
+                      <div class="unit-row-fields">
+                        <div class="ar-field unit-row-category">
+                          <label>Category</label>
+                          <div class="unit-row-tag">Data</div>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unlimited Usage</label>
+                          <select
+                            id="unlimitedUsageData"
+                            name="unlimitedUsageData"
+                            class="ar-input"
+                          >
+                            <option value="N">No</option>
+                            <option value="Y">Yes</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Type</label>
+                          <select
+                            id="unitTypeData"
+                            name="unitTypeData"
+                            class="ar-input"
+                          >
+                            <option value="Byt">Kilobytes</option>
+                            <option value="Amt">Amount</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Value</label>
+                          <input
+                            type="number"
+                            id="unitValueData"
+                            name="unitValueData"
+                            class="ar-input"
+                            min="0"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="unit-row is-hidden" data-unit-row="mms">
+                      <div class="unit-row-fields">
+                        <div class="ar-field unit-row-category">
+                          <label>Category</label>
+                          <div class="unit-row-tag">MMS</div>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unlimited Usage</label>
+                          <select
+                            id="unlimitedUsageMms"
+                            name="unlimitedUsageMms"
+                            class="ar-input"
+                          >
+                            <option value="N">No</option>
+                            <option value="Y">Yes</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Type</label>
+                          <select
+                            id="unitTypeMms"
+                            name="unitTypeMms"
+                            class="ar-input"
+                          >
+                            <option value="Msg">Messages</option>
+                            <option value="Amt">Amount</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Value</label>
+                          <input
+                            type="number"
+                            id="unitValueMms"
+                            name="unitValueMms"
+                            class="ar-input"
+                            min="0"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="unit-row is-hidden" data-unit-row="global">
+                      <div class="unit-row-fields">
+                        <div class="ar-field unit-row-category">
+                          <label>Category</label>
+                          <div class="unit-row-tag">Global</div>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unlimited Usage</label>
+                          <!-- Global never supports unlimited usage —
+                         fixed to No and locked so the user must
+                         always give an explicit Unit Type/Value. -->
+                          <select
+                            id="unlimitedUsageGlobal"
+                            name="unlimitedUsageGlobal"
+                            class="ar-input is-locked"
+                            disabled
+                          >
+                            <option value="N" selected>No</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Type</label>
+                          <select
+                            id="unitTypeGlobal"
+                            name="unitTypeGlobal"
+                            class="ar-input"
+                          >
+                            <option value="Amt">Amount</option>
+                          </select>
+                        </div>
+                        <div class="ar-field">
+                          <label>Unit Value</label>
+                          <input
+                            type="number"
+                            id="unitValueGlobal"
+                            name="unitValueGlobal"
+                            class="ar-input"
+                            min="0"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- ===== Derived Services & Usage Types ===== -->
+                  <div class="ar-card is-hidden" id="derivedServicesCard">
+                    <div class="ar-card-title">
+                      Derived Services &amp; Usage Types
+                    </div>
+                    <div class="ar-card-sub">
+                      Available options depend on the balance categories
+                      selected above.
+                    </div>
+                    <div class="services-row">
+                      <div class="service-pair" data-service-pair="voice">
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="voice"
+                        >
+                          <div class="ar-tagselect">
+                            <label>Voice Derived Services</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search services"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="local_mo"
+                                />
+                                Local MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="local_mt"
+                                />
+                                Local MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="std"
+                                />
+                                STD</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="isd"
+                                />
+                                ISD</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="national_roaming"
+                                />
+                                National ROAMING</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="national_roaming_mt"
+                                />
+                                National ROAMING MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="international_roaming"
+                                />
+                                InterNational ROAMING</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="international_roaming_mt"
+                                />
+                                InterNational ROAMING MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="closed_user_group"
+                                />
+                                Closed User Group</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="friends_family"
+                                />
+                                Friends Family</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="homzone"
+                                />
+                                Homzone</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="roaming_callback_service"
+                                />
+                                Roaming Call back Service</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="call_forwarding"
+                                />
+                                Call Forwarding</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedVoice"
+                                  value="community_account"
+                                />
+                                Community Account</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="voice"
+                        >
+                          <div
+                            class="ar-tagselect"
+                            data-target="usageTypeVoice"
+                          >
+                            <label>Voice Usage Types</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search usage types"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeVoice"
+                                  value="local_onnet_mo_m2m"
+                                />
+                                Local On-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeVoice"
+                                  value="local_offnet_mo_m2m"
+                                />
+                                Local Off-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeVoice"
+                                  value="isd_mo_m2m"
+                                />
+                                ISD MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeVoice"
+                                  value="premium_mo"
+                                />
+                                Premium MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeVoice"
+                                  value="roaming_mo"
+                                />
+                                Roaming MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeVoice"
+                                  value="national_roaming_mo"
+                                />
+                                National Roaming MO</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="service-pair" data-service-pair="sms">
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="sms"
+                        >
+                          <div class="ar-tagselect">
+                            <label>SMS Derived Services</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search services"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="local_mo"
+                                />
+                                Local MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="local_mt"
+                                />
+                                Local MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="std"
+                                />
+                                STD</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="isd"
+                                />
+                                ISD</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="national_roaming"
+                                />
+                                National ROAMING</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="national_roaming_mt"
+                                />
+                                National ROAMING MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="international_roaming"
+                                />
+                                InterNational ROAMING</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="international_roaming_mt"
+                                />
+                                InterNational ROAMING MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="closed_user_group"
+                                />
+                                Closed User Group</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="friends_family"
+                                />
+                                Friends Family</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="homzone"
+                                />
+                                Homzone</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedSms"
+                                  value="community_account"
+                                />
+                                Community Account</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="sms"
+                        >
+                          <div class="ar-tagselect" data-target="usageTypeSms">
+                            <label>SMS Usage Types</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search usage types"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeSms"
+                                  value="local_onnet_mo_m2m"
+                                />
+                                Local On-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeSms"
+                                  value="local_offnet_mo_m2m"
+                                />
+                                Local Off-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeSms"
+                                  value="isd_mo_m2m"
+                                />
+                                ISD MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeSms"
+                                  value="premium_mo"
+                                />
+                                Premium MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeSms"
+                                  value="roaming_mo"
+                                />
+                                Roaming MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeSms"
+                                  value="national_roaming_mo"
+                                />
+                                National Roaming MO</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="service-pair" data-service-pair="data">
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="data"
+                        >
+                          <div class="ar-tagselect">
+                            <label>Data Derived Services</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search services"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedData"
+                                  value="local_mo"
+                                />
+                                Local MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedData"
+                                  value="national_roaming"
+                                />
+                                National ROAMING</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedData"
+                                  value="international_roaming"
+                                />
+                                InterNational ROAMING</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="data"
+                        >
+                          <div class="ar-tagselect" data-target="usageTypeData">
+                            <label>Data Usage Types</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search usage types"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeData"
+                                  value="non_roaming_data"
+                                />
+                                Non Roaming Data</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeData"
+                                  value="roaming_data"
+                                />
+                                Roaming Data</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeData"
+                                  value="national_roaming_data"
+                                />
+                                National Roaming Data</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="service-pair" data-service-pair="mms">
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="mms"
+                        >
+                          <div class="ar-tagselect">
+                            <label>MMS Derived Services</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search services"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="local_mo"
+                                />
+                                Local MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="local_mt"
+                                />
+                                Local MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="std"
+                                />
+                                STD</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="isd"
+                                />
+                                ISD</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="national_roaming"
+                                />
+                                National ROAMING</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="national_roaming_mt"
+                                />
+                                National ROAMING MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="international_roaming"
+                                />
+                                InterNational ROAMING</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="international_roaming_mt"
+                                />
+                                InterNational ROAMING MT</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedMms"
+                                  value="community_account"
+                                />
+                                Community Account</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="mms"
+                        >
+                          <div class="ar-tagselect" data-target="usageTypeMms">
+                            <label>MMS Usage Types</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search usage types"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeMms"
+                                  value="local_onnet_mo_m2m"
+                                />
+                                Local On-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeMms"
+                                  value="local_offnet_mo_m2m"
+                                />
+                                Local Off-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeMms"
+                                  value="isd_mo_m2m"
+                                />
+                                ISD MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeMms"
+                                  value="premium_mo"
+                                />
+                                Premium MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeMms"
+                                  value="roaming_mo"
+                                />
+                                Roaming MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeMms"
+                                  value="national_roaming_mo"
+                                />
+                                National Roaming MO</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="service-pair" data-service-pair="global">
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="global"
+                        >
+                          <div class="ar-tagselect">
+                            <label>Global Derived Services</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search services"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedGlobal"
+                                  value="international_roaming"
+                                />
+                                International Roaming</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedGlobal"
+                                  value="balance_sharing"
+                                />
+                                Global Balance Sharing</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="derivedGlobal"
+                                  value="multi_currency"
+                                />
+                                Multi-Currency Billing</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="derived-group is-hidden"
+                          data-derived-group="global"
+                        >
+                          <div
+                            class="ar-tagselect"
+                            data-target="usageTypeGlobal"
+                          >
+                            <label>Global Usage Types</label>
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search usage types"
+                                />
+                              </div>
+                              <div class="ar-checklist-actions">
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-select-all
+                                  title="Select all"
+                                >
+                                  <span class="material-icons">done_all</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ar-checklist-icon-btn"
+                                  data-deselect
+                                  title="Deselect all"
+                                >
+                                  <span class="material-icons">remove_done</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body">
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeGlobal"
+                                  value="local_onnet_mo_m2m"
+                                />
+                                Local On-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeGlobal"
+                                  value="local_offnet_mo_m2m"
+                                />
+                                Local Off-Net MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeGlobal"
+                                  value="isd_mo_m2m"
+                                />
+                                ISD MO (M2M)</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeGlobal"
+                                  value="premium_mo"
+                                />
+                                Premium MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeGlobal"
+                                  value="roaming_mo"
+                                />
+                                Roaming MO</label
+                              >
+                              <label class="ar-check-row"
+                                ><input
+                                  type="checkbox"
+                                  name="usageTypeGlobal"
+                                  value="national_roaming_mo"
+                                />
+                                National Roaming MO</label
+                              >
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- ===== Roaming & Network Access ===== -->
+                  <div class="ar-card">
+                    <div class="ar-card-title">
+                      Roaming &amp; Network Access
+                    </div>
+
+                    <div class="ar-tagselect roaming-networks">
+                      <label>Roaming Networks</label>
+                      <div class="ar-checklist-body" id="roamingNetworksBody">
+                        <label class="ar-check-row"
+                          ><input
+                            type="checkbox"
+                            name="roamingNetworks"
+                            value="all"
+                          />
+                          All Networks</label
+                        >
+                        <label class="ar-check-row"
+                          ><input
+                            type="checkbox"
+                            name="roamingNetworks"
+                            value="india"
+                          />
+                          India</label
+                        >
+                        <label class="ar-check-row"
+                          ><input
+                            type="checkbox"
+                            name="roamingNetworks"
+                            value="ftl"
+                          />
+                          FTL</label
+                        >
+                      </div>
+                    </div>
+
+                    <div class="atpc-grid-3">
+                      <div class="ar-field">
+                        <label>Allow National Roaming Data</label>
+                        <select
+                          name="allowNationalRoamingData"
+                          class="ar-input"
+                        >
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                      <div class="ar-field">
+                        <label>Allow International Roaming Data</label>
+                        <select
+                          name="allowInternationalRoamingData"
+                          class="ar-input"
+                        >
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                      <div class="ar-field">
+                        <label>SIM / IMSI</label>
+                        <select name="simRangeFlag" class="ar-input">
+                          <option value="sim">SIM</option>
+                          <option value="imsi">IMSI</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="ar-field">
+                      <div class="ar-field-header">
+                        <label>SIM / IMSI Range Details</label>
+                        <button
+                          type="button"
+                          class="ar-add-row-btn"
+                          id="addSimRangeBtn"
+                        >
+                          <span class="material-icons">add</span> Add Range
+                        </button>
+                      </div>
+                      <div class="ar-condition-list" id="simRangeList"></div>
+                    </div>
+                  </div>
+
+                  <!-- ===== Calendar Config & Zone Groups ===== -->
+                  <div class="ar-card" id="calendarZoneCard">
+                    <div class="ar-card-title">
+                      Calendar Config &amp; Zone Groups
+                    </div>
+                    <div class="ar-card-sub">
+                      Calendar applies to every ATP; the zone group shown
+                      depends on the balance categories selected above.
+                    </div>
+
+                    <div class="atpc-grid-3">
+                      <div class="ar-field">
+                        <label>Calendar Config</label>
+                        <select
+                          id="calendarConfig"
+                          name="calendarConfig"
+                          class="ar-input"
+                        >
+                          <option value="5">NATIONAL_CALENDAR</option>
+                          <option value="4">DNS_DATA_CAL</option>
+                          <option value="3">LOCAL_DATA_CAL</option>
+                          <option value="2">LOCAL_SMS_CAL</option>
+                          <option value="1">LOCAL_VOICE_CAL</option>
+                          <option value="66">MT_CALENDAR_ROAMING</option>
+                        </select>
+                      </div>
+                      <div
+                        class="ar-field is-hidden"
+                        id="zoneGroupField"
+                        data-zone-field="voiceSms"
+                      >
+                        <label>Zone Group</label>
+                        <div class="ar-msdropdown">
+                          <button type="button" class="ar-input ar-msdropdown-toggle">
+                            <span class="ar-msdropdown-label">Select</span>
+                            <span class="material-icons ar-msdropdown-caret">expand_more</span>
+                          </button>
+                          <div class="ar-tagselect ar-msdropdown-panel is-hidden">
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search zone groups"
+                                />
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body" data-rating-checklist="zoneGroup">
+                              <!-- Rating (Y) and Restricted (N) rows are rendered
+                                   client-side from ZONE_GROUP_OPTIONS in Atpcreate.js
+                                   (see renderRatingChecklist) so both this list and
+                                   Data Zone Group's stay in sync with the same
+                                   static-options-today / GET-API-tomorrow shape. -->
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        class="ar-field is-hidden"
+                        id="dataZoneGroupField"
+                        data-zone-field="data"
+                      >
+                        <label>Data Zone Group</label>
+                        <div class="ar-msdropdown">
+                          <button type="button" class="ar-input ar-msdropdown-toggle">
+                            <span class="ar-msdropdown-label">Select</span>
+                            <span class="material-icons ar-msdropdown-caret">expand_more</span>
+                          </button>
+                          <div class="ar-tagselect ar-msdropdown-panel is-hidden">
+                            <div class="ar-checklist-toolbar">
+                              <div class="ar-checklist-search">
+                                <span class="material-icons">search</span
+                                ><input
+                                  type="text"
+                                  placeholder="Search zone groups"
+                                />
+                              </div>
+                            </div>
+                            <div class="ar-checklist-body" data-rating-checklist="dataZoneGroup">
+                              <!-- rendered client-side, see zoneGroupField above -->
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <!-- FIXED FOOTER -->
+              <div class="ar-form-footer">
+                <button
+                  class="ar-cancel-btn"
+                  type="button"
+                  onclick="_acCancelForm()"
+                >
+                  Cancel
+                </button>
+                <!-- <button class="ar-cancel-btn" type="button" id="atpCreateSaveDraft">
+                  Save Draft
+                </button> -->
+                <button
+                  class="ar-submit-btn"
+                  type="submit"
+                  form="atpCreateForm"
+                  id="atpCreatePublish"
+                >
+                  <span id="atpCreatePublishLabel">Publish ATP</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script th:src="@{/js/Atpcreate.js}"></script>
+      <script th:inline="javascript">
+        (function () {
+          const fromSel = document.getElementById("hoursFromSelect");
+          const toSel = document.getElementById("hoursToSelect");
+          for (let h = 0; h <= 23; h++) {
+            const label = String(h).padStart(2, "0") + ":00";
+            fromSel.insertAdjacentHTML(
+              "beforeend",
+              `<option value="${h}" ${h === 0 ? "selected" : ""}>${label}</option>`,
+            );
+            toSel.insertAdjacentHTML(
+              "beforeend",
+              `<option value="${h}" ${h === 23 ? "selected" : ""}>${label}</option>`,
+            );
+          }
+        })();
+      </script>
+    </section>
+  </body>
+</html>
