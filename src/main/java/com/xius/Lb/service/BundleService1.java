@@ -149,7 +149,7 @@ public class BundleService1 {
 
 	private String generateBundleName(String atpName, Long bundleId) {
 
-		String bundleName = atpName + "_BND" + bundleId;
+		String bundleName = atpName;
 
 		logger.info("Generated bundle name={} using ATP={} bundleId={}", bundleName, atpName, bundleId);
 

@@ -1632,8 +1632,13 @@
                       </div>
                     </div>
 
-                    <div class="atpc-grid-3">
-                      <div class="ar-field">
+                    <div class="atpc-grid-3" id="roamingAccessGrid">
+                      <!-- Data-only fields: shown once "Data" is checked
+                           under Balance & Usage Configuration. -->
+                      <div
+                        class="ar-field is-hidden"
+                        data-roaming-field="data"
+                      >
                         <label>Allow National Roaming Data</label>
                         <select
                           name="allowNationalRoamingData"
@@ -1643,7 +1648,10 @@
                           <option value="yes">Yes</option>
                         </select>
                       </div>
-                      <div class="ar-field">
+                      <div
+                        class="ar-field is-hidden"
+                        data-roaming-field="data"
+                      >
                         <label>Allow International Roaming Data</label>
                         <select
                           name="allowInternationalRoamingData"
@@ -1653,11 +1661,52 @@
                           <option value="yes">Yes</option>
                         </select>
                       </div>
-                      <div class="ar-field">
-                        <label>SIM / IMSI</label>
-                        <select name="simRangeFlag" class="ar-input">
-                          <option value="sim">SIM</option>
-                          <option value="imsi">IMSI</option>
+
+                      <!-- Voice/SMS/MMS-only fields: shown once any of
+                           those three is checked. Both groups can be
+                           visible together (e.g. Data + Voice). -->
+                      <div
+                        class="ar-field is-hidden"
+                        data-roaming-field="voice"
+                      >
+                        <label>Allow MTC</label>
+                        <select name="allowMtc" class="ar-input">
+                          <option value="">Select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                      <div
+                        class="ar-field is-hidden"
+                        data-roaming-field="voice"
+                      >
+                        <label>Allow MOC</label>
+                        <select name="allowMoc" class="ar-input">
+                          <option value="">Select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                      <div
+                        class="ar-field is-hidden"
+                        data-roaming-field="voice"
+                      >
+                        <label>Allow NLD MO</label>
+                        <select name="allowNldMo" class="ar-input">
+                          <option value="">Select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                      <div
+                        class="ar-field is-hidden"
+                        data-roaming-field="voice"
+                      >
+                        <label>Allow ILD MO</label>
+                        <select name="allowIldMo" class="ar-input">
+                          <option value="">Select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
                         </select>
                       </div>
                     </div>

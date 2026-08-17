@@ -501,7 +501,7 @@ public class BucketService {
 
 	private String generateBucketName(String atpName, String balanceCategory, Long sequence) {
 
-		String bucketName = atpName + "_" + balanceCategory + "_BKT_" + sequence;
+		String bucketName = atpName + "_" + balanceCategory;
 
 		logger.info("Generated bucket name={} for ATP={} balanceCategory={} sequence={}", bucketName, atpName,
 				balanceCategory, sequence);

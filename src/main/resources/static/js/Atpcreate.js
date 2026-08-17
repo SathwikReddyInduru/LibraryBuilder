@@ -570,6 +570,12 @@ function _acRenderAtpDetail(detail) {
   const roamingNetworkLabels = (d.roamingNetworks || []).map(
     (id) => ROAMING_NETWORK_LABEL_MAP[id] ?? id,
   );
+  // Allow MTC/MOC/NLD MO/ILD MO only show up on the create form once
+  // VOICE/SMS/MMS is picked, so only render them here if the API
+  // actually returned a value for at least one — otherwise every ATP
+  // would show a misleading "No" for fields that were never set.
+  const hasVoiceRoamingFields =
+    d.allowMtc != null || d.allowMoc != null || d.allowNldMo != null || d.allowIldMo != null;
   const roamingCard = `
     <div class="ar-card">
       <div class="ar-card-title">Roaming</div>
@@ -577,21 +583,26 @@ function _acRenderAtpDetail(detail) {
         ${_acDetailChips("Roaming Networks", roamingNetworkLabels)}
         <div class="ar-detail-item"><div class="ar-detail-label">Allow National Roaming Data</div>${_acYn(d.allowNationalRoamingData)}</div>
         <div class="ar-detail-item"><div class="ar-detail-label">Allow International Roaming Data</div>${_acYn(d.allowInternationalRoamingData)}</div>
+        ${hasVoiceRoamingFields ? `<div class="ar-detail-item"><div class="ar-detail-label">Allow MTC</div>${_acYn(d.allowMtc)}</div>` : ""}
+        ${hasVoiceRoamingFields ? `<div class="ar-detail-item"><div class="ar-detail-label">Allow MOC</div>${_acYn(d.allowMoc)}</div>` : ""}
+        ${hasVoiceRoamingFields ? `<div class="ar-detail-item"><div class="ar-detail-label">Allow NLD MO</div>${_acYn(d.allowNldMo)}</div>` : ""}
+        ${hasVoiceRoamingFields ? `<div class="ar-detail-item"><div class="ar-detail-label">Allow ILD MO</div>${_acYn(d.allowIldMo)}</div>` : ""}
       </div>
     </div>`;
 
   // ---- SIM / IMSI Range Details ----
-  // Format is "<I|E>-<start>-<end>"; simImsiFlag ("S"/"I") says
-  // whether these ranges are SIM or IMSI numbers, once for the whole
-  // list (see getSimRangeDetails in the form code below). Shown as
-  // compact "start → end" rows rather than a field grid, since the
-  // pair reads as one unit, not three separate facts.
+  // Format is "<I|E>-<S|I>-<start>-<end>" — Include/Exclude and
+  // SIM/IMSI are both chosen per row now (see getSimRangeDetails in
+  // the form code below). Shown as compact "start → end" rows rather
+  // than a field grid, since each pair reads as one unit.
   const simRangeRows = (d.simRangeDetails || [])
     .map((entry) => {
-      const [mode, start, end] = String(entry).split("-");
+      const [mode, simType, start, end] = String(entry).split("-");
       const isExclude = mode === "E";
+      const isImsi = simType === "I";
       return `<div class="ar-detail-range-row">
         <span class="ar-badge ar-badge--${isExclude ? "exclude" : "include"}">${isExclude ? "Exclude" : "Include"}</span>
+        <span class="ar-badge">${isImsi ? "IMSI" : "SIM"}</span>
         <span class="ar-detail-value--code">${_acEscape(start)}</span>
         <span class="ar-detail-range-arrow">&#8594;</span>
         <span class="ar-detail-value--code">${_acEscape(end)}</span>
@@ -601,9 +612,6 @@ function _acRenderAtpDetail(detail) {
   const simCard = `
     <div class="ar-card">
       <div class="ar-card-title">SIM / IMSI Range Details</div>
-      <div class="ar-detail-grid" style="padding-bottom:6px;">
-        ${_acDetailItem("Range Type", d.simImsiFlag === "I" ? "IMSI" : "SIM")}
-      </div>
       ${simRangeRows || `<span class="ar-detail-value ar-detail-value--muted">No ranges</span>`}
     </div>`;
 
@@ -793,7 +801,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // atp-rate.js, etc. may declare similarly-named constants).
 // ============================================================
 (function () {
-  const ATP_API_URL = "/atp/create";
+  const ATP_API_URL = "/atp/create1";
 
   /* ---------- Small helpers ---------- */
 
@@ -905,6 +913,48 @@ document.addEventListener("DOMContentLoaded", () => {
         .querySelectorAll('#dataZoneGroupField input[name="dataZoneGroup"]')
         .forEach((cb) => (cb.checked = false));
     }
+
+    // Roaming & Network Access: Allow National/International Roaming
+    // Data only make sense for DATA; Allow MTC/MOC/NLD MO/ILD MO only
+    // make sense for VOICE/SMS/MMS. Both groups show together when
+    // both kinds of category are checked (e.g. Data + Voice).
+    const voiceSmsMms = Array.from(checkboxes).some(
+      (cb) =>
+        ["voice", "sms", "mms"].includes(cb.dataset.unitTarget) && cb.checked,
+    );
+    document
+      .querySelectorAll('[data-roaming-field="data"]')
+      .forEach((field) => field.classList.toggle("is-hidden", !dataChecked));
+    document
+      .querySelectorAll('[data-roaming-field="voice"]')
+      .forEach((field) =>
+        field.classList.toggle("is-hidden", !voiceSmsMms),
+      );
+
+    // Layout of the roaming-fields grid depends on which combination
+    // of groups is visible: 4-across when only Voice/SMS/MMS fields
+    // are showing, 3-across when Data's fields join them, and a
+    // centered 2-up layout when Data is the only group showing.
+    const roamingGrid = document.getElementById("roamingAccessGrid");
+    if (roamingGrid) {
+      let layout = "";
+      if (dataChecked && voiceSmsMms) layout = "both";
+      else if (voiceSmsMms) layout = "voice-only";
+      else if (dataChecked) layout = "data-only";
+      roamingGrid.dataset.layout = layout;
+    }
+
+    if (!dataChecked) {
+      document
+        .querySelectorAll('[data-roaming-field="data"] select')
+        .forEach((sel) => (sel.selectedIndex = 0));
+    }
+    if (!voiceSmsMms) {
+      document
+        .querySelectorAll('[data-roaming-field="voice"] select')
+        .forEach((sel) => (sel.selectedIndex = 0));
+    }
+
     syncMsDropdownLabels();
   }
 
@@ -1028,6 +1078,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const row = document.createElement("div");
     row.className = "ar-condition-row sim-range-row";
     row.innerHTML = `
+    <select class="sim-range-type">
+      <option value="sim" ${prefill?.simType !== "imsi" ? "selected" : ""}>SIM</option>
+      <option value="imsi" ${prefill?.simType === "imsi" ? "selected" : ""}>IMSI</option>
+    </select>
     <select class="sim-range-mode">
       <option value="include" ${prefill?.mode !== "exclude" ? "selected" : ""}>Include</option>
       <option value="exclude" ${prefill?.mode === "exclude" ? "selected" : ""}>Exclude</option>
@@ -1062,17 +1116,18 @@ document.addEventListener("DOMContentLoaded", () => {
     updateSimRangeRemoveState();
   }
 
-  // Format is "<I|E>-<start>-<end>" — I for Include, E for Exclude.
-  // Whether the range is SIM or IMSI is carried once at the top level
-  // (simImsiFlag), not per-row, so there's no prefix here.
+  // Format is "<I|E>-<S|I>-<start>-<end>" — I/E for Include/Exclude, S/I
+  // for SIM/IMSI. Both are chosen per row now (not once for the whole
+  // list), so each row's own .sim-range-type carries its own flag.
   function getSimRangeDetails() {
     return Array.from(document.querySelectorAll("#simRangeList .sim-range-row"))
       .map((row) => {
         const mode = row.querySelector(".sim-range-mode").value;
+        const simType = row.querySelector(".sim-range-type").value;
         const start = row.querySelector(".sim-range-start").value.trim();
         const end = row.querySelector(".sim-range-end").value.trim();
         if (!start || !end) return null;
-        return `${mode === "exclude" ? "E" : "I"}-${start}-${end}`;
+        return `${mode === "exclude" ? "E" : "I"}-${simType === "imsi" ? "I" : "S"}-${start}-${end}`;
       })
       .filter(Boolean);
   }
@@ -1558,11 +1613,19 @@ document.addEventListener("DOMContentLoaded", () => {
       extendValidityYn: toYN(fd.get("extendValidity")),
 
       roamingNetworks: roamingNetworks,
+      // These four are only shown/collected when the relevant balance
+      // category is selected (see syncBalanceSections) — sent as "N"
+      // via toYN() when hidden/unset, same as any other unchecked flag.
       allowNationalRoamingData: toYN(fd.get("allowNationalRoamingData")),
       allowInternationalRoamingData: toYN(
         fd.get("allowInternationalRoamingData"),
       ),
-      simImsiFlag: fd.get("simRangeFlag") === "imsi" ? "I" : "S",
+      allowMtc: toYN(fd.get("allowMtc")),
+      allowMoc: toYN(fd.get("allowMoc")),
+      allowNldMo: toYN(fd.get("allowNldMo")),
+      allowIldMo: toYN(fd.get("allowIldMo")),
+      // SIM vs IMSI is chosen per row now — see getSimRangeDetails(),
+      // each entry carries its own "S"/"I" flag.
       simRangeDetails: simRangeDetails,
 
       balanceCategories: balanceCategories,
@@ -1965,6 +2028,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (box) box.checked = true;
     });
 
+    // These four fields are shown/hidden by the syncBalanceSections()
+    // call above based on which categories are checked — set the
+    // values regardless, they just won't be visible if the relevant
+    // category isn't part of this ATP.
     setField(
       "allowNationalRoamingData",
       detail.allowNationalRoamingData === "Y" ? "yes" : "no",
@@ -1973,10 +2040,21 @@ document.addEventListener("DOMContentLoaded", () => {
       "allowInternationalRoamingData",
       detail.allowInternationalRoamingData === "Y" ? "yes" : "no",
     );
-    setField("simRangeFlag", detail.simImsiFlag === "I" ? "imsi" : "sim");
+    if (detail.allowMtc != null) {
+      setField("allowMtc", detail.allowMtc === "Y" ? "yes" : "no");
+    }
+    if (detail.allowMoc != null) {
+      setField("allowMoc", detail.allowMoc === "Y" ? "yes" : "no");
+    }
+    if (detail.allowNldMo != null) {
+      setField("allowNldMo", detail.allowNldMo === "Y" ? "yes" : "no");
+    }
+    if (detail.allowIldMo != null) {
+      setField("allowIldMo", detail.allowIldMo === "Y" ? "yes" : "no");
+    }
 
-    // SIM / IMSI Range Details — "<I|E>-<start>-<end>" strings back
-    // into repeater rows.
+    // SIM / IMSI Range Details — "<I|E>-<S|I>-<start>-<end>" strings
+    // back into repeater rows, each with its own SIM/IMSI selector.
     const simList = document.getElementById("simRangeList");
     if (simList) simList.innerHTML = "";
     const ranges = detail.simRangeDetails || [];
@@ -1984,12 +2062,13 @@ document.addEventListener("DOMContentLoaded", () => {
       addSimRangeRow();
     } else {
       ranges.forEach((entry) => {
-        const match = /^([IE])-(\d+)-(\d+)$/.exec(entry);
+        const match = /^([IE])-([SI])-(\d+)-(\d+)$/.exec(entry);
         if (!match) return;
         addSimRangeRow({
           mode: match[1] === "E" ? "exclude" : "include",
-          start: match[2],
-          end: match[3],
+          simType: match[2] === "I" ? "imsi" : "sim",
+          start: match[3],
+          end: match[4],
         });
       });
       if (!simList.querySelector(".sim-range-row")) addSimRangeRow();

@@ -65,7 +65,7 @@ public class TariffPlanService {
 		String userDefined2 = null;
 		String userDefined3 = null;
 
-		String publicityId = request.getPublicityId();
+		String publicityId = request.getPublicityId()+"_TP";
 
 		tariffPlanRepository.insertServicePackage(servicePackageId, request.getAtpName() + "_TP" + servicePackageId,
 

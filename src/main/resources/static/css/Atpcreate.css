@@ -132,6 +132,42 @@
   display: none;
 }
 
+/* ── Roaming & Network Access fields — the 6 balance-category-linked
+   dropdowns (Allow National/International Roaming Data, Allow MTC/
+   MOC/NLD MO/ILD MO) get a layout tailored to which combination of
+   groups is currently visible, rather than the generic auto-fit
+   wrap used elsewhere. ── */
+
+/* Voice/SMS/MMS only (Data not checked): the 4 voice-side dropdowns
+   read best together as a single row. */
+.atpc-page #roamingAccessGrid[data-layout="voice-only"] {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Data + Voice/SMS/MMS together (all 6 fields showing): settle
+   into a clean 3-per-row, 2-row block instead of wrapping oddly. */
+.atpc-page #roamingAccessGrid[data-layout="both"] {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Data only: just 2 fields, so a full-width auto-fit row leaves
+   them stretched thin. Cap their width and left-align instead of
+   letting them balloon to fill the row. */
+.atpc-page #roamingAccessGrid[data-layout="data-only"] {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 320px));
+  justify-content: start;
+}
+
+@media (max-width: 720px) {
+  .atpc-page #roamingAccessGrid[data-layout="voice-only"],
+  .atpc-page #roamingAccessGrid[data-layout="both"] {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .atpc-page #roamingAccessGrid[data-layout="data-only"] {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Balance Category pills — stretch to fill the row's full
    width (instead of shrinking to fit their text) and sized up a
    bit so this key selector reads as the primary control it is. ── */
@@ -359,7 +395,7 @@
    browser style. Styling them to match + adding the Include/
    Exclude dropdown the range applies to. ── */
 .atpc-page .ar-condition-row.sim-range-row {
-  grid-template-columns: 120px 1fr 1fr 32px;
+  grid-template-columns: 90px 120px 1fr 1fr 32px;
 }
 
 .atpc-page .ar-condition-row input[type="text"] {

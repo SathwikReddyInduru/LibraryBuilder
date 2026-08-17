@@ -1,4 +1,27 @@
 [ {
+  "name" : "Untitled Draft",
+  "packageType" : "PREPAID",
+  "tariffPackCategory" : "GENERAL",
+  "periodicChargeID" : "",
+  "savedOn" : "17 Aug 2026",
+  "savedTime" : "11:56",
+  "username" : "FTLUSER",
+  "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
+  "selectedSvcs_s3" : null,
+  "selectedSvcs_s4" : null,
+  "selectedSvcs_s5" : null,
+  "state" : {
+    "s2" : [ ],
+    "s3" : [ ],
+    "s4" : [ ],
+    "s5" : [ ],
+    "price" : "",
+    "publicityCode" : "",
+    "startDate" : "",
+    "endDate" : "",
+    "isCorporate" : false
+  }
+}, {
   "name" : "FTLCA1",
   "packageType" : "POSTPAID",
   "tariffPackCategory" : null,
@@ -125,19 +148,6 @@
     "endDate" : "2026-08-28",
     "isCorporate" : false
   }
-}, {
-  "name" : "Untitled Draft",
-  "packageType" : "POSTPAID",
-  "tariffPackCategory" : null,
-  "periodicChargeID" : "",
-  "savedOn" : "03 Aug 2026",
-  "savedTime" : "11:03",
-  "username" : "FTLUSER",
-  "selectedSvcs_s2" : "[\"VOICE\",\"SMS\",\"DATA\"]",
-  "selectedSvcs_s3" : null,
-  "selectedSvcs_s4" : null,
-  "selectedSvcs_s5" : null,
-  "state" : { }
 }, {
   "name" : "1044",
   "packageType" : "POSTPAID",
