@@ -34,7 +34,7 @@ public class TariffPlanService {
 
 		logger.info("Tariff Plan request validation completed");
 
-//		validateServicePlans(servicePlanIds);
+		// validateServicePlans(servicePlanIds);
 
 		logger.info("Service Plan validation completed servicePlanIds={}", servicePlanIds);
 
@@ -65,7 +65,7 @@ public class TariffPlanService {
 		String userDefined2 = null;
 		String userDefined3 = null;
 
-		String publicityId = request.getPublicityId()+"_TP";
+		String publicityId = request.getPublicityId() + "_TP";
 
 		tariffPlanRepository.insertServicePackage(servicePackageId, request.getAtpName() + "_TP" + servicePackageId,
 
@@ -97,6 +97,53 @@ public class TariffPlanService {
 		logger.info("Tariff Plan creation completed successfully servicePackageId={}", servicePackageId);
 
 		return servicePackageId;
+	}
+
+	/**
+	 * Maps a single, already-created service plan into an existing Tariff
+	 * Plan. Used by Modify ATP when a new balance category (and its service
+	 * plan) is added and the caller passed back the existing tariffPlanId.
+	 */
+	@Transactional
+	public void addServicePlanMapping(Long servicePackageId, Long servicePlanId, Long networkId) {
+
+		logger.info("Mapping new servicePlanId={} into existing servicePackageId={}", servicePlanId,
+				servicePackageId);
+
+		tariffPlanRepository.insertServicePlanPackageMapping(servicePackageId, servicePlanId, networkId);
+	}
+
+	/**
+	 * Removes only the Tariff-Plan<->service-plan mapping row. The service
+	 * plan row itself is left untouched.
+	 */
+	@Transactional
+	public void removeServicePlanMapping(Long servicePackageId, Long servicePlanId) {
+
+		logger.info("Unmapping servicePlanId={} from servicePackageId={} (mapping only)", servicePlanId,
+				servicePackageId);
+
+		tariffPlanRepository.deleteServicePlanPackageMapping(servicePackageId, servicePlanId);
+	}
+
+	/**
+	 * Adds a single basic/derived service <-> Tariff Plan mapping row. Used
+	 * by Modify ATP when a new derivedServiceSelection entry is added.
+	 */
+	@Transactional
+	public void addServiceMapping(Long servicePackageId, Long networkId, Long basicServiceId, Long derivedServiceId) {
+
+		tariffPlanRepository.insertServiceAtpMapping(networkId, servicePackageId, basicServiceId, derivedServiceId);
+	}
+
+	/**
+	 * Removes a single basic/derived service <-> Tariff Plan mapping row.
+	 * Used by Modify ATP when a derivedServiceSelection entry is removed.
+	 */
+	@Transactional
+	public void removeServiceMapping(Long servicePackageId, Long basicServiceId, Long derivedServiceId) {
+
+		tariffPlanRepository.deleteServiceAtpMapping(servicePackageId, basicServiceId, derivedServiceId);
 	}
 
 	private void validateServicePlans(List<Long> servicePlanIds) {
@@ -267,33 +314,59 @@ public class TariffPlanService {
 		logger.info("Completed derived service mapping servicePackageId={}", servicePackageId);
 	}
 
-	private String buildServiceName(String basicServiceName, Long derivedServiceId) {
+	public Long findTariffPlanIdByServicePlanIds(List<Long> servicePlanIds) {
 
-		if (derivedServiceId == null) {
-
-			logger.info("Derived service ID is null. Using basic service name={}", basicServiceName);
-
-			return basicServiceName;
+		if (servicePlanIds == null || servicePlanIds.isEmpty()) {
+			throw new IllegalArgumentException(
+					"Service Plan IDs are required to find Tariff Plan");
 		}
 
-		try {
+		List<Long> tariffPlanIds = tariffPlanRepository.findTariffPlanIdsByServicePlanIds(
+				servicePlanIds);
 
-			String derivedServiceName = tariffPlanRepository.getDerivedServiceName(derivedServiceId);
-
-			String serviceName = basicServiceName + "~" + derivedServiceName;
-
-			logger.info("Built service name={} for derivedServiceId={}", serviceName, derivedServiceId);
-
-			return serviceName;
-
-		} catch (Exception ex) {
-
-			logger.warn("Unable to resolve derived service name for derivedServiceId={}. Using ID instead",
-					derivedServiceId);
-
-			return basicServiceName + "~" + derivedServiceId;
+		if (tariffPlanIds == null || tariffPlanIds.isEmpty()) {
+			throw new IllegalStateException(
+					"No Tariff Plan found for Service Plans: "
+							+ servicePlanIds);
 		}
+
+		if (tariffPlanIds.size() > 1) {
+			throw new IllegalStateException(
+					"Multiple Tariff Plans found for Service Plans: "
+							+ servicePlanIds
+							+ ". Expected only one Tariff Plan.");
+		}
+
+		return tariffPlanIds.get(0);
 	}
+
+	// private String buildServiceName(String basicServiceName, Long derivedServiceId) {
+
+	// 	if (derivedServiceId == null) {
+
+	// 		logger.info("Derived service ID is null. Using basic service name={}", basicServiceName);
+
+	// 		return basicServiceName;
+	// 	}
+
+	// 	try {
+
+	// 		String derivedServiceName = tariffPlanRepository.getDerivedServiceName(derivedServiceId);
+
+	// 		String serviceName = basicServiceName + "~" + derivedServiceName;
+
+	// 		logger.info("Built service name={} for derivedServiceId={}", serviceName, derivedServiceId);
+
+	// 		return serviceName;
+
+	// 	} catch (Exception ex) {
+
+	// 		logger.warn("Unable to resolve derived service name for derivedServiceId={}. Using ID instead",
+	// 				derivedServiceId);
+
+	// 		return basicServiceName + "~" + derivedServiceId;
+	// 	}
+	// }
 
 	private Long parseLong(String value, String fieldName) {
 

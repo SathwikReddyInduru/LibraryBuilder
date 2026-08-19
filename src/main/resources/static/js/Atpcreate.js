@@ -91,16 +91,20 @@ Object.values(USAGE_TYPE_ID_MAP).forEach((idMap) => {
 // the backend will eventually return ("Y" = rating zone group,
 // "N" = restricted zone group) so the payload shape (see
 // buildRatingFlagPairs) never has to change once real data lands —
-// only these two arrays get more entries. Deliberately only one
-// Y + one N each for now; renderRatingChecklist groups them under
-// "Rating"/"Restricted" headers regardless of how many there are.
+// only these two arrays get more entries. renderRatingChecklist
+// groups them under "Rating"/"Restricted" headers regardless of
+// how many there are.
 const ZONE_GROUP_OPTIONS = [
-  { id: 1, name: "FT_LOCAL_OFNET", ratingFlag: "Y" },
-  { id: 2, name: "DATAROAMING", ratingFlag: "N" },
+  { id: 1, name: "LOCAL_VOICE_ZONE", ratingFlag: "Y" },
+  { id: 2, name: "LOCAL_SMS_ZONE", ratingFlag: "Y" },
+  { id: 3, name: "FT_LOCAL_ONNET", ratingFlag: "N" },
+  { id: 4, name: "FT_LOCAL_OFNET", ratingFlag: "N" },
 ];
 const DATA_ZONE_GROUP_OPTIONS = [
-  { id: 1, name: "ABCDATA", ratingFlag: "Y" },
-  { id: 2, name: "DNS_DATA_ZONE", ratingFlag: "N" },
+  { id: 2, name: "DNS_DATA_ZONE", ratingFlag: "Y" },
+  { id: 11, name: "DATAROAMING", ratingFlag: "Y" },
+  { id: 22, name: "TEST_2580", ratingFlag: "N" },
+  { id: 43, name: "INSTA", ratingFlag: "N" },
 ];
 
 // Values match the legacy admin screen's derivedService1..4 option
@@ -247,6 +251,16 @@ const CATEGORY_OFFER_CODE_LABEL_MAP = {
   TB: "Traffic Bundle",
   TM: "Traffic Module",
   P: "Promotional",
+};
+
+// Matches the Calendar Config <select> options in atpcreate.html.
+const CALENDAR_CONFIG_LABEL_MAP = {
+  5: "NATIONAL_CALENDAR",
+  4: "DNS_DATA_CAL",
+  3: "LOCAL_DATA_CAL",
+  2: "LOCAL_SMS_CAL",
+  1: "LOCAL_VOICE_CAL",
+  66: "MT_CALENDAR_ROAMING",
 };
 
 function _acEscape(str) {
@@ -440,40 +454,90 @@ async function _acSelectAtp(id) {
   _acRenderView(id, listed.name, null);
 }
 
+// Icon + label for each detail section — looked up by _acCardTitle
+// to put a small icon badge next to each card's title.
+const AC_DETAIL_SECTIONS = [
+  { id: "overview", label: "Overview", icon: "description" },
+  { id: "validity", label: "Validity & Scheduling", icon: "event_available" },
+  { id: "sim", label: "SIM / IMSI Ranges", icon: "sim_card" },
+  { id: "roaming", label: "Roaming", icon: "public" },
+  { id: "balance", label: "Balance Categories", icon: "account_balance_wallet" },
+  { id: "derived", label: "Derived Services", icon: "hub" },
+  { id: "calendar", label: "Zone & Calendar", icon: "calendar_month" },
+];
+
 function _acRenderView(id, name, detail) {
   const panel = document.getElementById("acViewPanel");
   const displayName = detail?.servicePlanDesc || detail?.atpName || name || `ATP #${id}`;
 
+  // Quick-fact chips under the title — the handful of things you'd
+  // otherwise have to scroll to Overview/Validity to see. Only shown
+  // once `detail` has actually loaded.
+  // Rating/Billing + validity-days chips disabled per feedback —
+  // commented out rather than removed in case they're wanted back.
+  // const typeOfServiceLabel = { 1: "Rating", 2: "Billing" }[detail?.typeOfService] ?? null;
+  const heroFacts = detail
+    ? [
+        // typeOfServiceLabel && { icon: "sell", text: typeOfServiceLabel },
+        // detail.validityPeriodType && {
+        //   icon: "event_available",
+        //   text:
+        //     detail.validityPeriodType === "LIMITED"
+        //       ? `${detail.validityPeriodDays ?? "?"} day validity`
+        //       : "Unlimited validity",
+        // },
+        String(detail.vipPlanFlagYn ?? "").toUpperCase() === "Y" && {
+          icon: "star",
+          text: "VIP Plan",
+        },
+      ].filter(Boolean)
+    : [];
+
   panel.innerHTML = `
     <div class="ar-view-header">
-      <div>
+      <div class="ar-view-header-icon"><span class="material-icons">receipt_long</span></div>
+      <div class="ar-view-header-main">
         <h2>${_acEscape(displayName)}</h2>
-        <span class="ar-rule-date">Service Package ID: ${_acEscape(id)}</span>
+        <div class="ar-view-header-meta">
+          <span class="ar-rule-date">Service Package ID: <strong>${_acEscape(id)}</strong></span>
+          ${
+            heroFacts.length
+              ? `<span class="ar-view-hero-facts">${heroFacts
+                  .map(
+                    (f) =>
+                      `<span class="ar-view-hero-fact"><span class="material-icons">${f.icon}</span>${_acEscape(f.text)}</span>`,
+                  )
+                  .join("")}</span>`
+              : ""
+          }
+        </div>
       </div>
       <div class="ar-view-header-actions">
-        <button type="button" class="ar-icon-btn" onclick="_acModifyAtp('${id}')">
+        <button type="button" class="ar-icon-btn ar-icon-btn--primary" onclick="_acModifyAtp('${id}')">
           <span class="material-icons">edit</span> Modify
         </button>
       </div>
     </div>
-    <div class="ar-view-body">
-      ${
-        detail
-          ? _acRenderAtpDetail(detail)
-          : `<div class="ar-card">
-              <div class="ar-card-title">Summary</div>
-              <div class="atpc-grid-2">
-                <div class="ar-field"><label>ATP Name</label><div class="ar-input ar-input-readonly">${_acEscape(displayName)}</div></div>
-                <div class="ar-field"><label>Service Package ID</label><div class="ar-input ar-input-readonly">${_acEscape(id)}</div></div>
-              </div>
-              <div class="ar-field" style="margin-top:14px;">
-                <div class="ar-cancel-btn" style="cursor:default;display:inline-flex;align-items:center;gap:8px;background:#fffbeb;border-color:#fde68a;color:#92400e;">
-                  <span class="material-icons" style="font-size:16px;">info</span>
-                  Full ATP details aren't available from the backend yet — showing what's known from the list.
+    <div class="ar-view-scroller">
+      <div class="ar-view-body">
+        ${
+          detail
+            ? _acRenderAtpDetail(detail)
+            : `<div class="ar-card">
+                <div class="ar-card-title">Summary</div>
+                <div class="atpc-grid-2">
+                  <div class="ar-field"><label>ATP Name</label><div class="ar-input ar-input-readonly">${_acEscape(displayName)}</div></div>
+                  <div class="ar-field"><label>Service Package ID</label><div class="ar-input ar-input-readonly">${_acEscape(id)}</div></div>
                 </div>
-              </div>
-            </div>`
-      }
+                <div class="ar-field" style="margin-top:14px;">
+                  <div class="ar-cancel-btn" style="cursor:default;display:inline-flex;align-items:center;gap:8px;background:#fffbeb;border-color:#fde68a;color:#92400e;">
+                    <span class="material-icons" style="font-size:16px;">info</span>
+                    Full ATP details aren't available from the backend yet — showing what's known from the list.
+                  </div>
+                </div>
+              </div>`
+        }
+      </div>
     </div>`;
 }
 
@@ -518,6 +582,15 @@ function _acDetailChips(label, items) {
   </div>`;
 }
 
+// Card header used by every section below: icon (looked up from
+// AC_DETAIL_SECTIONS by id, defined next to _acRenderView) + title,
+// consistent across the whole view. `data-ar-section` on the outer
+// .ar-card is what the sticky nav rail scrolls to and scroll-spies.
+function _acCardTitle(sectionId, title) {
+  const icon = AC_DETAIL_SECTIONS.find((s) => s.id === sectionId)?.icon || "info";
+  return `<div class="ar-card-title"><span class="material-icons ar-card-title-icon">${icon}</span>${_acEscape(title)}</div>`;
+}
+
 function _acRenderAtpDetail(detail) {
   const d = detail || {};
 
@@ -529,11 +602,11 @@ function _acRenderAtpDetail(detail) {
   const categoryOfferCodeLabel = CATEGORY_OFFER_CODE_LABEL_MAP[d.categoryOfferCode]
     ?? d.categoryOfferCode;
   const ratingTypeLabel =
-    { R: "Slab Based", N: "Non Slab Based" }[d.ratingType] ?? d.ratingType;
+    { S: "Slab Based", N: "Non Slab Based" }[d.ratingType] ?? d.ratingType;
 
   const overviewCard = `
-    <div class="ar-card">
-      <div class="ar-card-title">Overview</div>
+    <div class="ar-card" data-ar-section="overview">
+      ${_acCardTitle("overview", "Overview")}
       <div class="ar-detail-grid">
         ${_acDetailItem("ATP Name", d.atpName, { mono: true })}
         ${_acDetailItem("Publicity ID", d.publicityId, { mono: true })}
@@ -542,16 +615,14 @@ function _acRenderAtpDetail(detail) {
         ${d.typeOfService === 2 ? _acDetailItem("Billing Service Type", billingServiceTypeLabel) : ""}
         ${_acDetailItem("Category Offer Code", categoryOfferCodeLabel)}
         <div class="ar-detail-item"><div class="ar-detail-label">VIP Plan</div>${_acYn(d.vipPlanFlagYn)}</div>
-        ${_acDetailItem("Network ID", d.networkId, { mono: true })}
-        ${_acDetailItem("Created By", d.createdBy, { mono: true })}
       </div>
       ${d.description ? `<div class="ar-detail-grid"><div class="ar-detail-item ar-detail-item--full"><div class="ar-detail-label">Description</div><span class="ar-detail-value">${_acEscape(d.description)}</span></div></div>` : ""}
     </div>`;
 
   // ---- Validity & Scheduling ----
   const validityCard = `
-    <div class="ar-card">
-      <div class="ar-card-title">Validity &amp; Scheduling</div>
+    <div class="ar-card" data-ar-section="validity">
+      ${_acCardTitle("validity", "Validity & Scheduling")}
       <div class="ar-detail-grid">
         ${_acDetailItem("Valid From", d.validFrom, { mono: true })}
         ${_acDetailItem("Valid To", d.validTo, { mono: true })}
@@ -577,8 +648,8 @@ function _acRenderAtpDetail(detail) {
   const hasVoiceRoamingFields =
     d.allowMtc != null || d.allowMoc != null || d.allowNldMo != null || d.allowIldMo != null;
   const roamingCard = `
-    <div class="ar-card">
-      <div class="ar-card-title">Roaming</div>
+    <div class="ar-card" data-ar-section="roaming">
+      ${_acCardTitle("roaming", "Roaming")}
       <div class="ar-detail-grid">
         ${_acDetailChips("Roaming Networks", roamingNetworkLabels)}
         <div class="ar-detail-item"><div class="ar-detail-label">Allow National Roaming Data</div>${_acYn(d.allowNationalRoamingData)}</div>
@@ -591,34 +662,45 @@ function _acRenderAtpDetail(detail) {
     </div>`;
 
   // ---- SIM / IMSI Range Details ----
-  // Format is "<I|E>-<S|I>-<start>-<end>" — Include/Exclude and
-  // SIM/IMSI are both chosen per row now (see getSimRangeDetails in
-  // the form code below). Shown as compact "start → end" rows rather
+  // Wire format (see AtpDetailsService#buildSimRangeDetails on the
+  // backend) is "<S|I>-<I|E>-<start>-<end>": SIM/IMSI flag first,
+  // then Include/Exclude flag, then the range. Older records saved
+  // before the per-row SIM/IMSI flag existed only have 3 parts
+  // ("<I|E>-<start>-<end>") — those fall back to SIM rather than
+  // losing the End value. Shown as compact "start → end" rows rather
   // than a field grid, since each pair reads as one unit.
   const simRangeRows = (d.simRangeDetails || [])
     .map((entry) => {
-      const [mode, simType, start, end] = String(entry).split("-");
+      const parts = String(entry).split("-");
+      let mode, simType, start, end;
+      if (parts.length >= 4) {
+        [simType, mode, start, end] = parts;
+      } else {
+        [mode, start, end] = parts;
+        simType = "S";
+      }
       const isExclude = mode === "E";
       const isImsi = simType === "I";
       return `<div class="ar-detail-range-row">
+        <span class="ar-detail-range-icon material-icons">${isImsi ? "sim_card" : "credit_card"}</span>
         <span class="ar-badge ar-badge--${isExclude ? "exclude" : "include"}">${isExclude ? "Exclude" : "Include"}</span>
         <span class="ar-badge">${isImsi ? "IMSI" : "SIM"}</span>
         <span class="ar-detail-value--code">${_acEscape(start)}</span>
-        <span class="ar-detail-range-arrow">&#8594;</span>
+        <span class="ar-detail-range-arrow material-icons">arrow_forward</span>
         <span class="ar-detail-value--code">${_acEscape(end)}</span>
       </div>`;
     })
     .join("");
   const simCard = `
-    <div class="ar-card">
-      <div class="ar-card-title">SIM / IMSI Range Details</div>
+    <div class="ar-card" data-ar-section="sim">
+      ${_acCardTitle("sim", "SIM / IMSI Range Details")}
       ${simRangeRows || `<span class="ar-detail-value ar-detail-value--muted">No ranges</span>`}
     </div>`;
 
   // ---- Balance Categories ----
   const balanceCard = (d.balanceCategories || []).length
-    ? `<div class="ar-card">
-        <div class="ar-card-title">Balance Categories</div>
+    ? `<div class="ar-card" data-ar-section="balance">
+        ${_acCardTitle("balance", "Balance Categories")}
         ${(d.balanceCategories || [])
           .map((bc, i) => {
             const usageLabels = (bc.usageType || []).map(
@@ -649,8 +731,8 @@ function _acRenderAtpDetail(detail) {
     (derivedByCategory[info.category] ||= []).push(info.label);
   });
   const derivedCard = Object.keys(derivedByCategory).length
-    ? `<div class="ar-card">
-        <div class="ar-card-title">Derived Services</div>
+    ? `<div class="ar-card" data-ar-section="derived">
+        ${_acCardTitle("derived", "Derived Services")}
         <div class="ar-detail-grid">
           ${Object.entries(derivedByCategory)
             .map(
@@ -681,10 +763,10 @@ function _acRenderAtpDetail(detail) {
           .join("")}</div>`
       : `<span class="ar-detail-value ar-detail-value--muted">Not set</span>`;
   const calendarCard = `
-    <div class="ar-card">
-      <div class="ar-card-title">Calendar Config &amp; Zone Groups</div>
+    <div class="ar-card" data-ar-section="calendar">
+      ${_acCardTitle("calendar", "Zone & Calendar Configuration")}
       <div class="ar-detail-grid">
-        ${_acDetailItem("Calendar Config", d.calendarConfig, { mono: true, full: true })}
+        ${_acDetailItem("Calendar Config", CALENDAR_CONFIG_LABEL_MAP[d.calendarConfig] ?? d.calendarConfig)}
       </div>
       <div class="ar-detail-item ar-detail-item--full">
         <div class="ar-detail-label">Zone Group</div>
@@ -801,7 +883,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // atp-rate.js, etc. may declare similarly-named constants).
 // ============================================================
 (function () {
-  const ATP_API_URL = "/atp/create1";
+  const ATP_API_URL = "/atp/create";
 
   /* ---------- Small helpers ---------- */
 
@@ -901,6 +983,8 @@ document.addEventListener("DOMContentLoaded", () => {
     zoneGroupField?.classList.toggle("is-hidden", !voiceOrSms);
     dataZoneGroupField?.classList.toggle("is-hidden", !dataChecked);
 
+    syncCalendarZoneCardVisibility();
+
     // Clear the checklist rather than leaving a stale selection once
     // a field is hidden again.
     if (!voiceOrSms) {
@@ -971,6 +1055,47 @@ document.addEventListener("DOMContentLoaded", () => {
       const billingServiceType = document.getElementById("billingServiceType");
       if (billingServiceType) billingServiceType.selectedIndex = 0;
     }
+
+    // Calendar Config only applies to Rating ATPs — hidden for
+    // Billing *and* while Type of Service hasn't been picked yet
+    // (excluded from the payload too, see buildAtpPayload).
+    const isRating = typeOfService?.value === "1";
+    document
+      .getElementById("calendarConfigField")
+      ?.classList.toggle("is-hidden", !isRating);
+
+    // Billing ATPs also only ever roam under a Restricted zone group
+    // — hide the Rating (Y) group in both Zone Group and Data Zone
+    // Group checklists and clear any Rating selection so a stale
+    // pick doesn't get validated or submitted.
+    document
+      .querySelectorAll('[data-rating-checklist] [data-rating-flag="Y"]')
+      .forEach((el) => el.classList.toggle("is-hidden", isBilling));
+    if (isBilling) {
+      document
+        .querySelectorAll(
+          '[data-rating-checklist] input[data-rating-flag="Y"]:checked',
+        )
+        .forEach((cb) => (cb.checked = false));
+    }
+
+    syncCalendarZoneCardVisibility();
+  }
+
+  // The Zone & Calendar Configuration card should only render once at
+  // least one field inside it would actually show something: Calendar
+  // Config (Rating ATPs only) or either zone-group checklist (needs a
+  // balance category checked). Called from both syncBillingServiceType
+  // (Type of Service changes) and syncBalanceSections (balance category
+  // checkboxes change) since either can flip the answer.
+  function syncCalendarZoneCardVisibility() {
+    const isRating = document.getElementById("typeOfService")?.value === "1";
+    const anyBalanceCategoryChecked = document.querySelector(
+      '#balanceCategoryGroup input[type="checkbox"]:checked',
+    );
+    document
+      .getElementById("calendarZoneCard")
+      ?.classList.toggle("is-hidden", !(isRating || anyBalanceCategoryChecked));
   }
 
   /* ---------- Section: Validity Period Days show/hide ----------
@@ -1028,7 +1153,14 @@ document.addEventListener("DOMContentLoaded", () => {
         valueField.disabled = true;
         typeField.classList.add("is-locked");
         valueField.classList.add("is-locked");
-      } else {
+      } else if (typeField.disabled) {
+        // Only clear/unlock when this category is actually coming out
+        // of the locked (Unlimited=Y) state. This function re-runs on
+        // every balance-category checkbox change (see wiring below),
+        // not just this category's own Unlimited toggle — if we reset
+        // unconditionally here, unchecking e.g. SMS would also wipe
+        // out a manually-entered value in an already-unlocked field
+        // like Data's unit value.
         typeField.selectedIndex = 0;
         valueField.value = "";
         typeField.disabled = false;
@@ -1116,9 +1248,11 @@ document.addEventListener("DOMContentLoaded", () => {
     updateSimRangeRemoveState();
   }
 
-  // Format is "<I|E>-<S|I>-<start>-<end>" — I/E for Include/Exclude, S/I
-  // for SIM/IMSI. Both are chosen per row now (not once for the whole
-  // list), so each row's own .sim-range-type carries its own flag.
+  // Format is "<S|I>-<I|E>-<start>-<end>" — S/I for SIM/IMSI first,
+  // then I/E for Include/Exclude (matches AtpDetailsService#buildSimRangeDetails
+  // on the backend). Both are chosen per row now (not once for the
+  // whole list), so each row's own .sim-range-type carries its own
+  // flag.
   function getSimRangeDetails() {
     return Array.from(document.querySelectorAll("#simRangeList .sim-range-row"))
       .map((row) => {
@@ -1127,7 +1261,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const start = row.querySelector(".sim-range-start").value.trim();
         const end = row.querySelector(".sim-range-end").value.trim();
         if (!start || !end) return null;
-        return `${mode === "exclude" ? "E" : "I"}-${simType === "imsi" ? "I" : "S"}-${start}-${end}`;
+        return `${simType === "imsi" ? "I" : "S"}-${mode === "exclude" ? "E" : "I"}-${start}-${end}`;
       })
       .filter(Boolean);
   }
@@ -1161,38 +1295,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (!start) {
         flashInvalid(startField);
-        markStatus(null, "Enter Range Start");
+        flagError("Enter Range Start");
         startField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
       if (!/^[0-9]+$/.test(start)) {
         flashInvalid(startField);
-        markStatus(null, "Enter a valid Range Start");
+        flagError("Enter a valid Range Start");
         startField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
       if (start.length < 15) {
         flashInvalid(startField);
-        markStatus(null, "Range Start must be at least 15 digits");
+        flagError("Range Start must be at least 15 digits");
         startField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
 
       if (!end) {
         flashInvalid(endField);
-        markStatus(null, "Enter Range End");
+        flagError("Enter Range End");
         endField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
       if (!/^[0-9]+$/.test(end)) {
         flashInvalid(endField);
-        markStatus(null, "Enter a valid Range End");
+        flagError("Enter a valid Range End");
         endField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
       if (end.length < 15) {
         flashInvalid(endField);
-        markStatus(null, "Range End must be at least 15 digits");
+        flagError("Range End must be at least 15 digits");
         endField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
@@ -1202,10 +1336,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // limit (ranges can be up to 20 digits).
       if (BigInt(start) > BigInt(end)) {
         flashInvalid(endField);
-        markStatus(
-          null,
-          "Range End must be greater than or equal to Range Start",
-        );
+        flagError("Range End must be greater than or equal to Range Start");
         endField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
@@ -1214,7 +1345,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (seenRanges.has(key)) {
         flashInvalid(startField);
         flashInvalid(endField);
-        markStatus(null, "This range is already mapped");
+        flagError("This range is already mapped");
         startField.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
@@ -1223,7 +1354,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (populatedCount === 0) {
-      markStatus(null, "Add at least one SIM / IMSI range");
+      flagError("Add at least one SIM / IMSI range");
       document
         .getElementById("simRangeList")
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1275,9 +1406,10 @@ document.addEventListener("DOMContentLoaded", () => {
      ratingFlag (Y = rating zone group, N = restricted zone group),
      grouped under "Rating"/"Restricted" headers so the grouping still
      makes sense once the GET APIs return more than one of each.
-     Rules: only one restricted (N) option may be checked at a time
-     (radio-like, enforced live below); rating (Y) options stay
-     multi-select for when there's more than one to pick from. */
+     Rules (radio-like, enforced live below): only one restricted (N)
+     option may be checked at a time, in both checklists; only one
+     rating (Y) option may be checked in Zone Group, while Data Zone
+     Group's rating (Y) options stay multi-select. */
 
   function renderRatingChecklist(fieldName, options) {
     const body = document.querySelector(
@@ -1297,37 +1429,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const headingEl = document.createElement("div");
       headingEl.className = "ar-checklist-group-heading";
+      headingEl.dataset.ratingFlag = flag;
       headingEl.textContent = heading;
       body.appendChild(headingEl);
 
       rows.forEach((opt) => {
         const label = document.createElement("label");
         label.className = "ar-check-row";
+        label.dataset.ratingFlag = flag;
         label.innerHTML = `<input type="checkbox" name="${fieldName}" value="${opt.id}" data-rating-flag="${flag}" /> ${opt.name}`;
         body.appendChild(label);
       });
     });
   }
 
-  // Enforces "only one restricted zone group selected" per checklist:
-  // checking a restricted (N) box unchecks any other restricted box
-  // in the same checklist body. Rating (Y) boxes are untouched, so
-  // multiple can stay checked.
+  // Enforces selection limits per checklist:
+  // - Restricted (N): only one box can stay checked, in BOTH the
+  //   Zone Group and Data Zone Group checklists.
+  // - Rating (Y): only one box can stay checked in the Zone Group
+  //   checklist; Data Zone Group's Rating boxes are unrestricted
+  //   (multiple can stay checked).
   function initRatingZoneGroupExclusivity() {
     document
       .querySelectorAll("[data-rating-checklist]")
       .forEach((body) => {
+        const fieldName = body.dataset.ratingChecklist;
         body.addEventListener("change", (e) => {
           const cb = e.target;
-          if (
-            !cb.matches('input[type="checkbox"]') ||
-            cb.dataset.ratingFlag !== "N" ||
-            !cb.checked
-          ) {
-            return;
-          }
+          if (!cb.matches('input[type="checkbox"]') || !cb.checked) return;
+
+          const flag = cb.dataset.ratingFlag;
+          const singleSelect =
+            flag === "N" || (flag === "Y" && fieldName === "zoneGroup");
+          if (!singleSelect) return;
+
           body
-            .querySelectorAll('input[type="checkbox"][data-rating-flag="N"]')
+            .querySelectorAll(
+              `input[type="checkbox"][data-rating-flag="${flag}"]`,
+            )
             .forEach((other) => {
               if (other !== cb) other.checked = false;
             });
@@ -1351,21 +1490,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Only enforced while the field is visible (see syncZoneGroupVisibility
   // etc. — hidden fields don't apply to the selected balance categories).
-  // For now, with exactly one Y and one N option available, "one rating
-  // + one restricted" is effectively "select both" — but written as a
-  // flag-count check so it keeps working once more options exist.
+  // This only checks that at least one Rating and at least one
+  // Restricted box are checked — it doesn't care how many, so it holds
+  // whether the checklist enforces single-select or multi-select for
+  // Rating (see initRatingZoneGroupExclusivity).
   function validateRatingChecklist(fieldName, fieldEl, label) {
     if (!fieldEl || fieldEl.classList.contains("is-hidden")) return true;
 
+    const isBilling =
+      document.getElementById("typeOfService")?.value === "2";
     const pairs = buildRatingFlagPairs(fieldName);
     const hasRating = pairs.some((p) => p.ratingFlag === "Y");
     const hasRestricted = pairs.some((p) => p.ratingFlag === "N");
 
+    // Billing ATPs never show the Rating (Y) group (see
+    // syncBillingServiceType), so only a Restricted pick is required.
+    if (isBilling) {
+      if (!hasRestricted) {
+        flagError(`Select a Restricted ${label} option`);
+        fieldEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
+      }
+      return true;
+    }
+
     if (!hasRating || !hasRestricted) {
-      markStatus(
-        null,
-        `Select one Rating and one Restricted ${label} option`,
-      );
+      flagError(`Select one Rating and one Restricted ${label} option`);
       fieldEl.scrollIntoView({ behavior: "smooth", block: "center" });
       return false;
     }
@@ -1391,6 +1541,87 @@ document.addEventListener("DOMContentLoaded", () => {
     ) {
       return false;
     }
+    return true;
+  }
+
+  /* ---------- Section: full-form required-field validation ----------
+     Every field on this form is mandatory. On submit we walk it once,
+     skipping anything currently hidden or disabled — a field that
+     doesn't apply yet (e.g. Billing Service Type before "Billing" is
+     picked, or the SMS unit row before "SMS" is checked under Balance
+     Category) isn't demanded until it's actually shown. The first
+     empty field found stops submission: it's flashed, focused, and
+     both the status line and a toast explain what's missing. Zone
+     Group / Data Zone Group and the SIM/IMSI ranges have their own
+     richer rules (Rating+Restricted pairing, digit-length checks) and
+     stay validated separately by validateZoneGroups() /
+     validateSimRanges() rather than being re-checked here. */
+
+  function fieldGroupLabel(container) {
+    const label = container?.querySelector("label");
+    if (!label) return "This field";
+    return label.textContent.replace("*", "").trim() || "This field";
+  }
+
+  function validateAllRequiredFields() {
+    const form = document.getElementById("atpCreateForm");
+    if (!form) return true;
+
+    // 1. Plain single-value fields — text/number/date inputs, selects,
+    // and the description textarea. Requiring a `name` attribute
+    // naturally excludes the little checklist search boxes, which
+    // aren't real form fields.
+    const singleValueFields = form.querySelectorAll(
+      [
+        '.ar-field input[name][type="text"]',
+        '.ar-field input[name][type="number"]',
+        '.ar-field input[name][type="date"]',
+        ".ar-field select[name]",
+        ".ar-field textarea[name]",
+      ].join(", "),
+    );
+    for (const field of singleValueFields) {
+      if (field.closest(".is-hidden") || field.disabled) continue;
+      if (!field.value || !field.value.toString().trim()) {
+        const fieldEl = field.closest(".ar-field");
+        flagError(`${fieldGroupLabel(fieldEl)} is required`);
+        flashInvalid(field);
+        field.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
+      }
+    }
+
+    // 2. Balance Category — at least one pill checked.
+    const balanceGroup = document.getElementById("balanceCategoryGroup");
+    if (balanceGroup && !balanceGroup.closest(".is-hidden")) {
+      if (!balanceGroup.querySelector('input[type="checkbox"]:checked')) {
+        flagError("Select at least one Balance Category");
+        balanceGroup.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
+      }
+    }
+
+    // 3. Every other checkbox checklist — derived services, usage
+    // types, roaming networks. Zone Group / Data Zone Group carry
+    // [data-rating-checklist] and are excluded here since
+    // validateZoneGroups() already covers them with the
+    // Rating+Restricted rule.
+    const checklistBodies = form.querySelectorAll(
+      ".ar-checklist-body:not([data-rating-checklist])",
+    );
+    for (const body of checklistBodies) {
+      if (body.closest(".is-hidden")) continue;
+      const boxes = body.querySelectorAll('input[type="checkbox"]');
+      if (boxes.length === 0) continue;
+      if (!body.querySelector('input[type="checkbox"]:checked')) {
+        const heading = body.closest(".ar-tagselect")?.querySelector("label");
+        const label = heading ? heading.textContent.trim() : "This checklist";
+        flagError(`Select at least one option under ${label}`);
+        body.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -1535,6 +1766,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         balanceCategories.push({
           balanceCategory: capsCat,
+          // Only present in edit mode, stashed on the pill checkbox
+          // by _acPopulateForm() from the GET-by-id response's
+          // bucketId — a fresh create has nothing to send here, so
+          // this stays null and the backend assigns a new bucket.
+          bucketId: cb.dataset.bucketId || null,
           bucketType: BUCKET_TYPE_MAP[fd.get("bucketType")] || null,
           usageType: usageTypeIds,
           bucketUnitType:
@@ -1557,6 +1793,21 @@ document.addEventListener("DOMContentLoaded", () => {
        "All Networks" (exclusive of the individual ones — see
        initRoamingNetworksExclusivity) has no numeric ID and stays as
        the uppercase string it always was. */
+    /* Roaming & Network Access flags — only meaningful, and only
+       sent, when their respective balance category is selected
+       (see syncBalanceSections, which hides+resets these fields
+       otherwise). Checked straight off the checkboxes rather than
+       FormData, since FormData still reports the hidden select's
+       default option value even while the field itself is hidden. */
+    const dataCategoryChecked = document.querySelector(
+      '#balanceCategoryGroup input[data-unit-target="data"]:checked',
+    );
+    const voiceSmsMmsCategoryChecked = document.querySelector(
+      '#balanceCategoryGroup input[data-unit-target="voice"]:checked, ' +
+        '#balanceCategoryGroup input[data-unit-target="sms"]:checked, ' +
+        '#balanceCategoryGroup input[data-unit-target="mms"]:checked',
+    );
+
     const roamingNetworks = fd
       .getAll("roamingNetworks")
       .map((v) => ROAMING_NETWORK_ID_MAP[v] ?? v.toUpperCase());
@@ -1614,16 +1865,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
       roamingNetworks: roamingNetworks,
       // These four are only shown/collected when the relevant balance
-      // category is selected (see syncBalanceSections) — sent as "N"
-      // via toYN() when hidden/unset, same as any other unchecked flag.
-      allowNationalRoamingData: toYN(fd.get("allowNationalRoamingData")),
-      allowInternationalRoamingData: toYN(
-        fd.get("allowInternationalRoamingData"),
-      ),
-      allowMtc: toYN(fd.get("allowMtc")),
-      allowMoc: toYN(fd.get("allowMoc")),
-      allowNldMo: toYN(fd.get("allowNldMo")),
-      allowIldMo: toYN(fd.get("allowIldMo")),
+      // category is selected (see syncBalanceSections) — sent as null,
+      // not "N", when that category isn't checked, so the backend can
+      // tell "explicitly No" apart from "not applicable to this ATP".
+      allowNationalRoamingData: dataCategoryChecked
+        ? toYN(fd.get("allowNationalRoamingData"))
+        : null,
+      allowInternationalRoamingData: dataCategoryChecked
+        ? toYN(fd.get("allowInternationalRoamingData"))
+        : null,
+      allowMtc: voiceSmsMmsCategoryChecked ? toYN(fd.get("allowMtc")) : null,
+      allowMoc: voiceSmsMmsCategoryChecked ? toYN(fd.get("allowMoc")) : null,
+      allowNldMo: voiceSmsMmsCategoryChecked
+        ? toYN(fd.get("allowNldMo"))
+        : null,
+      allowIldMo: voiceSmsMmsCategoryChecked
+        ? toYN(fd.get("allowIldMo"))
+        : null,
       // SIM vs IMSI is chosen per row now — see getSimRangeDetails(),
       // each entry carries its own "S"/"I" flag.
       simRangeDetails: simRangeDetails,
@@ -1639,12 +1897,33 @@ document.addEventListener("DOMContentLoaded", () => {
       // serviceDuration, rentalPeriod) are deliberately left out
       // rather than sent as guessed/hardcoded values — add them here
       // once this form grows inputs for them.
-      calendarConfig: fd.get("calendarConfig") || null,
+      // calendarConfig only applies to Rating ATPs — hidden (and
+      // excluded here) for anything else via syncBillingServiceType,
+      // so it's sent as null rather than whatever stale value the
+      // hidden select still holds.
+      calendarConfig:
+        fd.get("typeOfService") === "1"
+          ? fd.get("calendarConfig") || null
+          : null,
       // Each entry is {id, ratingFlag} — see buildRatingFlagPairs.
       zoneGroup: buildRatingFlagPairs("zoneGroup"),
       dataZoneGroupId: buildRatingFlagPairs("dataZoneGroup"),
     };
   }
+
+  // Dev helper: the Publish button is disabled in edit mode (see
+  // applyEditModeUI), so it never fires a "submit" event to log
+  // through — a disabled button can't trigger form submission at
+  // all, no matter what the submit handler does. This bypasses the
+  // button entirely: run `_acDebugAtpPayload()` in the browser
+  // console at any time (create or edit mode) to build the payload
+  // off the form's current values and log it, without touching the
+  // network. Not called from anywhere in this file automatically.
+  window._acDebugAtpPayload = function () {
+    const payload = buildAtpPayload();
+    console.log("🔍 [debug] Current form payload:", payload);
+    return payload;
+  };
 
   /* ---------- API call ---------- */
 
@@ -1661,7 +1940,7 @@ document.addEventListener("DOMContentLoaded", () => {
       result?.message ||
       result?.reason ||
       result?.error ||
-      "Something went wrong while creating the ATP."
+      "Something went wrong while saving the ATP."
     );
   }
 
@@ -1696,12 +1975,51 @@ document.addEventListener("DOMContentLoaded", () => {
     return parts.length ? parts.join(" · ") : null;
   }
 
+  // Same idea as getApiSuccessSummary, but for the shape PUT
+  // /atp/modify/{atpId} returns (AtpModifyResponse) — added/updated/
+  // removed counts per bucket, service plan, and derived-service
+  // selection, instead of the flat ID lists a create response has.
+  function getModifySuccessSummary(result) {
+    const parts = [];
+
+    const bucketBits = [];
+    if (result?.addedBucketIds?.length) bucketBits.push(`${result.addedBucketIds.length} added`);
+    if (result?.updatedBucketIds?.length) bucketBits.push(`${result.updatedBucketIds.length} updated`);
+    if (result?.removedBucketIds?.length) bucketBits.push(`${result.removedBucketIds.length} removed`);
+    if (bucketBits.length) parts.push(`Buckets: ${bucketBits.join(", ")}`);
+
+    const planBits = [];
+    if (result?.addedServicePlanIds?.length) planBits.push(`${result.addedServicePlanIds.length} added`);
+    if (result?.updatedServicePlanIds?.length) planBits.push(`${result.updatedServicePlanIds.length} updated`);
+    if (result?.removedServicePlanIds?.length) planBits.push(`${result.removedServicePlanIds.length} removed`);
+    if (planBits.length) parts.push(`Service Plans: ${planBits.join(", ")}`);
+
+    const derivedBits = [];
+    if (result?.addedDerivedServiceSelections?.length)
+      derivedBits.push(`${result.addedDerivedServiceSelections.length} added`);
+    if (result?.removedDerivedServiceSelections?.length)
+      derivedBits.push(`${result.removedDerivedServiceSelections.length} removed`);
+    if (derivedBits.length) parts.push(`Derived Services: ${derivedBits.join(", ")}`);
+
+    return parts.length ? parts.join(" · ") : null;
+  }
+
   async function callAtpApi() {
     const payload = buildAtpPayload();
-    console.log("📤 Payload:", payload);
+    // Edit mode hits PUT /atp/modify/{atpId} (AtpController#modifyAtp)
+    // with the same payload shape the create form already builds;
+    // create mode keeps hitting POST /atp/create. The service-package
+    // ID is read off #acFormPanel's dataset, set by _acModifyAtp()
+    // when it opens the form in edit mode.
+    const editId = isEditMode()
+      ? document.querySelector(".atpc-fullscreen")?.dataset.servicePackageId
+      : null;
+    const url = editId ? `/atp/modify/${editId}` : ATP_API_URL;
+    const method = editId ? "PUT" : "POST";
+    console.log(`📤 [${method}] ${url}`, payload);
 
-    const response = await fetch(ATP_API_URL, {
-      method: "POST",
+    const response = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -1746,6 +2064,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (text) text.textContent = label;
   }
 
+  // Every validation failure on this form should be impossible to
+  // miss — not just the small status-line text, but a toast too.
+  // Shared by the required-field pass below and the existing SIM
+  // range / zone group validators so all of it looks consistent.
+  function flagError(message) {
+    markStatus(null, message);
+    if (typeof showToast === "function") {
+      showToast(message, "error");
+    }
+  }
+
   function setBtnLoading(btn, isLoading, loadingLabel) {
     if (!btn) return;
     if (isLoading) {
@@ -1776,12 +2105,9 @@ document.addEventListener("DOMContentLoaded", () => {
      (_acModifyAtp in the list-pane script above), which sets
      data-mode="edit" + data-service-package-id on #acFormPanel
      (.atpc-fullscreen) and calls window._acPopulateForm(detail) with
-     the GET /atp/{id} response to fill this form in. The "save
-     changes" API still doesn't exist on the backend (see
-     AtpDetailsController), so in edit mode we keep the form
-     populated for reference/copy-editing but disable the actions
-     that would need that API, instead of silently creating a
-     duplicate ATP via the create endpoint. */
+     the GET /atp/{id} response to fill this form in. Publish now
+     hits PUT /atp/modify/{atpId} (see callAtpApi) instead of being
+     disabled — AtpController#modifyAtp is implemented. */
   function isEditMode() {
     return (
       document.querySelector(".atpc-fullscreen")?.dataset.mode === "edit"
@@ -1791,16 +2117,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function applyEditModeUI() {
     if (!isEditMode()) return;
 
-    const notice = document.getElementById("atpFormModifyNotice");
-    if (notice) notice.style.display = "flex";
-
-    const publishBtn = document.getElementById("atpCreatePublish");
     const publishLabel = document.getElementById("atpCreatePublishLabel");
-    if (publishBtn) {
-      publishBtn.disabled = true;
-      publishBtn.title = "Modify API not implemented yet";
-    }
-    if (publishLabel) publishLabel.textContent = "Publish (unavailable)";
+    if (publishLabel) publishLabel.textContent = "Save Changes";
   }
   // Exposed so _acModifyAtp() (list-pane script above) can re-apply
   // this after switching #acFormPanel into edit mode — the
@@ -1817,6 +2135,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("atpCreateForm");
     if (!form) return;
     form.reset();
+
+    // Clear any bucketId stashed on the pill checkboxes by a previous
+    // edit-mode populate (see _acPopulateForm) — form.reset() doesn't
+    // touch dataset attributes, so without this a stale bucketId from
+    // whatever ATP was last opened for edit would silently leak into
+    // the next fresh create's payload.
+    document
+      .querySelectorAll("#balanceCategoryGroup input[data-bucket-id]")
+      .forEach((cb) => delete cb.dataset.bucketId);
 
     // Segmented toggles (Rating Type, Rental Type): form.reset() already
     // restored the hidden input to its default value attribute — just
@@ -1935,7 +2262,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const pillBox = document.querySelector(
         `#balanceCategoryGroup input[data-unit-target="${cat}"]`,
       );
-      if (pillBox) pillBox.checked = true;
+      if (pillBox) {
+        pillBox.checked = true;
+        // bucketId has no form input of its own — it's backend-assigned,
+        // never user-entered — so stash it straight on the pill checkbox
+        // here and read it back off the same element in buildAtpPayload().
+        // Only the GET-by-id response (edit mode) carries it; a fresh
+        // create has nothing to stash, so this stays unset there and
+        // buildAtpPayload() sends bucketId: null as before.
+        if (entry.bucketId != null) {
+          pillBox.dataset.bucketId = entry.bucketId;
+        } else {
+          delete pillBox.dataset.bucketId;
+        }
+      }
 
       // Bucket Type is one shared field across every category in
       // this form — take it from whichever entry actually has one.
@@ -2034,27 +2374,32 @@ document.addEventListener("DOMContentLoaded", () => {
     // category isn't part of this ATP.
     setField(
       "allowNationalRoamingData",
-      detail.allowNationalRoamingData === "Y" ? "yes" : "no",
+      detail.allowNationalRoamingData === "Y" ? "Y" : "N",
     );
     setField(
       "allowInternationalRoamingData",
-      detail.allowInternationalRoamingData === "Y" ? "yes" : "no",
+      detail.allowInternationalRoamingData === "Y" ? "Y" : "N",
     );
     if (detail.allowMtc != null) {
-      setField("allowMtc", detail.allowMtc === "Y" ? "yes" : "no");
+      setField("allowMtc", detail.allowMtc === "Y" ? "Y" : "N");
     }
     if (detail.allowMoc != null) {
-      setField("allowMoc", detail.allowMoc === "Y" ? "yes" : "no");
+      setField("allowMoc", detail.allowMoc === "Y" ? "Y" : "N");
     }
     if (detail.allowNldMo != null) {
-      setField("allowNldMo", detail.allowNldMo === "Y" ? "yes" : "no");
+      setField("allowNldMo", detail.allowNldMo === "Y" ? "Y" : "N");
     }
     if (detail.allowIldMo != null) {
-      setField("allowIldMo", detail.allowIldMo === "Y" ? "yes" : "no");
+      setField("allowIldMo", detail.allowIldMo === "Y" ? "Y" : "N");
     }
 
-    // SIM / IMSI Range Details — "<I|E>-<S|I>-<start>-<end>" strings
+    // SIM / IMSI Range Details — "<S|I>-<I|E>-<start>-<end>" strings
     // back into repeater rows, each with its own SIM/IMSI selector.
+    // (Matches AtpDetailsService#buildSimRangeDetails on the backend:
+    // SIM/IMSI flag first, then Include/Exclude flag.) Older records
+    // saved before the per-row SIM/IMSI flag existed only have 3 parts
+    // ("<I|E>-<start>-<end>") — those are matched separately and
+    // default to SIM.
     const simList = document.getElementById("simRangeList");
     if (simList) simList.innerHTML = "";
     const ranges = detail.simRangeDetails || [];
@@ -2062,14 +2407,23 @@ document.addEventListener("DOMContentLoaded", () => {
       addSimRangeRow();
     } else {
       ranges.forEach((entry) => {
-        const match = /^([IE])-([SI])-(\d+)-(\d+)$/.exec(entry);
-        if (!match) return;
-        addSimRangeRow({
-          mode: match[1] === "E" ? "exclude" : "include",
-          simType: match[2] === "I" ? "imsi" : "sim",
-          start: match[3],
-          end: match[4],
-        });
+        const match4 = /^([SI])-([IE])-(\d+)-(\d+)$/.exec(entry);
+        const match3 = match4 ? null : /^([IE])-(\d+)-(\d+)$/.exec(entry);
+        if (match4) {
+          addSimRangeRow({
+            mode: match4[2] === "E" ? "exclude" : "include",
+            simType: match4[1] === "I" ? "imsi" : "sim",
+            start: match4[3],
+            end: match4[4],
+          });
+        } else if (match3) {
+          addSimRangeRow({
+            mode: match3[1] === "E" ? "exclude" : "include",
+            simType: "sim",
+            start: match3[2],
+            end: match3[3],
+          });
+        }
       });
       if (!simList.querySelector(".sim-range-row")) addSimRangeRow();
     }
@@ -2166,11 +2520,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         return;
       }
-      if (!atpNameField.value.trim()) {
-        flashInvalid(atpNameField);
-        markStatus(null, "Add an ATP name to save a draft");
-        return;
-      }
+      if (!validateAllRequiredFields()) return;
       if (!validateSimRanges()) return;
       if (!validateZoneGroups()) return;
       markStatus(null, "Saving...");
@@ -2203,42 +2553,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
     form?.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (isEditMode()) {
-        if (typeof showToast === "function") {
-          showToast("Modify API not implemented yet.", "info");
-        }
-        return;
-      }
-      if (!atpNameField.value.trim()) {
-        flashInvalid(atpNameField);
-        markStatus(null, "ATP Name is required to publish");
-        atpNameField.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
+      if (!validateAllRequiredFields()) return;
       if (!validateSimRanges()) return;
       if (!validateZoneGroups()) return;
-      markStatus(null, "Publishing...");
-      setBtnLoading(publishBtn, true, "Publishing...");
+
+      const editing = isEditMode();
+      const editId = editing
+        ? document.querySelector(".atpc-fullscreen")?.dataset.servicePackageId
+        : null;
+
+      markStatus(null, editing ? "Saving changes..." : "Publishing...");
+      setBtnLoading(publishBtn, true, editing ? "Saving..." : "Publishing...");
       try {
         const result = await callAtpApi();
         markStatus(
-          "published",
-          `Published · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+          editing ? "saved" : "published",
+          `${editing ? "Changes saved" : "Published"} · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
         );
         if (typeof showToast === "function") {
-          const summary = getApiSuccessSummary(result);
-          showToast(
-            summary
-              ? `ATP published successfully — ${summary}`
-              : "ATP published successfully.",
-            "success",
-            summary ? 6000 : undefined,
-          );
+          if (editing) {
+            const summary = getModifySuccessSummary(result);
+            const baseMsg = result?.message || "ATP updated successfully.";
+            showToast(
+              summary ? `${baseMsg} — ${summary}` : baseMsg,
+              "success",
+              summary ? 6000 : undefined,
+            );
+          } else {
+            const summary = getApiSuccessSummary(result);
+            showToast(
+              summary
+                ? `ATP published successfully — ${summary}`
+                : "ATP published successfully.",
+              "success",
+              summary ? 6000 : undefined,
+            );
+          }
         }
-        resetAtpCreateForm();
+        if (editing && editId) {
+          // Stay on this ATP instead of resetting into a blank Create
+          // form: drop the cached GET /atp/{id} response (it's stale
+          // now) and reload both the list row and the read-only view
+          // so Modify -> Save -> view shows what was actually saved.
+          delete _acDetailCache[editId];
+          await _acLoadList();
+          _acSelectAtp(editId);
+        } else {
+          resetAtpCreateForm();
+        }
       } catch (err) {
-        console.error("Publish failed:", err);
-        markStatus(null, "Failed to publish");
+        console.error(editing ? "Save changes failed:" : "Publish failed:", err);
+        markStatus(null, editing ? "Failed to save changes" : "Failed to publish");
         if (typeof showToast === "function") {
           showToast(err.message, "error");
         }

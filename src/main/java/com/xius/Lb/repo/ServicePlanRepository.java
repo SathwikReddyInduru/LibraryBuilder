@@ -155,6 +155,95 @@ public class ServicePlanRepository {
 				allowNtnlRmData, allowIntlRmData, mtCalendarId, deviceGroupId, mmsCalendarId, planConfirmNotification,
 				planExpNotification, planExpNotifThresholdDays, planExpNotifThresholdHrs, zoneBasedVipPlanFlagYn);
 	}
+	
+	public void insertSimpleServicePlan(
+	        Long networkId,
+	        Long servicePlanId,
+	        String servicePlanDesc,
+	        String servicePlanType,
+	        Integer billingServiceType,
+	        String status) {
+
+	    String sql = """
+	            INSERT INTO cs_rat_service_plans
+	            (
+	                network_id,
+	                service_plan_id,
+	                service_plan_desc,
+	                service_plan_type,
+	                type_of_service,
+	                created_date,
+	                status
+	            )
+	            VALUES
+	            (
+	                ?,
+	                ?,
+	                ?,
+	                ?,
+	                ?,
+	                SYSDATE,
+	                ?
+	            )
+	            """;
+
+	    oracleJdbcTemplate.update(
+	            sql,
+	            networkId,
+	            servicePlanId,
+	            servicePlanDesc,
+	            servicePlanType,
+	            billingServiceType,
+	            status
+	    );
+	}
+
+	/**
+	 * Field-level update for an existing service plan. Row is never
+	 * dropped/recreated on Modify ATP - only re-syncs what changed.
+	 */
+	public void updateServicePlan(Long servicePlanId, String limitedHoursYn, Integer applicableFromHrs,
+			Integer applicableToHrs, String allowMtc, String allowMoc, String allowNldMo, String allowIldMo,
+			String ratingType, Long zoneGroupId, String allowNtnlRmData, String allowIntlRmData, Long mtCalendarId,
+			String zoneBasedVipPlanFlagYn) {
+
+		String sql = """
+				UPDATE cs_rat_service_plans
+				SET limited_hours_yn = ?,
+				    service_plan_freq_from_hrs = ?,
+				    service_plan_freq_to_hrs = ?,
+				    allow_mtc = ?,
+				    allow_moc = ?,
+				    allow_nld_mo = ?,
+				    allow_ild_mo = ?,
+				    rating_type = ?,
+				    zone_group_id = ?,
+				    allow_ntnl_rm_data = ?,
+				    allow_int_rm_data = ?,
+				    mt_calender_id = ?,
+				    zone_based_vip_plan_flag_yn = ?
+				WHERE service_plan_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, limitedHoursYn, applicableFromHrs, applicableToHrs, allowMtc, allowMoc,
+				allowNldMo, allowIldMo, ratingType, zoneGroupId, allowNtnlRmData, allowIntlRmData, mtCalendarId,
+				zoneBasedVipPlanFlagYn, servicePlanId);
+	}
+
+	/**
+	 * DATA zone mappings have no natural key, so Modify ATP replaces them
+	 * wholesale for a DATA service plan: delete then re-insert via
+	 * insertDataZoneMappings.
+	 */
+	public void deleteDataZoneMappings(Long servicePlanId) {
+
+		String sql = """
+				DELETE FROM cs_rat_service_data_zone_map
+				WHERE service_plan_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, servicePlanId);
+	}
 
 	/**
 	 * Procedure:

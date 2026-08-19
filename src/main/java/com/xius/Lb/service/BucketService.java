@@ -68,6 +68,85 @@ public class BucketService {
 		return bucketIds;
 	}
 
+	/**
+	 * Public entry point used by Modify ATP to create exactly one new bucket
+	 * for a newly-added balance category, reusing the same validation +
+	 * insert logic as normal ATP creation ({@link #createBuckets}).
+	 */
+	@Transactional
+	public String createSingleBucket(AtpRequest request, BalanceCategoryRequest bucketRequest) {
+
+		logger.info("Creating single bucket for Modify ATP balanceCategory={} ATP={}",
+				bucketRequest != null ? bucketRequest.getBalanceCategory() : null,
+				request != null ? request.getAtpName() : null);
+
+		validateBucket(bucketRequest);
+
+		String bucketId = createBucket(request, bucketRequest);
+
+		logger.info("Single bucket created for Modify ATP bucketId={}", bucketId);
+
+		return bucketId;
+	}
+
+	/**
+	 * Updates an existing bucket in place for Modify ATP. Only field values
+	 * are re-written - the bucket row, and everything hanging under it, is
+	 * never dropped/recreated. Roaming networks (no natural key) are
+	 * resynced by delete-then-reinsert.
+	 */
+	@Transactional
+	public void updateBucket(AtpRequest request, BalanceCategoryRequest bucketRequest) {
+
+		validateBucket(bucketRequest);
+
+		String bucketId = bucketRequest.getBucketId();
+
+		if (isBlank(bucketId)) {
+
+			logger.error("Validation failed: bucketId is mandatory to update an existing bucket");
+
+			throw new IllegalArgumentException("bucketId is mandatory to update an existing bucket");
+		}
+
+		String balanceCategory = bucketRequest.getBalanceCategory().trim().toUpperCase();
+
+		logger.info("Updating bucketId={} balanceCategory={} for ATP={}", bucketId, balanceCategory,
+				request.getAtpName());
+
+		Long usageType = calculateUsageType(bucketRequest.getUsageType());
+
+		String limitedNetworksYn = determineLimitedNetworks(request.getRoamingNetworks());
+
+		String limitedHours = determineLimitedHours(request.getApplicableFromHrs(), request.getApplicableToHrs());
+
+		Long zoneGroupId = getZoneGroupIdWithRatingN(request.getZoneGroup());
+
+		Long dataZoneGroupId = getZoneGroupIdWithRatingN(request.getDataZoneGroupId());
+
+		try {
+
+			bucketRepository.updateBucket(bucketId, balanceCategory, usageType, request.getValidityPeriodDays(),
+					bucketRequest.getBucketUnitValue(), bucketRequest.getBucketUnitType(), request.getRollOverYn(),
+					request.getExtendValidityYn(), zoneGroupId, dataZoneGroupId, limitedNetworksYn, limitedHours,
+					request.getApplicableFromHrs(), request.getApplicableToHrs(), bucketRequest.getUnlimitedUsageYn());
+
+			logger.info("Successfully updated bucketId={}", bucketId);
+
+		} catch (Exception ex) {
+
+			logger.error("Error updating bucketId={} balanceCategory={}", bucketId, balanceCategory, ex);
+
+			throw ex;
+		}
+
+		bucketRepository.deleteBucketRoamingNetworks(bucketId);
+
+		insertRoamingNetworks(request, bucketId);
+
+		logger.info("Completed bucket update bucketId={}", bucketId);
+	}
+
 	private String createBucket(AtpRequest request, BalanceCategoryRequest bucketRequest) {
 
 		String balanceCategory = bucketRequest.getBalanceCategory().trim().toUpperCase();
@@ -334,7 +413,7 @@ public class BucketService {
 
 		validateYn(bucket.getUnlimitedUsageYn(), "unlimitedUsageYn");
 
-		for (Integer usageType : bucket.getUsageType()) {
+		for (Long usageType : bucket.getUsageType()) {
 
 			if (usageType == null) {
 
@@ -411,13 +490,13 @@ public class BucketService {
 		logger.info("Bucket unit type validation successful category={} unitType={}", category, unit);
 	}
 
-	private Long calculateUsageType(List<Integer> usageTypes) {
+	private Long calculateUsageType(List<Long> usageTypes) {
 
 		logger.info("Calculating usageType from usageTypes={}", usageTypes);
 
 		long result = 0;
 
-		for (Integer usageType : usageTypes) {
+		for (Long usageType : usageTypes) {
 
 			result += usageType;
 		}

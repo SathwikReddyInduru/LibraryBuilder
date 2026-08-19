@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.xius.Lb.Dto.AtpDetailsResponse;
+import com.xius.Lb.Dto.AtpModifyResponse;
 import com.xius.Lb.Dto.AtpRequest;
 import com.xius.Lb.Dto.AtpResponse;
 import com.xius.Lb.service.AtpDetailsService;
@@ -41,6 +42,18 @@ public class AtpController {
 
         AtpDetailsResponse response =
                 atpDetailsService.getAtpDetails(atpId);
+
+        return ResponseEntity
+                .ok(response);
+    }
+
+    @PutMapping("modify/{atpId}")
+    public ResponseEntity<AtpModifyResponse> modifyAtp(
+            @PathVariable Long atpId,
+            @RequestBody AtpRequest request) {
+
+        AtpModifyResponse response =
+                atpService.modifyAtp(atpId, request);
 
         return ResponseEntity
                 .ok(response);

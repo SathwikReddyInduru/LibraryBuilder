@@ -1,7 +1,9 @@
 package com.xius.Lb.service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +34,15 @@ public class AtpDetailsService {
 
 	public AtpDetailsService(AtpDetailsRepository atpDetailsRepository) {
 		this.atpDetailsRepository = atpDetailsRepository;
+	}
+
+	/**
+	 * Exposes the bundle id mapped to an ATP, so Modify ATP can target
+	 * bucket/bundle mapping updates without duplicating the repository
+	 * lookup.
+	 */
+	public Long findBundleId(Long atpId) {
+		return atpDetailsRepository.findBundleIdForAtp(atpId);
 	}
 
 	public AtpDetailsResponse getAtpDetails(Long atpId) {
@@ -82,7 +93,8 @@ public class AtpDetailsService {
 			List<SimRangeRow> simRanges = atpDetailsRepository.findSimRanges(bundleId);
 
 			response.setSimRangeDetails(buildSimRangeDetails(simRanges));
-			response.setSimImsiFlag(simRanges.isEmpty() ? null : simRanges.get(0).simImsiFlag());
+			// response.setSimImsiFlag(simRanges.isEmpty() ? null :
+			// simRanges.get(0).simImsiFlag());
 		} else {
 			logger.warn("No bundle mapping found for atpId={}", atpId);
 		}
@@ -91,7 +103,7 @@ public class AtpDetailsService {
 
 		BucketDerivedZoneIds bucketZoneIds = applyBucketDerivedFields(response, buckets);
 
-		response.setRoamingNetworks(atpDetailsRepository.findRoamingNetworksForBuckets(bucketIds));
+		response.setRoamingNetworks(resolveRoamingNetworks(bucketIds, buckets));
 
 		response.setDerivedServiceSelections(atpDetailsRepository.findDerivedServiceSelections(atpId));
 
@@ -104,6 +116,36 @@ public class AtpDetailsService {
 		logger.info("Completed fetching ATP details atpId={}", atpId);
 
 		return response;
+	}
+
+	/**
+	 * Roaming networks aren't stored as a flat list — a bucket's
+	 * limited_networks_yn ('N') plus no rows in bndl_mt_bucket_roam_nws
+	 * means "All Networks" was selected (see BucketService#insertRoamingNetworks
+	 * / #determineLimitedNetworks, which intentionally skip inserting mapping
+	 * rows for that case). Reconstruct the "ALL" sentinel here so Modify ATP
+	 * can tell that apart from "nothing selected".
+	 */
+	private List<String> resolveRoamingNetworks(List<String> bucketIds, List<BucketRow> buckets) {
+
+		List<Long> mappedNetworkIds = atpDetailsRepository.findRoamingNetworksForBuckets(bucketIds);
+
+		if (mappedNetworkIds != null && !mappedNetworkIds.isEmpty()) {
+
+			return mappedNetworkIds.stream().map(String::valueOf).collect(Collectors.toList());
+		}
+
+		boolean unrestricted = buckets != null
+				&& buckets.stream().anyMatch(bucket -> "N".equalsIgnoreCase(bucket.limitedNetworksYn()));
+
+		if (unrestricted) {
+
+			logger.info("No specific roaming network mappings found but buckets are unrestricted. Returning ALL");
+
+			return List.of("ALL");
+		}
+
+		return Collections.emptyList();
 	}
 
 	// =================================================================
@@ -122,6 +164,7 @@ public class AtpDetailsService {
 
 			BalanceCategoryRequest balanceCategory = new BalanceCategoryRequest();
 
+			balanceCategory.setBucketId(bucket.bucketId());
 			balanceCategory.setBalanceCategory(bucket.balanceCategory());
 			balanceCategory.setBucketType(extractBucketType(bucket.bucketId()));
 			balanceCategory.setUsageType(decomposeUsageType(bucket.usageType()));
@@ -131,16 +174,8 @@ public class AtpDetailsService {
 
 			balanceCategories.add(balanceCategory);
 
-			// Every bucket for an ATP is created with the same
-			// validityPeriodDays / rollOverYn / extendValidityYn /
-			// applicableFromHrs / applicableToHrs (see BucketService#createBucket),
-			// so the first bucket's values represent the whole ATP.
 			if (!validityPeriodSeen) {
 
-				// BucketRepository#insertBucket does NVL(?, -1) for
-				// validity_period_days, so -1 on the way in means the user
-				// picked "Unlimited" on the create form and no days value was
-				// sent at all (see Atpcreate.js validityPeriodType handling).
 				Integer validityPeriodDays = bucket.validityPeriodDays();
 
 				if (validityPeriodDays != null && validityPeriodDays == -1) {
@@ -204,6 +239,22 @@ public class AtpDetailsService {
 				response.setRatingType(plan.ratingType());
 			}
 
+			if (response.getAllowMtc() == null) {
+				response.setAllowMtc(plan.allowMtc());
+			}
+
+			if (response.getAllowMoc() == null) {
+				response.setAllowMoc(plan.allowMoc());
+			}
+
+			if (response.getAllowNldMo() == null) {
+				response.setAllowNldMo(plan.allowNldMo());
+			}
+
+			if (response.getAllowIldMo() == null) {
+				response.setAllowIldMo(plan.allowIldMo());
+			}
+
 			if (response.getAllowNationalRoamingData() == null) {
 				response.setAllowNationalRoamingData(plan.allowNationalRoamingData());
 			}
@@ -254,21 +305,25 @@ public class AtpDetailsService {
 		}
 
 		return switch (servicePlanType.trim().toUpperCase()) {
-		case "R" -> 1;
-		case "B" -> 2;
-		default -> null;
+			case "R" -> 1;
+			case "B" -> 2;
+			default -> null;
 		};
 	}
 
 	private List<String> buildSimRangeDetails(List<SimRangeRow> simRanges) {
 
-		List<String> ranges = new ArrayList<>();
-
-		for (SimRangeRow row : simRanges) {
-			ranges.add(row.includeExcludeFlag() + "-" + row.rangeFrom() + "-" + row.rangeTo());
+		if (simRanges == null || simRanges.isEmpty()) {
+			return Collections.emptyList();
 		}
 
-		return ranges;
+		return simRanges.stream()
+				.map(row -> String.join("-",
+						row.simImsiFlag(),
+						row.includeExcludeFlag(),
+						row.rangeFrom(),
+						row.rangeTo()))
+				.collect(Collectors.toList());
 	}
 
 	private String extractBucketType(String bucketId) {
@@ -288,9 +343,9 @@ public class AtpDetailsService {
 	 * 4, 8, 16, ...), the sum can be decomposed back into the original flags by
 	 * bit position.
 	 */
-	private List<Integer> decomposeUsageType(Long usageType) {
+	private List<Long> decomposeUsageType(Long usageType) {
 
-		List<Integer> flags = new ArrayList<>();
+		List<Long> flags = new ArrayList<>();
 
 		if (usageType == null) {
 			return flags;
@@ -298,12 +353,12 @@ public class AtpDetailsService {
 
 		long remaining = usageType;
 
-		for (int bit = 0; bit < 32 && remaining != 0; bit++) {
+		for (int bit = 0; bit < 64 && remaining != 0; bit++) {
 
 			long flag = 1L << bit;
 
 			if ((remaining & flag) != 0) {
-				flags.add((int) flag);
+				flags.add(flag);
 				remaining &= ~flag;
 			}
 		}

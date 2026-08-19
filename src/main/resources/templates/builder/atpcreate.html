@@ -145,7 +145,10 @@
                 <form id="atpCreateForm">
                   <!-- ===== ATP Details ===== -->
                   <div class="ar-card">
-                    <div class="ar-card-title">ATP Details</div>
+                    <div class="ar-card-title">
+                      <span class="material-icons ar-card-title-icon">description</span>
+                      ATP Details
+                    </div>
                     <div class="atpc-grid-3">
                       <div class="ar-field">
                         <label>ATP Name <span class="ar-req">*</span></label>
@@ -173,16 +176,16 @@
                           type="hidden"
                           id="ratingType"
                           name="ratingType"
-                          value="N"
+                          value="S"
                         />
                         <div
                           class="ar-segmented ar-segmented--three"
                           data-hidden-input="ratingType"
                         >
-                          <button type="button" data-value="S">
+                          <button type="button" class="active" data-value="S">
                             Slab Based
                           </button>
-                          <button type="button" class="active" data-value="N">
+                          <button type="button" data-value="N">
                             Non Slab Based
                           </button>
                         </div>
@@ -273,7 +276,10 @@
                   <!-- ===== Validity & Scheduling ===== -->
 
                   <div class="ar-card">
-                    <div class="ar-card-title">Validity &amp; Scheduling</div>
+                    <div class="ar-card-title">
+                      <span class="material-icons ar-card-title-icon">event_available</span>
+                      Validity &amp; Scheduling
+                    </div>
                     <div class="atpc-grid-3">
                       <div class="ar-field">
                         <label>Valid From</label>
@@ -347,6 +353,7 @@
 
                   <div class="ar-card">
                     <div class="ar-card-title">
+                      <span class="material-icons ar-card-title-icon">account_balance_wallet</span>
                       Balance &amp; Usage Configuration
                     </div>
                     <div class="ar-card-sub">
@@ -438,7 +445,10 @@
 
                   <!-- ===== Unit Types & Values ===== -->
                   <div class="ar-card is-hidden" id="unitTypesCard">
-                    <div class="ar-card-title">Unit Types &amp; Values</div>
+                    <div class="ar-card-title">
+                      <span class="material-icons ar-card-title-icon">tune</span>
+                      Unit Types &amp; Values
+                    </div>
                     <div class="ar-card-sub">
                       Set the unit type and value for each selected balance
                       category.
@@ -658,6 +668,7 @@
                   <!-- ===== Derived Services & Usage Types ===== -->
                   <div class="ar-card is-hidden" id="derivedServicesCard">
                     <div class="ar-card-title">
+                      <span class="material-icons ar-card-title-icon">hub</span>
                       Derived Services &amp; Usage Types
                     </div>
                     <div class="ar-card-sub">
@@ -1599,6 +1610,7 @@
                   <!-- ===== Roaming & Network Access ===== -->
                   <div class="ar-card">
                     <div class="ar-card-title">
+                      <span class="material-icons ar-card-title-icon">public</span>
                       Roaming &amp; Network Access
                     </div>
 
@@ -1644,8 +1656,8 @@
                           name="allowNationalRoamingData"
                           class="ar-input"
                         >
-                          <option value="no">No</option>
-                          <option value="yes">Yes</option>
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
                         </select>
                       </div>
                       <div
@@ -1657,8 +1669,8 @@
                           name="allowInternationalRoamingData"
                           class="ar-input"
                         >
-                          <option value="no">No</option>
-                          <option value="yes">Yes</option>
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
                         </select>
                       </div>
 
@@ -1671,9 +1683,8 @@
                       >
                         <label>Allow MTC</label>
                         <select name="allowMtc" class="ar-input">
-                          <option value="">Select</option>
-                          <option value="no">No</option>
-                          <option value="yes">Yes</option>
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
                         </select>
                       </div>
                       <div
@@ -1682,9 +1693,8 @@
                       >
                         <label>Allow MOC</label>
                         <select name="allowMoc" class="ar-input">
-                          <option value="">Select</option>
-                          <option value="no">No</option>
-                          <option value="yes">Yes</option>
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
                         </select>
                       </div>
                       <div
@@ -1693,9 +1703,8 @@
                       >
                         <label>Allow NLD MO</label>
                         <select name="allowNldMo" class="ar-input">
-                          <option value="">Select</option>
-                          <option value="no">No</option>
-                          <option value="yes">Yes</option>
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
                         </select>
                       </div>
                       <div
@@ -1704,9 +1713,8 @@
                       >
                         <label>Allow ILD MO</label>
                         <select name="allowIldMo" class="ar-input">
-                          <option value="">Select</option>
-                          <option value="no">No</option>
-                          <option value="yes">Yes</option>
+                          <option value="N">No</option>
+                          <option value="Y">Yes</option>
                         </select>
                       </div>
                     </div>
@@ -1727,9 +1735,10 @@
                   </div>
 
                   <!-- ===== Calendar Config & Zone Groups ===== -->
-                  <div class="ar-card" id="calendarZoneCard">
+                  <div class="ar-card is-hidden" id="calendarZoneCard">
                     <div class="ar-card-title">
-                      Calendar Config &amp; Zone Groups
+                      <span class="material-icons ar-card-title-icon">calendar_month</span>
+                      Zone &amp; Calendar Configuration
                     </div>
                     <div class="ar-card-sub">
                       Calendar applies to every ATP; the zone group shown
@@ -1737,7 +1746,7 @@
                     </div>
 
                     <div class="atpc-grid-3">
-                      <div class="ar-field">
+                      <div class="ar-field" id="calendarConfigField">
                         <label>Calendar Config</label>
                         <select
                           id="calendarConfig"

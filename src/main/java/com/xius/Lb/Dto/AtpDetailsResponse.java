@@ -29,34 +29,37 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * Billing plans, so it will always come back null.
  */
 @JsonPropertyOrder({
-    "networkId",
-    "createdBy",
-    "atpName",
-    "typeOfService",
-    "billingServiceType",
-    "categoryOfferCode",
-    "vipPlanFlagYn",
-    "ratingType",
-    "description",
-    "publicityId",
-    "validFrom",
-    "validTo",
-    "validityPeriodType",
-    "validityPeriodDays",
-    "applicableFromHrs",
-    "applicableToHrs",
-    "rollOverYn",
-    "extendValidityYn",
-    "roamingNetworks",
-    "allowNationalRoamingData",
-    "allowInternationalRoamingData",
-    "simImsiFlag",
-    "simRangeDetails",
-    "balanceCategories",
-    "derivedServiceSelections",
-    "calendarConfig",
-    "zoneGroup",
-    "dataZoneGroupId"
+        "networkId",
+        "createdBy",
+        "atpName",
+        "typeOfService",
+        "billingServiceType",
+        "categoryOfferCode",
+        "vipPlanFlagYn",
+        "ratingType",
+        "description",
+        "publicityId",
+        "validFrom",
+        "validTo",
+        "validityPeriodType",
+        "validityPeriodDays",
+        "applicableFromHrs",
+        "applicableToHrs",
+        "rollOverYn",
+        "extendValidityYn",
+        "roamingNetworks",
+        "allowNationalRoamingData",
+        "allowInternationalRoamingData",
+        "allowMtc",
+        "allowMoc",
+        "allowNldMo",
+        "allowIldMo",
+        "simRangeDetails",
+        "balanceCategories",
+        "derivedServiceSelections",
+        "calendarConfig",
+        "zoneGroup",
+        "dataZoneGroupId"
 })
 public class AtpDetailsResponse {
 
@@ -94,15 +97,47 @@ public class AtpDetailsResponse {
 
     private String rollOverYn;
 
+    public String getAllowMtc() {
+        return allowMtc;
+    }
+
+    public void setAllowMtc(String allowMtc) {
+        this.allowMtc = allowMtc;
+    }
+
+    public String getAllowMoc() {
+        return allowMoc;
+    }
+
+    public void setAllowMoc(String allowMoc) {
+        this.allowMoc = allowMoc;
+    }
+
+    public String getAllowNldMo() {
+        return allowNldMo;
+    }
+
+    public void setAllowNldMo(String allowNldMo) {
+        this.allowNldMo = allowNldMo;
+    }
+
+    public String getAllowIldMo() {
+        return allowIldMo;
+    }
+
+    public void setAllowIldMo(String allowIldMo) {
+        this.allowIldMo = allowIldMo;
+    }
+
     private String extendValidityYn;
 
-    private List<Long> roamingNetworks;
+    private List<String> roamingNetworks;
 
     private String allowNationalRoamingData;
 
     private String allowInternationalRoamingData;
 
-    private String simImsiFlag;
+    // private String simImsiFlag;
 
     private List<String> simRangeDetails;
 
@@ -115,6 +150,11 @@ public class AtpDetailsResponse {
     private List<ZoneGroupRequest> zoneGroup;
 
     private List<ZoneGroupRequest> dataZoneGroupId;
+
+    private String allowMtc;
+    private String allowMoc;
+    private String allowNldMo;
+    private String allowIldMo;
 
     // ============================================================
     // GETTERS / SETTERS
@@ -264,11 +304,11 @@ public class AtpDetailsResponse {
         this.extendValidityYn = extendValidityYn;
     }
 
-    public List<Long> getRoamingNetworks() {
+    public List<String> getRoamingNetworks() {
         return roamingNetworks;
     }
 
-    public void setRoamingNetworks(List<Long> roamingNetworks) {
+    public void setRoamingNetworks(List<String> roamingNetworks) {
         this.roamingNetworks = roamingNetworks;
     }
 
@@ -288,13 +328,13 @@ public class AtpDetailsResponse {
         this.allowInternationalRoamingData = allowInternationalRoamingData;
     }
 
-    public String getSimImsiFlag() {
-        return simImsiFlag;
-    }
+    // public String getSimImsiFlag() {
+    // return simImsiFlag;
+    // }
 
-    public void setSimImsiFlag(String simImsiFlag) {
-        this.simImsiFlag = simImsiFlag;
-    }
+    // public void setSimImsiFlag(String simImsiFlag) {
+    // this.simImsiFlag = simImsiFlag;
+    // }
 
     public List<String> getSimRangeDetails() {
         return simRangeDetails;

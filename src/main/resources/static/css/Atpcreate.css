@@ -60,6 +60,9 @@
 
 .atpc-page .ar-card-title {
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .atpc-page .ar-card-sub {
@@ -329,6 +332,13 @@
   padding-top: 8px;
 }
 
+/* Billing ATPs hide the Rating (Y) group entirely (see
+   syncBillingServiceType) — both the sub-heading and its rows. */
+.atpc-page .ar-checklist-group-heading.is-hidden,
+.atpc-page .ar-check-row.is-hidden {
+  display: none;
+}
+
 /* ── Derived Services + Usage Types side by side, wrapping to a
    single column once a side would drop below ~320px so it never
    gets crushed on narrower laptop widths ── */
@@ -552,6 +562,134 @@
    what a tariff config actually is.
    ══════════════════════════════════════════════════════════════ */
 
+/* ── View header: icon avatar + title + quick-fact chips ────── */
+/* Full-bleed to the edges of the (rounded, overflow-hidden)
+   .ar-right-pane — the shared builder.css rule has `margin: 0 20px`
+   for the plain-white default header, which left gaps of white on
+   either side once this page gave the header its own gradient
+   background. Corners come for free from the parent's border-radius
+   + overflow:hidden, so no radius needed here. */
+.atpc-page .ar-view-header {
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  padding: 22px 30px 18px;
+  background: linear-gradient(135deg, #eff4ff 0%, #f7f9ff 60%, #ffffff 100%);
+  border-bottom: 1px solid #e4e9f4;
+}
+
+.atpc-page .ar-view-header-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.28);
+}
+
+.atpc-page .ar-view-header-icon .material-icons {
+  color: #fff;
+  font-size: 22px;
+}
+
+.atpc-page .ar-view-header-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.atpc-page .ar-view-header-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.atpc-page .ar-view-header .ar-rule-date strong {
+  color: #475569;
+  font-weight: 700;
+}
+
+.atpc-page .ar-view-hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atpc-page .ar-view-hero-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid #dbe4f5;
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 3px 10px 3px 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.atpc-page .ar-view-hero-fact .material-icons {
+  font-size: 13px;
+}
+
+.atpc-page .ar-icon-btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.atpc-page .ar-icon-btn--primary:hover {
+  background: #1c3899;
+  border-color: #1c3899;
+  color: #fff;
+}
+
+/* ── Scroller: just the scrolling card column now — the sticky
+   icon-nav rail was tried and removed per feedback (kept as a plain
+   wrapper rather than collapsing back into .ar-view-panel directly,
+   in case per-section quick-jump is wanted again later). ── */
+.atpc-page .ar-view-scroller {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.atpc-page .ar-view-body {
+  flex: 1;
+}
+
+/* ── Detail cards: icon-tagged titles, soft accent, rounded ─── */
+.atpc-page .ar-view-body .ar-card {
+  border-radius: 14px;
+  scroll-margin-top: 8px;
+}
+
+.atpc-page .ar-view-body .ar-card-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 12px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #f1f4f9;
+}
+
+.atpc-page .ar-card-title-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px !important;
+}
+
 .atpc-page .ar-detail-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -680,17 +818,27 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 2px;
+  padding: 11px 10px;
   font-size: 13px;
+  border-radius: 10px;
+}
+
+.atpc-page .ar-detail-range-row:nth-child(odd) {
+  background: #f8fafc;
 }
 
 .atpc-page .ar-detail-range-row + .ar-detail-range-row {
-  border-top: 1px solid #eef1f6;
+  margin-top: 4px;
+}
+
+.atpc-page .ar-detail-range-icon {
+  font-size: 16px !important;
+  color: #94a3b8;
 }
 
 .atpc-page .ar-detail-range-arrow {
   color: #cbd5e1;
-  font-size: 14px;
+  font-size: 15px !important;
 }
 
 /* Section label used to break up a card into named groups (e.g. one
@@ -698,13 +846,18 @@
 .atpc-page .ar-detail-subhead {
   display: flex;
   align-items: center;
+  gap: 8px;
   justify-content: space-between;
-  padding: 4px 2px;
+  padding: 8px 10px;
+  margin: 4px 0;
+  background: #f8fafc;
+  border-left: 3px solid var(--primary-light);
+  border-radius: 0 8px 8px 0;
   font-size: 12.5px;
   font-weight: 800;
   color: #1e293b;
 }
 
 .atpc-page .ar-detail-subhead + .ar-detail-subhead {
-  margin-top: 4px;
+  margin-top: 10px;
 }

@@ -56,9 +56,17 @@ public class AtpRequest {
 
     private String calendarConfig;
 
+    private String allowMtc;
+    private String allowMoc;
+    private String allowNldMo;
+    private String allowIldMo;
+
     private List<ZoneGroupRequest> zoneGroup;
 
     private List<ZoneGroupRequest> dataZoneGroupId;
+
+  
+    private Long tariffPlanId;
 
 
     // ============================================================
@@ -322,4 +330,45 @@ public class AtpRequest {
             List<ZoneGroupRequest> dataZoneGroupId) {
         this.dataZoneGroupId = dataZoneGroupId;
     }
+
+    public String getAllowMtc() {
+        return allowMtc;
+    }
+
+    public void setAllowMtc(String allowMtc) {
+        this.allowMtc = allowMtc;
+    }
+
+    public String getAllowMoc() {
+        return allowMoc;
+    }
+
+    public void setAllowMoc(String allowMoc) {
+        this.allowMoc = allowMoc;
+    }
+
+    public String getAllowNldMo() {
+        return allowNldMo;
+    }
+
+    public void setAllowNldMo(String allowNldMo) {
+        this.allowNldMo = allowNldMo;
+    }
+
+    public String getAllowIldMo() {
+        return allowIldMo;
+    }
+
+    public void setAllowIldMo(String allowIldMo) {
+        this.allowIldMo = allowIldMo;
+    }
+
+    public Long getTariffPlanId() {
+        return tariffPlanId;
+    }
+
+    public void setTariffPlanId(Long tariffPlanId) {
+        this.tariffPlanId = tariffPlanId;
+    }
+
 }

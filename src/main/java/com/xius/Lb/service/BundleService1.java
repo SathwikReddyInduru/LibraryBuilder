@@ -72,6 +72,60 @@ public class BundleService1 {
 		return bundleId;
 	}
 
+	/**
+	 * Field-level update of the bundle itself for Modify ATP. Bundle row is
+	 * never dropped/recreated.
+	 */
+	@Transactional
+	public void updateBundleCore(AtpRequest request, Long bundleId) {
+
+		logger.info("Updating bundle core fields bundleId={} ATP={}", bundleId, request.getAtpName());
+
+		bundleRepository.updateBundle(bundleId, request.getValidFrom(), request.getValidTo(),
+				request.getVipPlanFlagYn());
+
+		logger.info("Successfully updated bundle core fields bundleId={}", bundleId);
+	}
+
+	/**
+	 * Maps a single, already-created bucket into an existing bundle. Used by
+	 * Modify ATP when a new balance category is added.
+	 */
+	@Transactional
+	public void mapBucketToBundle(Long bundleId, Long networkId, String bucketId) {
+
+		logger.info("Mapping new bucketId={} into existing bundleId={}", bucketId, bundleId);
+
+		bundleRepository.insertBundleBucketMapping(bundleId, bucketId, networkId);
+	}
+
+	/**
+	 * Removes only the bundle<->bucket mapping for a single bucket. Used by
+	 * Modify ATP when the user removes a balance category - the bucket row
+	 * (and its own child rows) is left untouched.
+	 */
+	@Transactional
+	public void unmapBucketFromBundle(Long bundleId, String bucketId) {
+
+		logger.info("Unmapping bucketId={} from bundleId={} (mapping only, bucket row is kept)", bucketId, bundleId);
+
+		bundleRepository.deleteBundleBucketMapping(bundleId, bucketId);
+	}
+
+	/**
+	 * SIM/IMSI ranges have no natural key to diff against, so Modify ATP
+	 * replaces them wholesale for the bundle.
+	 */
+	@Transactional
+	public void syncSimImsiRanges(Long bundleId, AtpRequest request) {
+
+		logger.info("Resyncing SIM/IMSI ranges for bundleId={}", bundleId);
+
+		bundleRepository.deleteSimImsiRanges(bundleId);
+
+		insertSimImsiRanges(bundleId, request);
+	}
+
 	private void mapBucketsToBundle(Long bundleId, Long networkId, List<String> bucketIds) {
 
 		logger.info("Starting bucket mapping for bundleId={} networkId={} bucketCount={}", bundleId, networkId,
@@ -129,22 +183,37 @@ public class BundleService1 {
 
 			try {
 
-				bundleRepository.insertSimImsiRange(bundleId, values[0], request.getSimImsiFlag(), values[1], values[2],
+				String simImsiFlag = values[0];
+				String type = values[1];
+				String rangeFrom = values[2];
+				String rangeTo = values[3];
+
+				bundleRepository.insertSimImsiRange(
+						bundleId,
+						type,
+						simImsiFlag,
+						rangeFrom,
+						rangeTo,
 						request.getNetworkId());
 
-				logger.info("Successfully inserted SIM/IMSI range for bundleId={} rangeFrom={} rangeTo={}", bundleId,
-						values[1], values[2]);
+				logger.info(
+						"Successfully inserted SIM/IMSI range for bundleId={} simImsiFlag={} rangeFrom={} rangeTo={}",
+						bundleId,
+						simImsiFlag,
+						rangeFrom,
+						rangeTo);
 
 			} catch (Exception ex) {
 
-				logger.error("Error inserting SIM/IMSI range for bundleId={} rangeFrom={} rangeTo={}", bundleId,
-						values[1], values[2], ex);
+				logger.error(
+						"Error inserting SIM/IMSI range for bundleId={} range={}",
+						bundleId,
+						simRange,
+						ex);
 
 				throw ex;
 			}
 		}
-
-		logger.info("Completed SIM/IMSI range insertion for bundleId={}", bundleId);
 	}
 
 	private String generateBundleName(String atpName, Long bundleId) {
@@ -169,29 +238,36 @@ public class BundleService1 {
 
 		String[] values = simRange.split("-", -1);
 
-		if (values.length != 3) {
+		if (values.length != 4) {
 
-			logger.error("Invalid SIM/IMSI range format. Expected 3 values");
+			logger.error("Invalid SIM/IMSI range format. Expected 4 values");
 
 			throw new IllegalArgumentException(
-					"Invalid SIM/IMSI range: " + simRange + ". Expected format: I-<rangeFrom>-<rangeTo>");
+					"Invalid SIM/IMSI range: " + simRange + ". Expected format: <S|I>-<I|E>-<rangeFrom>-<rangeTo>");
 		}
 
 		if (values[0] == null || values[0].isBlank()) {
+
+			logger.error("SIM/IMSI range simImsiFlag is missing");
+
+			throw new IllegalArgumentException("SIM/IMSI flag is mandatory");
+		}
+
+		if (values[1] == null || values[1].isBlank()) {
 
 			logger.error("SIM/IMSI range include/exclude flag is missing");
 
 			throw new IllegalArgumentException("Include/exclude flag is mandatory");
 		}
 
-		if (values[1] == null || values[1].isBlank()) {
+		if (values[2] == null || values[2].isBlank()) {
 
 			logger.error("SIM/IMSI range from value is missing");
 
 			throw new IllegalArgumentException("SIM/IMSI range from is mandatory");
 		}
 
-		if (values[2] == null || values[2].isBlank()) {
+		if (values[3] == null || values[3].isBlank()) {
 
 			logger.error("SIM/IMSI range to value is missing");
 
@@ -251,13 +327,6 @@ public class BundleService1 {
 		validateDateFormat(request.getValidFrom(), "validFrom");
 
 		validateDateFormat(request.getValidTo(), "validTo");
-
-		if (isBlank(request.getSimImsiFlag())) {
-
-			logger.error("Validation failed: simImsiFlag is missing");
-
-			throw new IllegalArgumentException("simImsiFlag is mandatory");
-		}
 
 		logger.info("Bundle request validation completed successfully for ATP={}", request.getAtpName());
 	}

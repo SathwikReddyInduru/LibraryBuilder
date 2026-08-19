@@ -134,4 +134,52 @@ public class BucketRepository {
 
 		oracleJdbcTemplate.update(sql, networkId, bucketId, roamingNetworkId);
 	}
+
+	/**
+	 * Field-level update for an existing bucket. Used by Modify ATP: the
+	 * bucket row is never dropped/recreated, only the values that came back
+	 * changed on the incoming request are re-written in place.
+	 */
+	public void updateBucket(String bucketId, String balanceCategory, Long usageType, Integer validityPeriodDays,
+			Long bucketUnitValue, String bucketUnitType, String rollOverYn, String extendValidityYn, Long zoneGroupId,
+			Long dataZoneGroupId, String limitedNetworksYn, String limitedHours, Integer applicableFromHrs,
+			Integer applicableToHrs, String unlimitedUsageYn) {
+
+		String sql = """
+				UPDATE bndl_mt_buckets
+				SET balance_category = ?,
+				    usage_type = ?,
+				    validity_period_days = NVL(?, -1),
+				    bucket_unit_value = ?,
+				    bucket_unit_type = ?,
+				    roll_over_yn = ?,
+				    extend_validity_yn = ?,
+				    zone_group_id = ?,
+				    data_zone_group_id = ?,
+				    limited_networks_yn = ?,
+				    limited_hours = ?,
+				    aplicable_from_hrs = ?,
+				    aplicable_to_hrs = ?,
+				    unlimited_usage_yn = ?
+				WHERE bucket_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, balanceCategory, usageType, validityPeriodDays, bucketUnitValue, bucketUnitType,
+				rollOverYn, extendValidityYn, zoneGroupId, dataZoneGroupId, limitedNetworksYn, limitedHours,
+				applicableFromHrs, applicableToHrs, unlimitedUsageYn, bucketId);
+	}
+
+	/**
+	 * Removes only the roaming-network rows for a bucket, so they can be
+	 * re-inserted fresh on update. Never touches the bucket row itself.
+	 */
+	public void deleteBucketRoamingNetworks(String bucketId) {
+
+		String sql = """
+				DELETE FROM bndl_mt_bucket_roam_nws
+				WHERE bucket_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, bucketId);
+	}
 }

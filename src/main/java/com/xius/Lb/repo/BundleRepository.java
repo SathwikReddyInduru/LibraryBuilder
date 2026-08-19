@@ -145,4 +145,52 @@ public class BundleRepository {
 
 		oracleJdbcTemplate.update(sql, bundleId, includeExcludeFlag, simImsiFlag, rangeFrom, rangeTo, networkId);
 	}
+
+	/**
+	 * Field-level update for an existing bundle. Bundle row is never
+	 * dropped/recreated on modify.
+	 */
+	public void updateBundle(Long bundleId, String validFrom, String validTo, String zoneBasedVipPlanFlagYn) {
+
+		String sql = """
+				UPDATE bndl_mt_bundle
+				SET valid_from = TO_DATE(?, 'MM/DD/YYYY'),
+				    valid_upto = TO_DATE(?, 'MM/DD/YYYY'),
+				    zone_based_vip_plan_flag_yn = ?
+				WHERE bundle_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, validFrom, validTo, zoneBasedVipPlanFlagYn, bundleId);
+	}
+
+	/**
+	 * Removes only the bundle<->bucket mapping row for a single bucket.
+	 * The bucket row itself (and its own child rows) is left untouched -
+	 * used when the user removes a balance category on Modify ATP.
+	 */
+	public void deleteBundleBucketMapping(Long bundleId, String bucketId) {
+
+		String sql = """
+				DELETE FROM cs_bndl_mt_bndl_bucket_map
+				WHERE bundle_id = ?
+				  AND bucket_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, bundleId, bucketId);
+	}
+
+	/**
+	 * SIM/IMSI ranges have no natural key to diff against, so Modify ATP
+	 * replaces them wholesale: delete all existing rows for the bundle, then
+	 * re-insert whatever came in on the request via insertSimImsiRange.
+	 */
+	public void deleteSimImsiRanges(Long bundleId) {
+
+		String sql = """
+				DELETE FROM bndl_mt_sim_imsi_ranges
+				WHERE bundle_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, bundleId);
+	}
 }

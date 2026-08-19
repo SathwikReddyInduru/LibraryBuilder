@@ -305,6 +305,67 @@ public class TariffPlanRepository {
 		oracleJdbcTemplate.update(sql, networkId, servicePackageId, basicServiceId, derivedServiceId);
 	}
 
+	/**
+	 * Removes only the Tariff-Plan<->service-plan mapping row (used when a
+	 * balance category / its service plan is removed on Modify ATP). The
+	 * service plan row itself is left untouched.
+	 */
+	public void deleteServicePlanPackageMapping(Long servicePackageId, Long servicePlanId) {
+
+		String sql = """
+				DELETE FROM CS_RAT_SERVICE_PLAN_PACKAGE
+				WHERE SERVICE_PACKAGE_ID = ?
+				  AND SERVICE_PLAN_ID = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, servicePackageId, servicePlanId);
+	}
+
+	/**
+	 * Removes only a single basic/derived service <-> Tariff Plan mapping
+	 * row (used when the user removes a derivedServiceSelection entry on
+	 * Modify ATP).
+	 */
+	public void deleteServiceAtpMapping(Long servicePackageId, Long basicServiceId, Long derivedServiceId) {
+
+		String sql = """
+				DELETE FROM CS_RAT_SERVICE_ATP_MAP
+				WHERE SERVICE_PACKAGE_ID = ?
+				  AND BASIC_SERVICE_ID = ?
+				  AND DERIVED_SERVICE_ID = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, servicePackageId, basicServiceId, derivedServiceId);
+	}
+
 	public record BasicServiceInfo(String ratingServiceYn, String serviceName) {
 	}
+
+	public List<Long> findTariffPlanIdsByServicePlanIds(List<Long> servicePlanIds) {
+
+    if (servicePlanIds == null || servicePlanIds.isEmpty()) {
+        return Collections.emptyList();
+    }
+
+    String placeholders = servicePlanIds.stream()
+            .map(id -> "?")
+            .collect(Collectors.joining(","));
+
+    String sql = """
+            SELECT DISTINCT spp.SERVICE_PACKAGE_ID
+            FROM CS_RAT_SERVICE_PLAN_PACKAGE spp
+            JOIN CS_RAT_SERVICE_PACKAGE sp
+              ON sp.SERVICE_PACKAGE_ID = spp.SERVICE_PACKAGE_ID
+            WHERE spp.SERVICE_PLAN_ID IN (
+            """ + placeholders + """
+            )
+            AND sp.ADD_PACK_YN = 'N'
+            """;
+
+    return oracleJdbcTemplate.queryForList(
+            sql,
+            Long.class,
+            servicePlanIds.toArray()
+    );
+}
 }

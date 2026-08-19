@@ -2,7 +2,10 @@ package com.xius.Lb.service;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -10,9 +13,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.xius.Lb.Dto.AtpDetailsResponse;
+import com.xius.Lb.Dto.AtpModifyResponse;
 import com.xius.Lb.Dto.AtpRequest;
 import com.xius.Lb.Dto.AtpResponse;
 import com.xius.Lb.Dto.BalanceCategoryRequest;
+import com.xius.Lb.repo.AtpDetailsRepository;
+import com.xius.Lb.repo.AtpDetailsRepository.ServicePlanRow;
 import com.xius.Lb.repo.AtpRepository;
 import com.xius.Lb.repo.AtpRepository.BasicServiceInfo;
 
@@ -21,16 +28,28 @@ public class AtpService {
 
 	private static final Logger logger = LoggerFactory.getLogger(AtpService.class);
 
+	// service_plan_type_id -> balance category, matching
+	// PlanService#resolveTypeOfService / AtpDetailsService's
+	// TYPE_OF_SERVICE_* constants.
+	private static final int TYPE_OF_SERVICE_VOICE = 1;
+	private static final int TYPE_OF_SERVICE_SMS = 2;
+	private static final int TYPE_OF_SERVICE_DATA = 3;
+
 	private final AtpRepository atpRepository;
+	private final AtpDetailsRepository atpDetailsRepository;
+	private final AtpDetailsService atpDetailsService;
 	private final BucketService bucketService;
 	private final BundleService1 bundleService;
-	private final ServicePlanService1 servicePlanService;
+	private final PlanService servicePlanService;
 	private final TariffPlanService tariffPlanService;
 
-	public AtpService(AtpRepository atpRepository, BucketService bucketService, BundleService1 bundleService,
-			ServicePlanService1 servicePlanService, TariffPlanService tariffPlanService) {
+	public AtpService(AtpRepository atpRepository, AtpDetailsRepository atpDetailsRepository,
+			AtpDetailsService atpDetailsService, BucketService bucketService, BundleService1 bundleService,
+			PlanService servicePlanService, TariffPlanService tariffPlanService) {
 
 		this.atpRepository = atpRepository;
+		this.atpDetailsRepository = atpDetailsRepository;
+		this.atpDetailsService = atpDetailsService;
 		this.bucketService = bucketService;
 		this.bundleService = bundleService;
 		this.servicePlanService = servicePlanService;
@@ -118,6 +137,301 @@ public class AtpService {
 				tariffPlanId, request.getAtpName());
 
 		return new AtpResponse(atpId, bundleId, bucketIds, servicePlanIds, tariffPlanId, "ATP created successfully");
+	}
+
+	// =================================================================
+	// MODIFY ATP
+	// =================================================================
+
+	/**
+	 * Modify ATP: the frontend re-submits the same shape returned by
+	 * GET /atp/{atpId} (form pre-filled from existing data), and this diffs
+	 * it against what's persisted:
+	 *
+	 * - a balance category whose bucketId matches an existing bucket ->
+	 *   field-level update on that bucket (and its service plan)
+	 * - a balance category with no bucketId, or a bucketId not found on the
+	 *   existing ATP -> treated as newly added: created via the exact same
+	 *   creation logic as ATP create, then mapped in
+	 * - an existing bucketId missing from the payload -> the user removed
+	 *   that balance category: only the bundle<->bucket mapping is deleted
+	 *   (bucket row, and everything under it, is left untouched). If that
+	 *   was the last bucket needing a given service-plan type, the
+	 *   ATP<->service-plan mapping (and Tariff-Plan<->service-plan mapping,
+	 *   if tariffPlanId was supplied) is unmapped the same way.
+	 *
+	 * ATP core fields, Bundle dates/VIP flag, SIM/IMSI ranges and
+	 * derivedServiceSelections are synced the same way - field updates or
+	 * mapping-only add/remove, never a drop/recreate of the hierarchy.
+	 */
+	@Transactional
+	public AtpModifyResponse modifyAtp(Long atpId, AtpRequest request) {
+
+		logger.info("Starting Modify ATP atpId={} ATP={}", atpId, request != null ? request.getAtpName() : null);
+
+		if (atpId == null) {
+
+			logger.error("Modify ATP failed: atpId is missing");
+
+			throw new IllegalArgumentException("atpId is mandatory");
+		}
+
+		validateRequest(request);
+
+		logger.info("Modify ATP request validation completed atpId={}", atpId);
+
+		AtpDetailsResponse existing = atpDetailsService.getAtpDetails(atpId);
+
+		Long bundleId = atpDetailsService.findBundleId(atpId);
+
+		if (bundleId == null) {
+
+			logger.error("Modify ATP failed: no bundle mapped for atpId={}", atpId);
+
+			throw new IllegalStateException("No bundle found for ATP: " + atpId);
+		}
+
+		// ---- buckets / balance categories ----------------------------------
+
+		Map<String, BalanceCategoryRequest> existingByBucketId = new LinkedHashMap<>();
+
+		if (existing.getBalanceCategories() != null) {
+
+			for (BalanceCategoryRequest bc : existing.getBalanceCategories()) {
+
+				if (bc != null && !isBlank(bc.getBucketId())) {
+					existingByBucketId.put(bc.getBucketId(), bc);
+				}
+			}
+		}
+
+		List<String> addedBucketIds = new ArrayList<>();
+		List<String> updatedBucketIds = new ArrayList<>();
+		List<String> removedBucketIds = new ArrayList<>();
+
+		Set<String> keptBucketIds = new HashSet<>();
+		Set<String> finalBalanceCategoryTypes = new LinkedHashSet<>();
+
+		List<BalanceCategoryRequest> incomingBalances = request.getBalanceCategories() == null ? new ArrayList<>()
+				: request.getBalanceCategories();
+
+		for (BalanceCategoryRequest bc : incomingBalances) {
+
+			if (bc == null) {
+				continue;
+			}
+
+			String bucketId = bc.getBucketId();
+
+			if (!isBlank(bucketId) && existingByBucketId.containsKey(bucketId)) {
+
+				keptBucketIds.add(bucketId);
+
+				bucketService.updateBucket(request, bc);
+
+				updatedBucketIds.add(bucketId);
+
+			} else {
+
+				String newBucketId = bucketService.createSingleBucket(request, bc);
+
+				bundleService.mapBucketToBundle(bundleId, request.getNetworkId(), newBucketId);
+
+				addedBucketIds.add(newBucketId);
+			}
+
+			finalBalanceCategoryTypes.add(bc.getBalanceCategory().trim().toUpperCase());
+		}
+
+		for (String existingBucketId : existingByBucketId.keySet()) {
+
+			if (!keptBucketIds.contains(existingBucketId)) {
+
+				bundleService.unmapBucketFromBundle(bundleId, existingBucketId);
+
+				removedBucketIds.add(existingBucketId);
+			}
+		}
+
+		logger.info("Modify ATP bucket sync completed atpId={} added={} updated={} removed={}", atpId,
+				addedBucketIds, updatedBucketIds, removedBucketIds);
+
+		// ---- service plans (one per VOICE/SMS/DATA balance category, same as
+		// PlanService#createServicePlans) --------------------------------------
+
+		Set<String> finalServicePlanCategories = new LinkedHashSet<>();
+
+		for (String category : finalBalanceCategoryTypes) {
+
+			if ("VOICE".equals(category) || "SMS".equals(category) || "DATA".equals(category)) {
+				finalServicePlanCategories.add(category);
+			}
+		}
+
+		// List<Long> existingServicePlanIds = atpDetailsRepository.findServicePlanIdsForAtp(atpId);
+
+		List<Long> existingServicePlanIds =atpDetailsRepository.findServicePlanIdsForAtp(atpId);
+
+if (existingServicePlanIds == null || existingServicePlanIds.isEmpty()) {
+    throw new IllegalStateException(
+            "No Service Plans found for ATP: " + atpId);
+}
+
+Long tariffPlanId =
+        tariffPlanService.findTariffPlanIdByServicePlanIds(
+                existingServicePlanIds);
+
+		List<ServicePlanRow> existingServicePlanRows = atpDetailsRepository.findServicePlans(existingServicePlanIds);
+
+		Map<String, Long> existingServicePlanByCategory = new LinkedHashMap<>();
+
+		for (ServicePlanRow row : existingServicePlanRows) {
+
+			String category = mapTypeOfServiceToCategory(row.typeOfService());
+
+			if (category != null) {
+				existingServicePlanByCategory.put(category, row.servicePlanId());
+			}
+		}
+
+		List<Long> addedServicePlanIds = new ArrayList<>();
+		List<Long> updatedServicePlanIds = new ArrayList<>();
+		List<Long> removedServicePlanIds = new ArrayList<>();
+
+		// Long tariffPlanId = request.getTariffPlanId();
+
+		for (String category : finalServicePlanCategories) {
+
+			Long existingServicePlanId = existingServicePlanByCategory.get(category);
+
+			if (existingServicePlanId != null) {
+
+				servicePlanService.updateServicePlan(request, category, existingServicePlanId);
+
+				updatedServicePlanIds.add(existingServicePlanId);
+
+			} else {
+
+				Long newServicePlanId = servicePlanService.createSingleServicePlan(request, category);
+
+				atpRepository.insertServicePlanMapping(atpId, newServicePlanId, request.getNetworkId());
+
+				if (tariffPlanId != null) {
+					tariffPlanService.addServicePlanMapping(tariffPlanId, newServicePlanId, request.getNetworkId());
+				}
+
+				addedServicePlanIds.add(newServicePlanId);
+			}
+		}
+
+		for (Map.Entry<String, Long> entry : existingServicePlanByCategory.entrySet()) {
+
+			if (!finalServicePlanCategories.contains(entry.getKey())) {
+
+				Long servicePlanId = entry.getValue();
+
+				atpRepository.deleteServicePlanMapping(atpId, servicePlanId);
+
+				if (tariffPlanId != null) {
+					tariffPlanService.removeServicePlanMapping(tariffPlanId, servicePlanId);
+				}
+
+				removedServicePlanIds.add(servicePlanId);
+			}
+		}
+
+		logger.info("Modify ATP service plan sync completed atpId={} added={} updated={} removed={}", atpId,
+				addedServicePlanIds, updatedServicePlanIds, removedServicePlanIds);
+
+		// ---- ATP core fields -------------------------------------------------
+
+		atpRepository.updateAtp(atpId, request.getAtpName(), request.getValidTo(), request.getCategoryOfferCode(),
+				request.getDescription(), request.getPublicityId());
+
+		// ---- Bundle core fields + SIM/IMSI ranges (replace-all) --------------
+
+		bundleService.updateBundleCore(request, bundleId);
+
+		bundleService.syncSimImsiRanges(bundleId, request);
+
+		// ---- derived service selections ---------------------------------------
+
+		List<String> addedServices = new ArrayList<>();
+		List<String> removedServices = new ArrayList<>();
+
+		Set<String> existingServices = existing.getDerivedServiceSelections() == null ? new LinkedHashSet<>()
+				: new LinkedHashSet<>(existing.getDerivedServiceSelections());
+
+		Set<String> incomingServices = request.getDerivedServiceSelections() == null ? new LinkedHashSet<>()
+				: new LinkedHashSet<>(request.getDerivedServiceSelections());
+
+		for (String service : incomingServices) {
+
+			if (!existingServices.contains(service)) {
+
+				String[] values = parseServiceSelection(service);
+
+				Long basicServiceId = Long.valueOf(values[0]);
+				Long derivedServiceId = Long.valueOf(values[1]);
+
+				atpRepository.insertServiceAtpMapping(request.getNetworkId(), atpId, basicServiceId,
+						derivedServiceId);
+
+				if (tariffPlanId != null) {
+					tariffPlanService.addServiceMapping(tariffPlanId, request.getNetworkId(), basicServiceId,
+							derivedServiceId);
+				}
+
+				addedServices.add(service);
+			}
+		}
+
+		for (String service : existingServices) {
+
+			if (!incomingServices.contains(service)) {
+
+				String[] values = parseServiceSelection(service);
+
+				Long basicServiceId = Long.valueOf(values[0]);
+				Long derivedServiceId = Long.valueOf(values[1]);
+
+				atpRepository.deleteServiceAtpMapping(atpId, basicServiceId, derivedServiceId);
+
+				if (tariffPlanId != null) {
+					tariffPlanService.removeServiceMapping(tariffPlanId, basicServiceId, derivedServiceId);
+				}
+
+				removedServices.add(service);
+			}
+		}
+
+		logger.info("Modify ATP completed successfully atpId={} bundleId={} tariffPlanId={}", atpId, bundleId,
+				tariffPlanId);
+
+		return new AtpModifyResponse(atpId, bundleId, tariffPlanId, addedBucketIds, updatedBucketIds,
+				removedBucketIds, addedServicePlanIds, updatedServicePlanIds, removedServicePlanIds, addedServices,
+				removedServices, "ATP modified successfully");
+	}
+
+	private String mapTypeOfServiceToCategory(Integer typeOfService) {
+
+		if (typeOfService == null) {
+			return null;
+		}
+
+		if (typeOfService == TYPE_OF_SERVICE_VOICE) {
+			return "VOICE";
+		}
+
+		if (typeOfService == TYPE_OF_SERVICE_SMS) {
+			return "SMS";
+		}
+
+		if (typeOfService == TYPE_OF_SERVICE_DATA) {
+			return "DATA";
+		}
+
+		return null;
 	}
 
 	private void validateBalanceCategory(BalanceCategoryRequest balanceCategory) {

@@ -332,6 +332,58 @@ public class AtpRepository {
 		oracleJdbcTemplate.update(sql, bundleId, atpId, networkId);
 	}
 
+	/**
+	 * Field-level update of the ATP/service package core fields. Row is
+	 * never dropped/recreated on Modify ATP.
+	 */
+	public void updateAtp(Long atpId, String atpName, String validTo, String atpCategoryByOffer, String description,
+			String publicityId) {
+
+		String sql = """
+				UPDATE cs_rat_service_package
+				SET service_package_desc = ?,
+				    end_date = TO_DATE(?, 'MM/DD/YYYY'),
+				    atp_category_by_offer = ?,
+				    description = ?,
+				    publicity_id = ?
+				WHERE service_package_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, atpName, validTo, atpCategoryByOffer, description, publicityId, atpId);
+	}
+
+	/**
+	 * Removes only the ATP<->service-plan mapping row (used when a balance
+	 * category / its service plan is removed on Modify ATP). The service
+	 * plan row itself is left untouched.
+	 */
+	public void deleteServicePlanMapping(Long atpId, Long servicePlanId) {
+
+		String sql = """
+				DELETE FROM cs_rat_service_plan_package
+				WHERE service_package_id = ?
+				  AND service_plan_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, atpId, servicePlanId);
+	}
+
+	/**
+	 * Removes only a single basic/derived service <-> ATP mapping row (used
+	 * when the user removes a derivedServiceSelection entry on Modify ATP).
+	 */
+	public void deleteServiceAtpMapping(Long atpId, Long basicServiceId, Long derivedServiceId) {
+
+		String sql = """
+				DELETE FROM cs_rat_service_atp_map
+				WHERE service_package_id = ?
+				  AND basic_service_id = ?
+				  AND derived_service_id = ?
+				""";
+
+		oracleJdbcTemplate.update(sql, atpId, basicServiceId, derivedServiceId);
+	}
+
 	public record BasicServiceInfo(String ratingServiceYn, String serviceName) {
 	}
 }

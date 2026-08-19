@@ -11,14 +11,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Read-side counterpart of AtpRepository / BucketRepository / BundleRepository /
- * ServicePlanRepository / TariffPlanRepository.
- *
- * Every insert done while creating an ATP (AtpService.createAtp) is undone here
- * as a SELECT, table for table, so that GET /atp/{atpId} can reconstruct the
- * original create payload.
- */
 @Repository
 public class AtpDetailsRepository {
 
@@ -27,10 +19,6 @@ public class AtpDetailsRepository {
 	public AtpDetailsRepository(JdbcTemplate oracleJdbcTemplate) {
 		this.oracleJdbcTemplate = oracleJdbcTemplate;
 	}
-
-	// =================================================================
-	// ATP / SERVICE PACKAGE (cs_rat_service_package)
-	// =================================================================
 
 	public AtpCore findAtpCore(Long atpId) {
 
@@ -52,10 +40,6 @@ public class AtpDetailsRepository {
 		return results.isEmpty() ? null : results.get(0);
 	}
 
-	// =================================================================
-	// ATP -> BUNDLE MAPPING (CS_ATP_ACCUMU_BON_DISC_MAP, PLAN_TYPE = 'B')
-	// =================================================================
-
 	public Long findBundleIdForAtp(Long atpId) {
 
 		String sql = """
@@ -69,10 +53,6 @@ public class AtpDetailsRepository {
 
 		return results.isEmpty() ? null : results.get(0);
 	}
-
-	// =================================================================
-	// BUNDLE (bndl_mt_bundle)
-	// =================================================================
 
 	public BundleCore findBundle(Long bundleId) {
 
@@ -93,10 +73,6 @@ public class AtpDetailsRepository {
 		return results.isEmpty() ? null : results.get(0);
 	}
 
-	// =================================================================
-	// BUNDLE <-> BUCKET MAPPING (cs_bndl_mt_bndl_bucket_map)
-	// =================================================================
-
 	public List<String> findBucketIdsForBundle(Long bundleId) {
 
 		String sql = """
@@ -108,10 +84,6 @@ public class AtpDetailsRepository {
 		return oracleJdbcTemplate.queryForList(sql, String.class, bundleId);
 	}
 
-	// =================================================================
-	// BUCKETS (bndl_mt_buckets)
-	// =================================================================
-
 	public List<BucketRow> findBuckets(List<String> bucketIds) {
 
 		if (bucketIds == null || bucketIds.isEmpty()) {
@@ -122,8 +94,8 @@ public class AtpDetailsRepository {
 
 		String sql = "SELECT bucket_id, balance_category, usage_type, bucket_unit_type, bucket_unit_value, "
 				+ "unlimited_usage_yn, validity_period_days, roll_over_yn, extend_validity_yn, "
-				+ "aplicable_from_hrs, aplicable_to_hrs, zone_group_id, data_zone_group_id " + "FROM bndl_mt_buckets "
-				+ "WHERE bucket_id IN (" + placeholders + ")";
+				+ "aplicable_from_hrs, aplicable_to_hrs, zone_group_id, data_zone_group_id, limited_networks_yn "
+				+ "FROM bndl_mt_buckets " + "WHERE bucket_id IN (" + placeholders + ")";
 
 		RowMapper<BucketRow> mapper = (rs, rowNum) -> new BucketRow(rs.getString("bucket_id"),
 				rs.getString("balance_category"), rs.getLong("usage_type"), rs.getString("bucket_unit_type"),
@@ -131,14 +103,10 @@ public class AtpDetailsRepository {
 				getNullableInteger(rs, "validity_period_days"), rs.getString("roll_over_yn"),
 				rs.getString("extend_validity_yn"), getNullableInteger(rs, "aplicable_from_hrs"),
 				getNullableInteger(rs, "aplicable_to_hrs"), getNullableLong(rs, "zone_group_id"),
-				getNullableLong(rs, "data_zone_group_id"));
+				getNullableLong(rs, "data_zone_group_id"), rs.getString("limited_networks_yn"));
 
 		return oracleJdbcTemplate.query(sql, mapper, bucketIds.toArray());
 	}
-
-	// =================================================================
-	// BUCKET ROAMING NETWORKS (bndl_mt_bucket_roam_nws)
-	// =================================================================
 
 	public List<Long> findRoamingNetworksForBuckets(List<String> bucketIds) {
 
@@ -154,10 +122,6 @@ public class AtpDetailsRepository {
 		return oracleJdbcTemplate.queryForList(sql, Long.class, bucketIds.toArray());
 	}
 
-	// =================================================================
-	// SIM / IMSI RANGES (bndl_mt_sim_imsi_ranges)
-	// =================================================================
-
 	public List<SimRangeRow> findSimRanges(Long bundleId) {
 
 		String sql = """
@@ -172,10 +136,6 @@ public class AtpDetailsRepository {
 				bundleId);
 	}
 
-	// =================================================================
-	// BASIC / DERIVED SERVICE MAPPING (cs_rat_service_atp_map)
-	// =================================================================
-
 	public List<String> findDerivedServiceSelections(Long atpId) {
 
 		String sql = """
@@ -188,10 +148,6 @@ public class AtpDetailsRepository {
 				(rs, rowNum) -> rs.getLong("basic_service_id") + "~" + rs.getLong("derived_service_id"), atpId);
 	}
 
-	// =================================================================
-	// ATP <-> SERVICE PLAN MAPPING (cs_rat_service_plan_package)
-	// =================================================================
-
 	public List<Long> findServicePlanIdsForAtp(Long atpId) {
 
 		String sql = """
@@ -203,10 +159,6 @@ public class AtpDetailsRepository {
 		return oracleJdbcTemplate.queryForList(sql, Long.class, atpId);
 	}
 
-	// =================================================================
-	// SERVICE PLANS (cs_rat_service_plans)
-	// =================================================================
-
 	public List<ServicePlanRow> findServicePlans(List<Long> servicePlanIds) {
 
 		if (servicePlanIds == null || servicePlanIds.isEmpty()) {
@@ -215,21 +167,28 @@ public class AtpDetailsRepository {
 
 		String placeholders = servicePlanIds.stream().map(id -> "?").collect(Collectors.joining(","));
 
-		String sql = "SELECT service_plan_id, service_plan_type, type_of_service, rating_type, zone_group_id, "
-				+ "allow_ntnl_rm_data, allow_int_rm_data, mt_calender_id " + "FROM cs_rat_service_plans "
+		String sql = "SELECT service_plan_id, service_plan_type, type_of_service, rating_type, "
+				+ "zone_group_id, allow_mtc, allow_moc, allow_nld_mo, allow_ild_mo, "
+				+ "allow_ntnl_rm_data, allow_int_rm_data, mt_calender_id "
+				+ "FROM cs_rat_service_plans "
 				+ "WHERE service_plan_id IN (" + placeholders + ")";
 
-		RowMapper<ServicePlanRow> mapper = (rs, rowNum) -> new ServicePlanRow(rs.getLong("service_plan_id"),
-				rs.getString("service_plan_type"), getNullableInteger(rs, "type_of_service"),
-				rs.getString("rating_type"), getNullableLong(rs, "zone_group_id"), rs.getString("allow_ntnl_rm_data"),
-				rs.getString("allow_int_rm_data"), getNullableLong(rs, "mt_calender_id"));
+		RowMapper<ServicePlanRow> mapper = (rs, rowNum) -> new ServicePlanRow(
+				rs.getLong("service_plan_id"),
+				rs.getString("service_plan_type"),
+				getNullableInteger(rs, "type_of_service"),
+				rs.getString("rating_type"),
+				getNullableLong(rs, "zone_group_id"),
+				rs.getString("allow_mtc"),
+				rs.getString("allow_moc"),
+				rs.getString("allow_nld_mo"),
+				rs.getString("allow_ild_mo"),
+				rs.getString("allow_ntnl_rm_data"),
+				rs.getString("allow_int_rm_data"),
+				getNullableLong(rs, "mt_calender_id"));
 
 		return oracleJdbcTemplate.query(sql, mapper, servicePlanIds.toArray());
 	}
-
-	// =================================================================
-	// DATA ZONE MAPPINGS (cs_rat_service_data_zone_map)
-	// =================================================================
 
 	public List<Long> findDataZoneMappings(Long dataServicePlanId) {
 
@@ -246,16 +205,6 @@ public class AtpDetailsRepository {
 		return oracleJdbcTemplate.queryForList(sql, Long.class, dataServicePlanId);
 	}
 
-	// =================================================================
-	// NULL-SAFE NUMERIC HELPERS
-	//
-	// Oracle NUMBER columns come back from ResultSet#getObject() as
-	// BigDecimal, never Long/Integer, so a direct cast throws
-	// ClassCastException. These helpers go through BigDecimal explicitly
-	// and preserve NULL (getLong/getInt return 0 for NULL, which would
-	// silently corrupt optional columns like zone_group_id).
-	// =================================================================
-
 	private Long getNullableLong(ResultSet rs, String column) throws SQLException {
 
 		BigDecimal value = rs.getBigDecimal(column);
@@ -270,10 +219,6 @@ public class AtpDetailsRepository {
 		return value == null ? null : value.intValue();
 	}
 
-	// =================================================================
-	// ROW RECORDS
-	// =================================================================
-
 	public record AtpCore(Long networkId, String atpName, String categoryOfferCode, String description,
 			String publicityId, String validTo) {
 	}
@@ -284,14 +229,24 @@ public class AtpDetailsRepository {
 	public record BucketRow(String bucketId, String balanceCategory, Long usageType, String bucketUnitType,
 			Long bucketUnitValue, String unlimitedUsageYn, Integer validityPeriodDays, String rollOverYn,
 			String extendValidityYn, Integer applicableFromHrs, Integer applicableToHrs, Long zoneGroupId,
-			Long dataZoneGroupId) {
+			Long dataZoneGroupId, String limitedNetworksYn) {
 	}
 
 	public record SimRangeRow(String includeExcludeFlag, String simImsiFlag, String rangeFrom, String rangeTo) {
 	}
 
-	public record ServicePlanRow(Long servicePlanId, String servicePlanType, Integer typeOfService, String ratingType,
-			Long zoneGroupId, String allowNationalRoamingData, String allowInternationalRoamingData,
+	public record ServicePlanRow(
+			Long servicePlanId,
+			String servicePlanType,
+			Integer typeOfService,
+			String ratingType,
+			Long zoneGroupId,
+			String allowMtc,
+			String allowMoc,
+			String allowNldMo,
+			String allowIldMo,
+			String allowNationalRoamingData,
+			String allowInternationalRoamingData,
 			Long calendarConfig) {
 	}
 }

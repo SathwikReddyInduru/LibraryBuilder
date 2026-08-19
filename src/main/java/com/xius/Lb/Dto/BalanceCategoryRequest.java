@@ -2,23 +2,25 @@ package com.xius.Lb.Dto;
 
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+// import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
-@JsonPropertyOrder({
-    "balanceCategory",
-    "bucketType",
-    "usageType",
-    "bucketUnitType",
-    "bucketUnitValue",
-    "unlimitedUsageYn"
-})
+// @JsonPropertyOrder({
+//     "balanceCategory",
+//     "bucketType",
+//     "usageType",
+//     "bucketUnitType",
+//     "bucketUnitValue",
+//     "unlimitedUsageYn"
+// })
 public class BalanceCategoryRequest {
+
+	private String bucketId;
 
     private String balanceCategory;
 
     private String bucketType;
 
-    private List<Integer> usageType;
+    private List<Long> usageType;
 
     private String bucketUnitType;
 
@@ -50,11 +52,11 @@ public class BalanceCategoryRequest {
 		this.bucketUnitType = bucketUnitType;
 	}
 
-	public List<Integer> getUsageType() {
+	public List<Long> getUsageType() {
 		return usageType;
 	}
 
-	public void setUsageType(List<Integer> usageType) {
+	public void setUsageType(List<Long> usageType) {
 		this.usageType = usageType;
 	}
 
@@ -72,5 +74,13 @@ public class BalanceCategoryRequest {
 
 	public void setBalanceCategory(String balanceCategory) {
 		this.balanceCategory = balanceCategory;
+	}
+
+	public String getBucketId() {
+		return bucketId;
+	}
+
+	public void setBucketId(String bucketId) {
+		this.bucketId = bucketId;
 	}
 }

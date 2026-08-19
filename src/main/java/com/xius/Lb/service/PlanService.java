@@ -19,13 +19,13 @@ import com.xius.Lb.Dto.ZoneGroupRequest;
 import com.xius.Lb.repo.ServicePlanRepository;
 
 @Service
-public class ServicePlanService1 {
+public class PlanService {
 
-	private static final Logger logger = LoggerFactory.getLogger(ServicePlanService1.class);
+	private static final Logger logger = LoggerFactory.getLogger(PlanService.class);
 
 	private final ServicePlanRepository servicePlanRepository;
 
-	public ServicePlanService1(ServicePlanRepository servicePlanRepository) {
+	public PlanService(ServicePlanRepository servicePlanRepository) {
 		this.servicePlanRepository = servicePlanRepository;
 	}
 
@@ -35,17 +35,40 @@ public class ServicePlanService1 {
 		logger.info("Starting Service Plan creation for ATP={} networkId={} bundleId={}",
 				request != null ? request.getAtpName() : null, request != null ? request.getNetworkId() : null,
 				bundleId);
+		
+		
+		if (Integer.valueOf(2).equals(request.getTypeOfService())
+		        && request.getBillingServiceType() != null) {
 
-		validateRequest(request);
+		    logger.info(
+		            "Creating Service Plan using billingServiceType={} for ATP={}",
+		            request.getBillingServiceType(),
+		            request.getAtpName());
 
-		if (bundleId == null) {
+		    Long servicePlanId = createServicePlanForBillingServiceType(
+		            request,
+		            request.getBillingServiceType());
 
-			logger.error("Service Plan creation failed: bundleId is null");
+		    List<Long> servicePlanIds = new ArrayList<>();
+		    servicePlanIds.add(servicePlanId);
 
-			throw new IllegalArgumentException("bundleId is mandatory for service plan creation");
+		    logger.info(
+		            "Billing Service Plan created successfully servicePlanId={} billingServiceType={}",
+		            servicePlanId,
+		            request.getBillingServiceType());
+
+		    return servicePlanIds;
 		}
+//		if (bundleId == null) {
+//
+//			logger.error("Service Plan creation failed: bundleId is null");
+//
+//			throw new IllegalArgumentException("bundleId is mandatory for service plan creation");
+//		}
 
-		logger.info("Service Plan request validation completed successfully for ATP={}", request.getAtpName());
+//		logger.info("Service Plan request validation completed successfully for ATP={}", request.getAtpName());
+		
+		validateRequest(request);
 
 		Set<String> serviceTypes = new LinkedHashSet<>();
 
@@ -78,6 +101,80 @@ public class ServicePlanService1 {
 				servicePlanIds);
 
 		return servicePlanIds;
+	}
+
+	/**
+	 * Public entry point used by Modify ATP to create exactly one new
+	 * service plan for a newly-required balance category type, reusing the
+	 * same logic as normal ATP creation ({@link #createServicePlans}).
+	 */
+	@Transactional
+	public Long createSingleServicePlan(AtpRequest request, String balanceCategory) {
+
+		logger.info("Creating single Service Plan for Modify ATP balanceCategory={} ATP={}", balanceCategory,
+				request != null ? request.getAtpName() : null);
+
+		return createServicePlan(request, balanceCategory);
+	}
+
+	/**
+	 * Updates an existing service plan in place for Modify ATP. Only field
+	 * values are re-written - the service plan row itself is never
+	 * dropped/recreated. DATA zone mappings (no natural key) are resynced
+	 * by delete-then-reinsert.
+	 */
+	@Transactional
+	public void updateServicePlan(AtpRequest request, String balanceCategory, Long servicePlanId) {
+
+		String category = balanceCategory.trim().toUpperCase();
+
+		logger.info("Updating servicePlanId={} balanceCategory={} for ATP={}", servicePlanId, category,
+				request.getAtpName());
+
+		String limitedHoursYn = determineLimitedHours(request.getApplicableFromHrs(), request.getApplicableToHrs());
+
+		Long zoneGroupId = null;
+		List<Long> dataZoneGroupIds = Collections.emptyList();
+
+		if ("VOICE".equalsIgnoreCase(category) || "SMS".equalsIgnoreCase(category)) {
+
+			zoneGroupId = getZoneGroupIdWithRatingY(request.getZoneGroup());
+
+		} else if ("DATA".equalsIgnoreCase(category)) {
+
+			dataZoneGroupIds = getZoneGroupIdsWithRatingY(request.getDataZoneGroupId());
+		}
+
+		Long mtCalendarId = request.getCalendarConfig() != null ? Long.valueOf(request.getCalendarConfig()) : null;
+
+		try {
+
+			servicePlanRepository.updateServicePlan(servicePlanId, limitedHoursYn, request.getApplicableFromHrs(),
+					request.getApplicableToHrs(), request.getAllowMtc(), request.getAllowMoc(),
+					request.getAllowNldMo(), request.getAllowIldMo(), request.getRatingType(), zoneGroupId,
+					request.getAllowNationalRoamingData(), request.getAllowInternationalRoamingData(), mtCalendarId,
+					resolveZoneBasedVipFlag(request));
+
+			logger.info("Successfully updated servicePlanId={}", servicePlanId);
+
+		} catch (Exception ex) {
+
+			logger.error("Error updating servicePlanId={} balanceCategory={}", servicePlanId, category, ex);
+
+			throw ex;
+		}
+
+		if ("DATA".equalsIgnoreCase(category)) {
+
+			servicePlanRepository.deleteDataZoneMappings(servicePlanId);
+
+			if (!dataZoneGroupIds.isEmpty()) {
+
+				servicePlanRepository.insertDataZoneMappings(servicePlanId, dataZoneGroupIds);
+			}
+		}
+
+		logger.info("Completed Service Plan update servicePlanId={}", servicePlanId);
 	}
 
 	private Long createServicePlan(AtpRequest request, String balanceCategory) {
@@ -150,6 +247,10 @@ public class ServicePlanService1 {
 		Long smsCalendarId = null;
 		Long mtCalendarId = Long.valueOf(request.getCalendarConfig());
 		Long mmsCalendarId = null;
+		 String allowMtc=request.getAllowMtc();
+		 String allowMoc =request.getAllowMoc();
+		 String allowNldMo =request.getAllowNldMo();
+		  String allowIldMo=request.getAllowIldMo();
 
 		Long deviceGroupId = null;
 		String status="AP";
@@ -168,7 +269,7 @@ public class ServicePlanService1 {
 
 			servicePlanRepository.insertServicePlan(request.getNetworkId(), servicePlanId, servicePlanDesc,
 					servicePlanType, typeOfService, null, limitedHoursYn, request.getApplicableFromHrs(),
-					request.getApplicableToHrs(), null, null, null, null, null, request.getRatingType(), zoneGroupId,
+					request.getApplicableToHrs(), allowMtc, allowMoc, allowNldMo, allowIldMo, null, request.getRatingType(), zoneGroupId,
 					smsZoneGroupId, nsLocalOnnetCalendarId, nsLocalOffnetCalendarId, nsNldCalendarId, nsIldCalendarId,
 					null, null, request.getCreatedBy(),status, smsCalendarId, null, request.getAllowNationalRoamingData(),
 					request.getAllowInternationalRoamingData(), mtCalendarId, deviceGroupId, mmsCalendarId, null, null,
@@ -243,6 +344,71 @@ public class ServicePlanService1 {
 				balanceCategory);
 
 		return servicePlanId;
+	}
+	
+	
+	
+	private Long createServicePlanForBillingServiceType(
+	        AtpRequest request,
+	        Integer billingServiceType) {
+
+	    logger.info(
+	            "Starting Service Plan creation using billingServiceType={} ATP={} networkId={}",
+	            billingServiceType,
+	            request.getAtpName(),
+	            request.getNetworkId());
+
+	    Long servicePlanId =
+	            servicePlanRepository.getNextServicePlanId();
+
+	    String servicePlanDesc =
+	            request.getAtpName() + "_SP" + servicePlanId;
+
+	    logger.info(
+	            "Generated servicePlanId={} servicePlanDesc={}",
+	            servicePlanId,
+	            servicePlanDesc);
+
+	    boolean exists =
+	            servicePlanRepository.existsServicePlan(
+	                    request.getNetworkId(),
+	                    servicePlanDesc);
+
+	    if (exists) {
+	        throw new IllegalArgumentException(
+	                "Service plan already exists: " + servicePlanDesc);
+	    }
+
+	    // IMPORTANT:
+	    // Use billingServiceType to get servicePlanType
+	    String servicePlanType =
+	            servicePlanRepository.getRatingApplicableYn(
+	                    billingServiceType);
+
+	    logger.info(
+	            "Resolved servicePlanType={} using billingServiceType={}",
+	            servicePlanType,
+	            billingServiceType);
+
+	    String status = "AP";
+
+	    servicePlanRepository.insertSimpleServicePlan(
+	            request.getNetworkId(),
+	            servicePlanId,
+	            servicePlanDesc,
+	            servicePlanType,
+	            billingServiceType,
+	            status);
+
+	    logger.info(
+	            "Successfully created simple Service Plan servicePlanId={} " +
+	            "billingServiceType={} servicePlanType={} status={}",
+	            servicePlanId,
+	            billingServiceType,
+	            servicePlanType,
+	            status);
+
+	    return servicePlanId;
 	}
 
 	private Long getZoneGroupIdWithRatingY(List<ZoneGroupRequest> zoneGroups) {
