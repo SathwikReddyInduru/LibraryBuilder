@@ -3,6 +3,8 @@ package com.xius.Lb.repo;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import com.xius.Lb.Dto.AtpListItem;
+
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
@@ -145,6 +147,26 @@ public class AtpRepository {
 		oracleJdbcTemplate.update(sql, atpId, atpName, rentalAmount, activationCharge, networkId, tax1, tax2, tax3,
 				chargeId, addPackYn, rentalType, rentalPeriod, aspType, validTo, serviceDuration, atpCategory,
 				publicityId, atpCategoryByOffer, description, chargeOnFirstUsageYn);
+	}
+
+	/**
+	 * Get all ATPs (service packages) for the left-hand list on the ATP
+	 * Create page, restricted to ATP_CATEGORY = 'OT'.
+	 */
+	public List<AtpListItem> getAllAtps(Long networkId) {
+
+		String sql = """
+				SELECT SERVICE_PACKAGE_ID, SERVICE_PACKAGE_DESC
+				FROM CS_RAT_SERVICE_PACKAGE
+				WHERE NETWORK_ID = ?
+				  AND ATP_CATEGORY = 'OT'
+				  AND ADD_PACK_YN = 'Y'
+				ORDER BY SERVICE_PACKAGE_DESC
+				""";
+
+		return oracleJdbcTemplate.query(sql,
+				(rs, rowNum) -> new AtpListItem(rs.getLong("SERVICE_PACKAGE_ID"), rs.getString("SERVICE_PACKAGE_DESC")),
+				networkId);
 	}
 
 	/**

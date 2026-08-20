@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.xius.Lb.Dto.AtpDetailsResponse;
+import com.xius.Lb.Dto.AtpListItem;
 import com.xius.Lb.Dto.AtpModifyResponse;
 import com.xius.Lb.Dto.AtpRequest;
 import com.xius.Lb.Dto.AtpResponse;
@@ -54,6 +55,28 @@ public class AtpService {
 		this.bundleService = bundleService;
 		this.servicePlanService = servicePlanService;
 		this.tariffPlanService = tariffPlanService;
+	}
+
+	/**
+	 * List ATPs (service packages) for a network, restricted to
+	 * ATP_CATEGORY = 'OT'. Backs the left-pane list on the ATP Create page.
+	 */
+	public List<AtpListItem> getAllAtps(Long networkId) {
+
+		logger.info("Fetching ATP list networkId={}", networkId);
+
+		if (networkId == null) {
+
+			logger.error("getAllAtps failed: networkId is missing");
+
+			throw new IllegalArgumentException("networkId is mandatory");
+		}
+
+		List<AtpListItem> list = atpRepository.getAllAtps(networkId);
+
+		logger.debug("getAllAtps result size={} networkId={}", list.size(), networkId);
+
+		return list;
 	}
 
 	@Transactional

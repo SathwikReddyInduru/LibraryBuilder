@@ -86,26 +86,189 @@ Object.values(USAGE_TYPE_ID_MAP).forEach((idMap) => {
   });
 });
 
-// Static stand-in for the Zone Group / Data Zone Group GET APIs
-// (not implemented yet). Each option carries the id + ratingFlag
-// the backend will eventually return ("Y" = rating zone group,
-// "N" = restricted zone group) so the payload shape (see
-// buildRatingFlagPairs) never has to change once real data lands —
-// only these two arrays get more entries. renderRatingChecklist
-// groups them under "Rating"/"Restricted" headers regardless of
-// how many there are.
-const ZONE_GROUP_OPTIONS = [
-  { id: 1, name: "LOCAL_VOICE_ZONE", ratingFlag: "Y" },
-  { id: 2, name: "LOCAL_SMS_ZONE", ratingFlag: "Y" },
-  { id: 3, name: "FT_LOCAL_ONNET", ratingFlag: "N" },
-  { id: 4, name: "FT_LOCAL_OFNET", ratingFlag: "N" },
-];
-const DATA_ZONE_GROUP_OPTIONS = [
-  { id: 2, name: "DNS_DATA_ZONE", ratingFlag: "Y" },
-  { id: 11, name: "DATAROAMING", ratingFlag: "Y" },
-  { id: 22, name: "TEST_2580", ratingFlag: "N" },
-  { id: 43, name: "INSTA", ratingFlag: "N" },
-];
+// Zone Group / Data Zone Group options, loaded from GET
+// /atp/zone-groups/voice-sms and GET /atp/zone-groups/data — see
+// _acLoadZoneGroups() below. Each option carries the id + ratingFlag
+// ("Y" = rating zone group, "N" = restricted zone group) so the
+// payload shape (see buildRatingFlagPairs) and renderRatingChecklist's
+// "Rating"/"Restricted" grouping don't care how many of each the
+// backend returns.
+let ZONE_GROUP_OPTIONS = [];
+let DATA_ZONE_GROUP_OPTIONS = [];
+
+// Maps the GET /atp/zone-groups/* response shape
+// ({zoneGroupId, zoneGroupName, rating_yn}) to the {id, name,
+// ratingFlag} shape ZONE_GROUP_OPTIONS/DATA_ZONE_GROUP_OPTIONS use.
+function _acMapZoneGroupResponse(item) {
+  return {
+    id: item.zoneGroupId,
+    name: item.zoneGroupName,
+    ratingFlag: item.rating_yn,
+  };
+}
+
+async function _acLoadZoneGroups() {
+  try {
+    const [voiceSmsRes, dataRes] = await Promise.all([
+      fetch("/atp/zone-groups/voice-sms"),
+      fetch("/atp/zone-groups/data"),
+    ]);
+    if (!voiceSmsRes.ok)
+      throw new Error("HTTP " + voiceSmsRes.status + " (voice-sms)");
+    if (!dataRes.ok) throw new Error("HTTP " + dataRes.status + " (data)");
+
+    const [voiceSmsData, dataZoneData] = await Promise.all([
+      voiceSmsRes.json(),
+      dataRes.json(),
+    ]);
+
+    ZONE_GROUP_OPTIONS = (voiceSmsData || []).map(_acMapZoneGroupResponse);
+    DATA_ZONE_GROUP_OPTIONS = (dataZoneData || []).map(
+      _acMapZoneGroupResponse,
+    );
+  } catch (err) {
+    console.error("Failed to load zone group options:", err);
+    ZONE_GROUP_OPTIONS = [];
+    DATA_ZONE_GROUP_OPTIONS = [];
+  }
+}
+
+// Kicked off immediately rather than waiting for DOMContentLoaded, so
+// the fetch is already in flight by the time the form-pane IIFE below
+// needs the options to render the checklists (it awaits this before
+// calling renderRatingChecklist — see its DOMContentLoaded handler).
+const _acZoneGroupsReady = _acLoadZoneGroups();
+
+// ── Derived Services & Usage Types — loaded from GET
+// /atp/derived-services and GET /atp/bucket-usage-types, replacing
+// the old hardcoded DERIVED_SERVICE_ID_MAP / USAGE_TYPE_ID_MAP
+// checklist rows for voice/sms/data/mms with the real rows from the
+// DB, filtered per-category:
+//  - derived services are filtered by basicServiceId (1=voice,
+//    2=sms, 3=data, 4=mms — matches cs_rat_mt_services_map)
+//  - usage types are filtered by balanceCategory (VOICE/SMS/DATA/MMS
+//    — matches bndl_mt_bucket_usage_types)
+// Global has no basicServiceId/balanceCategory of its own in either
+// API, so it's left out here — its balance-category pill is
+// commented out in atpcreate.html so it can't be selected.
+const BASIC_SERVICE_ID_TO_CATEGORY = { 1: "voice", 2: "sms", 3: "data", 4: "mms" };
+const DERIVED_USAGE_CATEGORIES = ["voice", "sms", "data", "mms"];
+
+// category -> [{id, name}], id is "basicServiceId~derivedServiceId"
+// (the exact format the backend's mapServices() expects/splits on).
+let DERIVED_SERVICES_BY_CATEGORY = { voice: [], sms: [], data: [], mms: [] };
+// category -> [{id, name}], id is the real usageBinaryId.
+let USAGE_TYPES_BY_CATEGORY = { voice: [], sms: [], data: [], mms: [] };
+
+function _acCapitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// The derived-services checklist body is the first ".derived-group"
+// under a category's ".service-pair" (the usage-types checklist is
+// the second) — see the services-row markup in atpcreate.html.
+function _acDerivedChecklistBody(category) {
+  const pair = document.querySelector(
+    `.service-pair[data-service-pair="${category}"]`,
+  );
+  const groups = pair ? pair.querySelectorAll(".derived-group") : [];
+  return groups[0] ? groups[0].querySelector(".ar-checklist-body") : null;
+}
+
+// The usage-types checklist's .ar-tagselect already carries
+// data-target="usageType<Category>" — no markup changes needed.
+function _acUsageTypeChecklistBody(category) {
+  return document.querySelector(
+    `.ar-tagselect[data-target="usageType${_acCapitalize(category)}"] .ar-checklist-body`,
+  );
+}
+
+function _acRenderCheckRows(body, items, checkboxName) {
+  if (!body) return;
+  body.innerHTML = (items || [])
+    .map(
+      (item) =>
+        `<label class="ar-check-row"><input type="checkbox" name="${checkboxName}" value="${item.id}" /> ${item.name}</label>`,
+    )
+    .join("");
+}
+
+async function _acLoadDerivedServicesAndUsageTypes() {
+  try {
+    const [derivedRes, usageRes] = await Promise.all([
+      fetch("/atp/derived-services"),
+      fetch("/atp/bucket-usage-types"),
+    ]);
+    if (!derivedRes.ok)
+      throw new Error("HTTP " + derivedRes.status + " (derived-services)");
+    if (!usageRes.ok)
+      throw new Error("HTTP " + usageRes.status + " (bucket-usage-types)");
+
+    const [derivedData, usageData] = await Promise.all([
+      derivedRes.json(),
+      usageRes.json(),
+    ]);
+
+    const derivedByCategory = { voice: [], sms: [], data: [], mms: [] };
+    (derivedData || []).forEach((svc) => {
+      const category = BASIC_SERVICE_ID_TO_CATEGORY[svc.basicServiceId];
+      if (!category) return; // e.g. a Global basicServiceId — not handled here
+      const code = `${svc.basicServiceId}~${svc.derivedServiceId}`;
+      derivedByCategory[category].push({ id: code, name: svc.derivedSvcName });
+      // Keep the read-only detail view's label lookup (see
+      // renderAtpDetail below) in sync with the real API data too.
+      DERIVED_SERVICE_CODE_TO_INFO[code] = {
+        category,
+        label: svc.derivedSvcName,
+      };
+    });
+    DERIVED_SERVICES_BY_CATEGORY = derivedByCategory;
+
+    const usageByCategory = { voice: [], sms: [], data: [], mms: [] };
+    (usageData || []).forEach((ut) => {
+      // balanceCategory can list more than one category for a single
+      // usage type (e.g. a shared "VOICE/SMS/MMS" row) — split on any
+      // non-alphanumeric separator and add the row to every category
+      // it names, not just the first/only match.
+      const tokens = (ut.balanceCategory || "")
+        .toUpperCase()
+        .split(/[^A-Z0-9]+/)
+        .filter(Boolean);
+      const categories = DERIVED_USAGE_CATEGORIES.filter((cat) =>
+        tokens.includes(cat.toUpperCase()),
+      );
+      if (categories.length === 0) return;
+      categories.forEach((category) => {
+        usageByCategory[category].push({
+          id: ut.usageBinaryId,
+          name: ut.usageType,
+        });
+      });
+      // Keep the read-only detail view's label lookup in sync too.
+      USAGE_TYPE_ID_TO_LABEL[ut.usageBinaryId] = ut.usageType;
+    });
+    USAGE_TYPES_BY_CATEGORY = usageByCategory;
+
+    DERIVED_USAGE_CATEGORIES.forEach((cat) => {
+      _acRenderCheckRows(
+        _acDerivedChecklistBody(cat),
+        DERIVED_SERVICES_BY_CATEGORY[cat],
+        `derived${_acCapitalize(cat)}`,
+      );
+      _acRenderCheckRows(
+        _acUsageTypeChecklistBody(cat),
+        USAGE_TYPES_BY_CATEGORY[cat],
+        `usageType${_acCapitalize(cat)}`,
+      );
+    });
+  } catch (err) {
+    console.error("Failed to load derived services / usage types:", err);
+  }
+}
+
+// Kicked off immediately, same reasoning as _acZoneGroupsReady above.
+const _acDerivedUsageReady = _acLoadDerivedServicesAndUsageTypes();
+
 
 // Values match the legacy admin screen's derivedService1..4 option
 // lists (category prefix ~ legacy numeric id): Voice gets the full
@@ -253,15 +416,8 @@ const CATEGORY_OFFER_CODE_LABEL_MAP = {
   P: "Promotional",
 };
 
-// Matches the Calendar Config <select> options in atpcreate.html.
-const CALENDAR_CONFIG_LABEL_MAP = {
-  5: "NATIONAL_CALENDAR",
-  4: "DNS_DATA_CAL",
-  3: "LOCAL_DATA_CAL",
-  2: "LOCAL_SMS_CAL",
-  1: "LOCAL_VOICE_CAL",
-  66: "MT_CALENDAR_ROAMING",
-};
+// Populated at runtime from GET /atp/calendars — see _acLoadCalendars().
+let CALENDAR_CONFIG_LABEL_MAP = {};
 
 function _acEscape(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
@@ -289,7 +445,7 @@ async function _acLoadList() {
   }
 
   try {
-    const res = await fetch("/builder/added-packages?networkId=" + networkId);
+    const res = await fetch("/atp/list?networkId=" + networkId);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
 
@@ -303,6 +459,37 @@ async function _acLoadList() {
   }
 
   _acRenderList(_acAtps);
+}
+
+// Fetches the Calendar Config options from GET /atp/calendars and
+// populates both the <select id="calendarConfig"> (for the create/modify
+// form) and CALENDAR_CONFIG_LABEL_MAP (for the read-only detail card).
+async function _acLoadCalendars() {
+  const selectEl = document.getElementById("calendarConfig");
+
+  try {
+    const res = await fetch("/atp/calendars");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+
+    const calendars = data || [];
+
+    CALENDAR_CONFIG_LABEL_MAP = {};
+    calendars.forEach((c) => {
+      CALENDAR_CONFIG_LABEL_MAP[c.calendarId] = c.calendarName;
+    });
+
+    if (selectEl) {
+      selectEl.innerHTML = calendars
+        .map(
+          (c) =>
+            `<option value="${c.calendarId}">${_acEscape(c.calendarName)}</option>`,
+        )
+        .join("");
+    }
+  } catch (err) {
+    console.error("Failed to load calendar list:", err);
+  }
 }
 
 function _acRenderList(atps) {
@@ -864,6 +1051,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   _acShowPlaceholder();
   _acLoadList();
+  _acLoadCalendars();
 });
 
 // ============================================================
@@ -915,6 +1103,18 @@ document.addEventListener("DOMContentLoaded", () => {
   function num(value, fallback = 0) {
     const n = Number(value);
     return isNaN(n) ? fallback : n;
+  }
+
+  // Calendar Config only makes sense once a Voice, SMS, or MMS balance
+  // category is in play (it drives which calendar those services roam
+  // under) — Data-only ATPs have no use for it even when Rating.
+  function _acHasVoiceSmsMmsChecked() {
+    return Array.from(
+      document.querySelectorAll('#balanceCategoryGroup input[type="checkbox"]'),
+    ).some(
+      (cb) =>
+        ["voice", "sms", "mms"].includes(cb.dataset.unitTarget) && cb.checked,
+    );
   }
 
   /* ---------- Section: Balance Category show/hide ---------- */
@@ -984,6 +1184,7 @@ document.addEventListener("DOMContentLoaded", () => {
     dataZoneGroupField?.classList.toggle("is-hidden", !dataChecked);
 
     syncCalendarZoneCardVisibility();
+    syncCalendarConfigVisibility();
 
     // Clear the checklist rather than leaving a stale selection once
     // a field is hidden again.
@@ -1044,6 +1245,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* ---------- Section: Billing Service Type show/hide ---------- */
 
+  // Calendar Config only applies to Rating ATPs that also have a
+  // Voice, SMS, or MMS balance category checked (excluded from the
+  // payload too, see buildAtpPayload) — Data-only Rating ATPs have
+  // no use for a calendar. Called from both syncBillingServiceType
+  // (Type of Service changes) and syncBalanceSections (balance
+  // category checkboxes change) since either can flip the answer.
+  function syncCalendarConfigVisibility() {
+    const isRating = document.getElementById("typeOfService")?.value === "1";
+    document
+      .getElementById("calendarConfigField")
+      ?.classList.toggle("is-hidden", !(isRating && _acHasVoiceSmsMmsChecked()));
+  }
+
   function syncBillingServiceType() {
     const typeOfService = document.getElementById("typeOfService");
     const field = document.getElementById("billingServiceTypeField");
@@ -1056,13 +1270,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (billingServiceType) billingServiceType.selectedIndex = 0;
     }
 
-    // Calendar Config only applies to Rating ATPs — hidden for
-    // Billing *and* while Type of Service hasn't been picked yet
-    // (excluded from the payload too, see buildAtpPayload).
-    const isRating = typeOfService?.value === "1";
-    document
-      .getElementById("calendarConfigField")
-      ?.classList.toggle("is-hidden", !isRating);
+    // Calendar Config only applies to Rating ATPs that also have a
+    // Voice, SMS, or MMS balance category checked (excluded from the
+    // payload too, see buildAtpPayload) — Data-only Rating ATPs have
+    // no use for a calendar.
+    syncCalendarConfigVisibility();
 
     // Billing ATPs also only ever roam under a Restricted zone group
     // — hide the Rating (Y) group in both Zone Group and Data Zone
@@ -1084,18 +1296,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // The Zone & Calendar Configuration card should only render once at
   // least one field inside it would actually show something: Calendar
-  // Config (Rating ATPs only) or either zone-group checklist (needs a
-  // balance category checked). Called from both syncBillingServiceType
-  // (Type of Service changes) and syncBalanceSections (balance category
-  // checkboxes change) since either can flip the answer.
+  // Config (Rating ATPs with a Voice/SMS/MMS balance category checked)
+  // or either zone-group checklist (needs a balance category checked).
+  // Called from both syncBillingServiceType (Type of Service changes)
+  // and syncBalanceSections (balance category checkboxes change) since
+  // either can flip the answer.
   function syncCalendarZoneCardVisibility() {
     const isRating = document.getElementById("typeOfService")?.value === "1";
+    const calendarConfigVisible = isRating && _acHasVoiceSmsMmsChecked();
     const anyBalanceCategoryChecked = document.querySelector(
       '#balanceCategoryGroup input[type="checkbox"]:checked',
     );
     document
       .getElementById("calendarZoneCard")
-      ?.classList.toggle("is-hidden", !(isRating || anyBalanceCategoryChecked));
+      ?.classList.toggle(
+        "is-hidden",
+        !(calendarConfigVisible || anyBalanceCategoryChecked),
+      );
   }
 
   /* ---------- Section: Validity Period Days show/hide ----------
@@ -1366,6 +1583,54 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* ---------- Section: checklist multi-select (roaming / derived / usage) ---------- */
 
+  // Filters a checklist body's rows by `query`. Most checklists are a
+  // flat list of rows, so this just matches each row's own label —
+  // same as before. The Zone Group / Data Zone Group checklists are
+  // different: they're split into "Rating" / "Restricted" group
+  // headings (see renderRatingChecklist), and searching "restricted"
+  // or "rating" should surface every row in that group rather than
+  // only rows whose own name happens to contain the word. So: a query
+  // that matches a group's heading shows all of that group's rows;
+  // otherwise rows fall back to matching their own label. Headings are
+  // hidden once none of their rows remain visible, and rows/headings
+  // already permanently hidden (e.g. billing hides "Rating" — see
+  // syncBillingServiceType) are left untouched either way.
+  function filterChecklistBody(body, query) {
+    let currentHeading = null;
+    let currentHeadingMatches = false;
+    let currentHeadingHasVisibleRow = false;
+
+    const closeGroup = () => {
+      if (currentHeading && !currentHeading.classList.contains("is-hidden")) {
+        currentHeading.style.display = currentHeadingHasVisibleRow
+          ? ""
+          : "none";
+      }
+    };
+
+    Array.from(body.children).forEach((el) => {
+      if (el.classList.contains("ar-checklist-group-heading")) {
+        closeGroup();
+        currentHeading = el;
+        currentHeadingHasVisibleRow = false;
+        currentHeadingMatches =
+          !el.classList.contains("is-hidden") &&
+          (!query || el.textContent.toLowerCase().includes(query));
+        return;
+      }
+
+      if (!el.classList.contains("ar-check-row")) return;
+      if (el.classList.contains("is-hidden")) return;
+
+      const label = el.textContent.toLowerCase();
+      const visible = !query || currentHeadingMatches || label.includes(query);
+      el.style.display = visible ? "" : "none";
+      if (visible) currentHeadingHasVisibleRow = true;
+    });
+
+    closeGroup();
+  }
+
   function initChecklistSearch() {
     document.querySelectorAll(".ar-checklist-search input").forEach((input) => {
       input.addEventListener("input", () => {
@@ -1373,10 +1638,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const body = input
           .closest(".ar-tagselect")
           .querySelector(".ar-checklist-body");
-        body.querySelectorAll(".ar-check-row").forEach((row) => {
-          const label = row.textContent.toLowerCase();
-          row.style.display = label.includes(query) ? "" : "none";
-        });
+        filterChecklistBody(body, query);
       });
     });
 
@@ -1443,6 +1705,42 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Moves checked rows to the top of their own "Rating"/"Restricted"
+  // group, right under that group's heading, so a selection doesn't
+  // sit buried below the fold in a long list. Order within the
+  // checked and unchecked buckets is otherwise left as rendered.
+  // Reorders each group independently — a checked Rating option never
+  // jumps into the Restricted group or vice versa.
+  function reorderRatingGroups(body) {
+    if (!body) return;
+
+    body
+      .querySelectorAll(".ar-checklist-group-heading")
+      .forEach((heading) => {
+        const rows = [];
+        let node = heading.nextElementSibling;
+        while (node && !node.classList.contains("ar-checklist-group-heading")) {
+          if (node.classList.contains("ar-check-row")) rows.push(node);
+          node = node.nextElementSibling;
+        }
+        if (rows.length === 0) return;
+
+        const checked = rows.filter((r) => r.querySelector("input").checked);
+        const unchecked = rows.filter(
+          (r) => !r.querySelector("input").checked,
+        );
+
+        // Re-insert each row right after `anchor`, walking `anchor`
+        // forward as we go. A row already in the right spot is a
+        // same-position insertBefore, i.e. a no-op.
+        let anchor = heading;
+        checked.concat(unchecked).forEach((row) => {
+          body.insertBefore(row, anchor.nextSibling);
+          anchor = row;
+        });
+      });
+  }
+
   // Enforces selection limits per checklist:
   // - Restricted (N): only one box can stay checked, in BOTH the
   //   Zone Group and Data Zone Group checklists.
@@ -1456,20 +1754,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const fieldName = body.dataset.ratingChecklist;
         body.addEventListener("change", (e) => {
           const cb = e.target;
-          if (!cb.matches('input[type="checkbox"]') || !cb.checked) return;
+          if (!cb.matches('input[type="checkbox"]')) return;
 
-          const flag = cb.dataset.ratingFlag;
-          const singleSelect =
-            flag === "N" || (flag === "Y" && fieldName === "zoneGroup");
-          if (!singleSelect) return;
+          if (cb.checked) {
+            const flag = cb.dataset.ratingFlag;
+            const singleSelect =
+              flag === "N" || (flag === "Y" && fieldName === "zoneGroup");
+            if (singleSelect) {
+              body
+                .querySelectorAll(
+                  `input[type="checkbox"][data-rating-flag="${flag}"]`,
+                )
+                .forEach((other) => {
+                  if (other !== cb) other.checked = false;
+                });
+            }
+          }
 
-          body
-            .querySelectorAll(
-              `input[type="checkbox"][data-rating-flag="${flag}"]`,
-            )
-            .forEach((other) => {
-              if (other !== cb) other.checked = false;
-            });
+          // Reorder after the exclusivity rule above has settled
+          // which boxes end up checked — covers both checking and
+          // unchecking a box.
+          reorderRatingGroups(body);
         });
       });
   }
@@ -1774,10 +2079,13 @@ document.addEventListener("DOMContentLoaded", () => {
           unlimitedUsageYn === "Y" && UNLIMITED_FIXED_UNITS[cat]
             ? UNLIMITED_FIXED_UNITS[cat].unitValue
             : fd.get(`unitValue${capitalize(cat)}`);
-        const usageTypeSlugs = fd.getAll(`usageType${capitalize(cat)}`);
-        const usageTypeIds = usageTypeSlugs
-          .map((slug) => USAGE_TYPE_ID_MAP[cat]?.[slug])
-          .filter((id) => id !== undefined);
+        // Checkbox values for voice/sms/data/mms are now the real
+        // usageBinaryId straight from GET /atp/bucket-usage-types
+        // (see _acRenderCheckRows) — no slug lookup needed anymore.
+        const usageTypeIds = fd
+          .getAll(`usageType${capitalize(cat)}`)
+          .map((id) => Number(id))
+          .filter((id) => !isNaN(id));
 
         balanceCategories.push({
           balanceCategory: capsCat,
@@ -1795,12 +2103,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
 
-    /* Derived service selections — flattened across categories */
+    /* Derived service selections — flattened across categories.
+       Checkbox values for voice/sms/data/mms are now the real
+       "basicServiceId~derivedServiceId" code straight from GET
+       /atp/derived-services (see _acRenderCheckRows) — no slug
+       lookup needed anymore. Global is excluded: its balance
+       category pill is commented out in atpcreate.html, so it can
+       never be selected. */
     const derivedServiceSelections = [];
-    ["voice", "sms", "data", "mms", "global"].forEach((cat) => {
-      fd.getAll(`derived${capitalize(cat)}`).forEach((slug) => {
-        const id = DERIVED_SERVICE_ID_MAP[cat]?.[slug];
-        if (id) derivedServiceSelections.push(id);
+    ["voice", "sms", "data", "mms"].forEach((cat) => {
+      fd.getAll(`derived${capitalize(cat)}`).forEach((code) => {
+        if (code) derivedServiceSelections.push(code);
       });
     });
 
@@ -1912,8 +2225,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // serviceDuration, rentalPeriod) are deliberately left out
       // rather than sent as guessed/hardcoded values — add them here
       // once this form grows inputs for them.
-      // calendarConfig only applies to Rating ATPs — hidden (and
-      // excluded here) for anything else via syncBillingServiceType,
+      // calendarConfig only applies to Rating ATPs that also have a
+      // Voice, SMS, or MMS balance category checked — hidden (and
+      // excluded here) for anything else via syncCalendarConfigVisibility,
       // so it's sent as null rather than whatever stale value the
       // hidden select still holds.
       // NOTE: must use fieldVal(), not fd.get(), here — typeOfService is
@@ -1923,7 +2237,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // modify. fieldVal() reads straight off the DOM and works in both
       // create and edit mode.
       calendarConfig:
-        fieldVal("typeOfService") === "1"
+        fieldVal("typeOfService") === "1" && voiceSmsMmsCategoryChecked
           ? fd.get("calendarConfig") || null
           : null,
       // Each entry is {id, ratingFlag} — see buildRatingFlagPairs.
@@ -2447,17 +2761,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // Usage type checklist — response carries the numeric ids,
-      // checkboxes are keyed by slug, so reverse USAGE_TYPE_ID_MAP.
-      const idToSlug = {};
-      Object.entries(USAGE_TYPE_ID_MAP[cat] || {}).forEach(([slug, id]) => {
-        idToSlug[id] = slug;
-      });
+      // Usage type checklist — checkbox values are now the real
+      // usageBinaryId straight from the API (see
+      // _acLoadDerivedServicesAndUsageTypes), same as the response,
+      // so no slug reverse-lookup is needed anymore.
       (entry.usageType || []).forEach((id) => {
-        const slug = idToSlug[id];
-        if (!slug) return;
         const cb = form.querySelector(
-          `input[name="usageType${capCat}"][value="${slug}"]`,
+          `input[name="usageType${capCat}"][value="${id}"]`,
         );
         if (cb) cb.checked = true;
       });
@@ -2468,17 +2778,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // categories just got checked above.
     syncBalanceSections();
 
-    // Derived service selections — flattened codes like "1~1" back
-    // to their {category, slug} checkbox.
+    // Derived service selections — flattened codes like "1~1"
+    // (basicServiceId~derivedServiceId). Checkbox values for
+    // voice/sms/data/mms are now that exact code straight from the
+    // API (see _acLoadDerivedServicesAndUsageTypes), so the code's
+    // basicServiceId prefix maps straight to its category.
     (detail.derivedServiceSelections || []).forEach((code) => {
-      for (const [category, slugs] of Object.entries(DERIVED_SERVICE_ID_MAP)) {
-        const slug = Object.keys(slugs).find((s) => slugs[s] === code);
-        if (!slug) continue;
+      const basicServiceId = Number(String(code).split("~", 1)[0]);
+      const category = BASIC_SERVICE_ID_TO_CATEGORY[basicServiceId];
+      if (category) {
         const cb = form.querySelector(
-          `input[name="derived${capitalize(category)}"][value="${slug}"]`,
+          `input[name="derived${capitalize(category)}"][value="${code}"]`,
         );
         if (cb) cb.checked = true;
-        break;
       }
     });
 
@@ -2573,6 +2885,16 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       if (cb) cb.checked = true;
     });
+    // The boxes above were checked directly (no "change" event), so
+    // the reorder-on-change in initRatingZoneGroupExclusivity never
+    // ran — surface the loaded selections at the top of their group
+    // here too.
+    reorderRatingGroups(
+      document.querySelector('[data-rating-checklist="zoneGroup"]'),
+    );
+    reorderRatingGroups(
+      document.querySelector('[data-rating-checklist="dataZoneGroup"]'),
+    );
     syncMsDropdownLabels();
 
     markStatus(null, "");
@@ -2602,10 +2924,24 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     syncBalanceSections();
     initSegmented();
-    // Render before initChecklistSearch/initMsDropdowns so both pick
-    // up the checkboxes that just got created.
-    renderRatingChecklist("zoneGroup", ZONE_GROUP_OPTIONS);
-    renderRatingChecklist("dataZoneGroup", DATA_ZONE_GROUP_OPTIONS);
+    // Zone Group / Data Zone Group options now load asynchronously
+    // from GET /atp/zone-groups/voice-sms and GET /atp/zone-groups/data
+    // (see _acLoadZoneGroups() near the top of this file) — render the
+    // checklists once that resolves rather than blocking the rest of
+    // this handler on the network. initChecklistSearch/initMsDropdowns/
+    // initRatingZoneGroupExclusivity below bind via event delegation on
+    // the (already-present) checklist containers, so they don't need
+    // the checkbox rows to exist yet — safe to call before the fetch
+    // resolves.
+    _acZoneGroupsReady.then(() => {
+      renderRatingChecklist("zoneGroup", ZONE_GROUP_OPTIONS);
+      renderRatingChecklist("dataZoneGroup", DATA_ZONE_GROUP_OPTIONS);
+      // Picks up any zoneGroup/dataZoneGroup selection already applied
+      // by populateAtpCreateForm() if a modify was opened before this
+      // resolved (checkboxes are set via .checked = true there, which
+      // doesn't fire "change", so the ms-dropdown labels need a nudge).
+      syncMsDropdownLabels();
+    });
     initChecklistSearch();
     initMsDropdowns();
     initRoamingNetworksExclusivity();

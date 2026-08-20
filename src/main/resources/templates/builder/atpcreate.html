@@ -400,6 +400,9 @@
                           />
                           MMS</label
                         >
+                        <!-- Global has no basicServiceId in GET /atp/derived-services
+                             and no matching balanceCategory in GET /atp/bucket-usage-types,
+                             so it isn't wired up — commented out so it can't be selected.
                         <label class="ar-check-pill"
                           ><input
                             type="checkbox"
@@ -409,6 +412,7 @@
                           />
                           Global</label
                         >
+                        -->
                       </div>
                     </div>
 
@@ -1753,12 +1757,7 @@
                           name="calendarConfig"
                           class="ar-input"
                         >
-                          <option value="5">NATIONAL_CALENDAR</option>
-                          <option value="4">DNS_DATA_CAL</option>
-                          <option value="3">LOCAL_DATA_CAL</option>
-                          <option value="2">LOCAL_SMS_CAL</option>
-                          <option value="1">LOCAL_VOICE_CAL</option>
-                          <option value="66">MT_CALENDAR_ROAMING</option>
+                          <!-- Populated dynamically from GET /atp/calenders -->
                         </select>
                       </div>
                       <div
