@@ -227,7 +227,7 @@ public class AtpService {
 
 				keptBucketIds.add(bucketId);
 
-				bucketService.updateBucket(request, bc);
+				bucketService.updateBucket(request, bc, existingByBucketId.get(bucketId));
 
 				updatedBucketIds.add(bucketId);
 
@@ -344,9 +344,12 @@ Long tariffPlanId =
 				addedServicePlanIds, updatedServicePlanIds, removedServicePlanIds);
 
 		// ---- ATP core fields -------------------------------------------------
+		// atpName / publicityId are locked in the UI once an ATP exists (see
+		// Atpcreate.js#applyEditModeFieldLocks) — enforced here too, straight
+		// off the existing row, so a direct API call can't change them either.
 
-		atpRepository.updateAtp(atpId, request.getAtpName(), request.getValidTo(), request.getCategoryOfferCode(),
-				request.getDescription(), request.getPublicityId());
+		atpRepository.updateAtp(atpId, existing.getAtpName(), request.getValidTo(), request.getCategoryOfferCode(),
+				request.getDescription(), existing.getPublicityId());
 
 		// ---- Bundle core fields + SIM/IMSI ranges (replace-all) --------------
 

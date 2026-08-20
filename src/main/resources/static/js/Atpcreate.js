@@ -1153,14 +1153,14 @@ document.addEventListener("DOMContentLoaded", () => {
         valueField.disabled = true;
         typeField.classList.add("is-locked");
         valueField.classList.add("is-locked");
-      } else if (typeField.disabled) {
+      } else if (typeField.classList.contains("is-locked")) {
         // Only clear/unlock when this category is actually coming out
-        // of the locked (Unlimited=Y) state. This function re-runs on
-        // every balance-category checkbox change (see wiring below),
-        // not just this category's own Unlimited toggle — if we reset
-        // unconditionally here, unchecking e.g. SMS would also wipe
-        // out a manually-entered value in an already-unlocked field
-        // like Data's unit value.
+        // of the locked (Unlimited=Y) state — checked via the
+        // "is-locked" marker this function itself sets below, not the
+        // generic .disabled flag. Edit-mode field locking (see
+        // applyEditModeFieldLocks) also disables this same field for
+        // an unrelated reason and must NOT be touched here, or
+        // checking a different category would wrongly reset it.
         typeField.selectedIndex = 0;
         valueField.value = "";
         typeField.disabled = false;
@@ -1735,6 +1735,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("atpCreateForm");
     const fd = new FormData(form);
 
+    // Fields locked (disabled) in edit mode — see applyEditModeFieldLocks()
+    // — drop out of FormData entirely, so their real value has to be read
+    // straight off the DOM element instead. This works identically for
+    // fields that aren't disabled too, so it's safe to use everywhere
+    // instead of fd.get() for anything that might be locked.
+    function fieldVal(name) {
+      const el = form.querySelector(`[name="${name}"]`);
+      return el ? el.value : fd.get(name);
+    }
+
     const validFromIso = fd.get("validFrom");
     const validToIso = fd.get("validTo");
 
@@ -1745,16 +1755,21 @@ document.addEventListener("DOMContentLoaded", () => {
       .forEach((cb) => {
         const cat = cb.dataset.unitTarget;
         const capsCat = cat.toUpperCase();
-        const unlimitedUsageYn = toYN(fd.get(`unlimitedUsage${capitalize(cat)}`));
+        const unlimitedUsageYn = toYN(
+          fieldVal(`unlimitedUsage${capitalize(cat)}`),
+        );
 
         // Unit Type / Unit Value are disabled (and so excluded from
         // FormData) when this category's own Unlimited Usage flag is
         // Yes — read the fixed values directly in that case instead
-        // of from the form.
+        // of from the form. (Also true — for a different reason — when
+        // this row is locked in edit mode; fieldVal() below covers
+        // that case by reading the DOM value directly regardless of
+        // disabled state.)
         const unitTypeRaw =
           unlimitedUsageYn === "Y" && UNLIMITED_FIXED_UNITS[cat]
             ? UNLIMITED_FIXED_UNITS[cat].unitType
-            : fd.get(`unitType${capitalize(cat)}`);
+            : fieldVal(`unitType${capitalize(cat)}`);
         const unitValueRaw =
           unlimitedUsageYn === "Y" && UNLIMITED_FIXED_UNITS[cat]
             ? UNLIMITED_FIXED_UNITS[cat].unitValue
@@ -1771,7 +1786,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // bucketId — a fresh create has nothing to send here, so
           // this stays null and the backend assigns a new bucket.
           bucketId: cb.dataset.bucketId || null,
-          bucketType: BUCKET_TYPE_MAP[fd.get("bucketType")] || null,
+          bucketType: BUCKET_TYPE_MAP[fieldVal("bucketType")] || null,
           usageType: usageTypeIds,
           bucketUnitType:
             unitTypeRaw && unitTypeRaw !== "-1" ? unitTypeRaw : null,
@@ -1824,12 +1839,12 @@ document.addEventListener("DOMContentLoaded", () => {
       networkId: num(networkId, 1),
       createdBy: createdBy,
 
-      atpName: fd.get("atpName"),
-      typeOfService: fd.get("typeOfService")
-        ? num(fd.get("typeOfService"))
+      atpName: fieldVal("atpName"),
+      typeOfService: fieldVal("typeOfService")
+        ? num(fieldVal("typeOfService"))
         : null,
       billingServiceType:
-        fd.get("typeOfService") === "2"
+        fieldVal("typeOfService") === "2"
           ? num(fd.get("billingServiceType"))
           : null,
       categoryOfferCode: fd.get("categoryOfferCode") || null,
@@ -1839,7 +1854,7 @@ document.addEventListener("DOMContentLoaded", () => {
       vipPlanFlagYn: fd.get("vipPlan") || "N",
       ratingType: document.getElementById("ratingType").value || null,
       description: fd.get("description"),
-      publicityId: fd.get("publicityId"),
+      publicityId: fieldVal("publicityId"),
 
       validFrom: toApiDate(validFromIso),
       validTo: toApiDate(validToIso),
@@ -1901,8 +1916,14 @@ document.addEventListener("DOMContentLoaded", () => {
       // excluded here) for anything else via syncBillingServiceType,
       // so it's sent as null rather than whatever stale value the
       // hidden select still holds.
+      // NOTE: must use fieldVal(), not fd.get(), here — typeOfService is
+      // disabled in edit mode (see applyEditModeFieldLocks), so fd.get()
+      // returns null for it during modify even when it's actually "1",
+      // which was causing calendarConfig to always be sent as null on
+      // modify. fieldVal() reads straight off the DOM and works in both
+      // create and edit mode.
       calendarConfig:
-        fd.get("typeOfService") === "1"
+        fieldVal("typeOfService") === "1"
           ? fd.get("calendarConfig") || null
           : null,
       // Each entry is {id, ratingFlag} — see buildRatingFlagPairs.
@@ -2114,11 +2135,113 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
+  /* ---------- Edit-mode field locking ----------
+     A handful of fields can't be changed once an ATP exists, since the
+     backend treats them as identity/creation-time-only:
+       - atpName, publicityId, typeOfService: ATP-level, immutable.
+       - bucketType: one shared field across every category on the
+         ATP (see populateAtpCreateForm) — no per-row concept of "new"
+         applies to it, so it's locked outright in edit mode.
+       - Unlimited Usage / Unit Type: locked per balance-category row,
+         but ONLY for a row that already has a bucket on this ATP
+         (data-bucket-id, stashed on the pill checkbox by
+         populateAtpCreateForm). A category checked *after* opening
+         the modify form has no bucketId yet — it's a brand-new bucket
+         being created alongside the modify, not an existing one being
+         edited in place — so it stays fully editable.
+     Unit Value is deliberately NOT locked; only the type and the
+     unlimited flag are ATP-modify-time-immutable.
+
+     Locked <select> elements are set `disabled` (readonly isn't
+     supported on <select>). buildAtpPayload()'s fieldVal() helper
+     reads locked fields straight off the DOM instead of FormData, so
+     their real value still makes it into the payload despite being
+     disabled — see the comment there. */
+  function applyEditModeFieldLocks() {
+    if (!isEditMode()) return;
+
+    const atpNameField = document.getElementById("atpName");
+    if (atpNameField) atpNameField.readOnly = true;
+
+    const publicityIdField = document.querySelector('[name="publicityId"]');
+    if (publicityIdField) publicityIdField.readOnly = true;
+
+    const typeOfServiceField = document.getElementById("typeOfService");
+    if (typeOfServiceField) typeOfServiceField.disabled = true;
+
+    const bucketTypeField = document.querySelector('[name="bucketType"]');
+    if (bucketTypeField) bucketTypeField.disabled = true;
+
+    document
+      .querySelectorAll("#balanceCategoryGroup input[data-unit-target]")
+      .forEach((cb) => {
+        const capCat = capitalize(cb.dataset.unitTarget);
+        const hasExistingBucket = !!cb.dataset.bucketId;
+
+        const unlimitedField = document.getElementById(
+          `unlimitedUsage${capCat}`,
+        );
+        const typeField = document.getElementById(`unitType${capCat}`);
+
+        if (unlimitedField) {
+          unlimitedField.disabled = hasExistingBucket;
+        }
+
+        // Don't fight the separate "Unlimited=Y locks the unit type to
+        // a fixed value" mechanism (syncUnlimitedUsageFields /
+        // populateAtpCreateForm's is-locked branch, which "is-locked"
+        // is reserved for exclusively) — a row that's already locked
+        // that way stays locked regardless, and this never touches
+        // its "is-locked" class.
+        if (typeField && !typeField.classList.contains("is-locked")) {
+          typeField.disabled = hasExistingBucket;
+        }
+      });
+  }
+
+  /* Reverses applyEditModeFieldLocks() — called from
+     resetAtpCreateForm() so a fresh "New ATP" doesn't inherit locks
+     left over from whatever ATP was last opened for edit. */
+  function clearEditModeFieldLocks() {
+    const atpNameField = document.getElementById("atpName");
+    if (atpNameField) atpNameField.readOnly = false;
+
+    const publicityIdField = document.querySelector('[name="publicityId"]');
+    if (publicityIdField) publicityIdField.readOnly = false;
+
+    const typeOfServiceField = document.getElementById("typeOfService");
+    if (typeOfServiceField) typeOfServiceField.disabled = false;
+
+    const bucketTypeField = document.querySelector('[name="bucketType"]');
+    if (bucketTypeField) bucketTypeField.disabled = false;
+
+    document
+      .querySelectorAll("#balanceCategoryGroup input[data-unit-target]")
+      .forEach((cb) => {
+        const capCat = capitalize(cb.dataset.unitTarget);
+        const unlimitedField = document.getElementById(
+          `unlimitedUsage${capCat}`,
+        );
+        const typeField = document.getElementById(`unitType${capCat}`);
+
+        if (unlimitedField) {
+          unlimitedField.disabled = false;
+        }
+        // Leave "is-locked" rows alone here too — that's the
+        // Unlimited=Y auto-lock's field to own, not this function's.
+        if (typeField && !typeField.classList.contains("is-locked")) {
+          typeField.disabled = false;
+        }
+      });
+  }
+
   function applyEditModeUI() {
     if (!isEditMode()) return;
 
     const publishLabel = document.getElementById("atpCreatePublishLabel");
     if (publishLabel) publishLabel.textContent = "Save Changes";
+
+    applyEditModeFieldLocks();
   }
   // Exposed so _acModifyAtp() (list-pane script above) can re-apply
   // this after switching #acFormPanel into edit mode — the
@@ -2135,6 +2258,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("atpCreateForm");
     if (!form) return;
     form.reset();
+
+    // Clear any edit-mode field locks (disabled/readonly) left over
+    // from whatever ATP was last opened for modify — see
+    // applyEditModeFieldLocks() / _acApplyEditModeUI.
+    clearEditModeFieldLocks();
 
     // Clear any bucketId stashed on the pill checkboxes by a previous
     // edit-mode populate (see _acPopulateForm) — form.reset() doesn't
@@ -2466,6 +2594,10 @@ document.addEventListener("DOMContentLoaded", () => {
         cb.addEventListener("change", () => {
           syncBalanceSections();
           syncUnlimitedUsageFields();
+          // Re-evaluate edit-mode locks: a category checked just now
+          // has no bucketId yet, so it must stay editable even though
+          // other, pre-existing categories on this ATP are locked.
+          applyEditModeFieldLocks();
         });
       });
     syncBalanceSections();

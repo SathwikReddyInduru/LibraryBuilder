@@ -101,7 +101,8 @@
 }
 
 .atpc-page .ar-input:disabled,
-.atpc-page .ar-input.is-locked {
+.atpc-page .ar-input.is-locked,
+.atpc-page .ar-input[readonly] {
   background: #f1f4f8;
   color: #6b7688;
   cursor: not-allowed;

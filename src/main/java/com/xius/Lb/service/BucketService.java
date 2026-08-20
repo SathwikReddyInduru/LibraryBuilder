@@ -96,7 +96,8 @@ public class BucketService {
 	 * resynced by delete-then-reinsert.
 	 */
 	@Transactional
-	public void updateBucket(AtpRequest request, BalanceCategoryRequest bucketRequest) {
+	public void updateBucket(AtpRequest request, BalanceCategoryRequest bucketRequest,
+			BalanceCategoryRequest existingBucket) {
 
 		validateBucket(bucketRequest);
 
@@ -124,12 +125,25 @@ public class BucketService {
 
 		Long dataZoneGroupId = getZoneGroupIdWithRatingN(request.getDataZoneGroupId());
 
+		// bucketUnitType (Unit Type) and unlimitedUsageYn (Unlimited Usage) are
+		// locked in the UI for an existing bucket (see
+		// Atpcreate.js#applyEditModeFieldLocks) — enforced here too, by
+		// ignoring whatever the request sent for them and always persisting
+		// what's already stored, so a direct API call can't change them
+		// either. Falls back to the request's values only if there's
+		// somehow no existing entry to compare against.
+		String bucketUnitType = existingBucket != null ? existingBucket.getBucketUnitType()
+				: bucketRequest.getBucketUnitType();
+
+		String unlimitedUsageYn = existingBucket != null ? existingBucket.getUnlimitedUsageYn()
+				: bucketRequest.getUnlimitedUsageYn();
+
 		try {
 
 			bucketRepository.updateBucket(bucketId, balanceCategory, usageType, request.getValidityPeriodDays(),
-					bucketRequest.getBucketUnitValue(), bucketRequest.getBucketUnitType(), request.getRollOverYn(),
+					bucketRequest.getBucketUnitValue(), bucketUnitType, request.getRollOverYn(),
 					request.getExtendValidityYn(), zoneGroupId, dataZoneGroupId, limitedNetworksYn, limitedHours,
-					request.getApplicableFromHrs(), request.getApplicableToHrs(), bucketRequest.getUnlimitedUsageYn());
+					request.getApplicableFromHrs(), request.getApplicableToHrs(), unlimitedUsageYn);
 
 			logger.info("Successfully updated bucketId={}", bucketId);
 
@@ -580,7 +594,7 @@ public class BucketService {
 
 	private String generateBucketName(String atpName, String balanceCategory, Long sequence) {
 
-		String bucketName = atpName + "_" + balanceCategory;
+		String bucketName = atpName + "_" + balanceCategory + "_" + sequence;
 
 		logger.info("Generated bucket name={} for ATP={} balanceCategory={} sequence={}", bucketName, atpName,
 				balanceCategory, sequence);
